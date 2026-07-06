@@ -486,7 +486,7 @@ function FirePlanEditorContent({
           onChangeText={(value) => setCurrentAge(normalizeNumberInput(value))}
           keyboardType={Platform.OS === "ios" ? "decimal-pad" : "numeric"}
           inputMode="numeric"
-          placeholder="31"
+          placeholder="Enter age"
           accessibilityLabel="Current age"
         />
         <Field
