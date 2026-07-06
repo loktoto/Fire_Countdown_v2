@@ -117,6 +117,10 @@ export function DashboardScreen() {
   const years =
     vm.projectedFireDays === null ? "No" : Math.max(0, vm.projectedFireDays / 365.25).toFixed(1);
   const projectedFireMonth = vm.projectedFireDate?.slice(0, 7) ?? "Not reached";
+  const projectedFireAge =
+    vm.projectedFireDays === null || vm.goal.currentAge == null
+      ? null
+      : Math.floor(vm.goal.currentAge + vm.projectedFireDays / 365.25);
 
   return (
     <ScreenContainer>
@@ -158,11 +162,18 @@ export function DashboardScreen() {
               {projectedFireMonth}
             </Text>
             <Text style={[styles.heroMeta, typography.body, { color: colors.textMuted }]}>
-              {vm.scenario?.name ?? "Base"} method | {money(vm.target, goalCurrency)} target
+              {vm.scenario?.name ?? "Base"} method | {money(vm.target, goalCurrency)} target |{" "}
+              {vm.projectedFireDays === null ? "No crossover" : `${years} years`}
             </Text>
           </View>
           <StatusBadge
-            label={vm.projectedFireDays === null ? "No crossover" : `${years} years`}
+            label={
+              vm.projectedFireDays === null
+                ? "No crossover"
+                : projectedFireAge == null
+                  ? "Age not set"
+                  : `Age ${projectedFireAge}`
+            }
             tone={vm.projectedFireDays === null ? "warning" : "primary"}
           />
         </View>
@@ -217,7 +228,7 @@ export function DashboardScreen() {
         <WealthCrossoverChart
           projection={vm.chartProjection}
           currency={goalCurrency}
-          currentAge={vm.goal.currentAge ?? 31}
+          currentAge={vm.goal.currentAge}
         />
       </GlassCard>
 

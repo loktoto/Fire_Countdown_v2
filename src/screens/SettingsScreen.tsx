@@ -17,6 +17,7 @@ import {
 
 import { EditableRow } from "../components/EditableRow";
 import {
+  FirePlanEditorSheet,
   MilestoneEditorSheet,
   MilestoneListSheet,
   ScenarioEditorSheet,
@@ -170,6 +171,7 @@ export function SettingsScreen() {
   const vm = useSettingsViewModel();
   const [milestoneListOpen, setMilestoneListOpen] = useState(false);
   const [scenarioListOpen, setScenarioListOpen] = useState(false);
+  const [firePlanEditorOpen, setFirePlanEditorOpen] = useState(false);
   const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null);
   const [creatingMilestone, setCreatingMilestone] = useState(false);
   const [editingScenario, setEditingScenario] = useState<ProjectionScenario | null>(null);
@@ -179,6 +181,8 @@ export function SettingsScreen() {
   const [exportPickerOpen, setExportPickerOpen] = useState(false);
   const goalCurrency = vm.goal?.baseCurrency ?? vm.snapshot.currency;
   const scenarioCount = vm.scenarios.length;
+  const currentAgeLabel =
+    vm.goal?.currentAge == null ? "Not set" : `${vm.goal.currentAge} years old`;
 
   function addMilestone() {
     const milestone = vm.newMilestoneDraft();
@@ -338,7 +342,28 @@ export function SettingsScreen() {
         <Text style={[styles.sectionTitle, typography.title, { color: colors.text }]}>
           FIRE Settings
         </Text>
+        <EditableRow
+          label="Current age"
+          value={currentAgeLabel}
+          onPress={() => setFirePlanEditorOpen(true)}
+        />
         <View style={styles.quickActions}>
+          <MotionPressable
+            onPress={() => setFirePlanEditorOpen(true)}
+            accessibilityLabel="Edit FIRE setup"
+            style={[
+              styles.quickAction,
+              {
+                backgroundColor: colors.backgroundAlt,
+                borderColor: colors.surfaceBorder,
+              },
+            ]}
+          >
+            <MaterialCommunityIcons name="target" size={18} color={colors.primary} />
+            <Text style={[styles.quickActionText, typography.button, { color: colors.text }]}>
+              FIRE setup
+            </Text>
+          </MotionPressable>
           <MotionPressable
             onPress={() => setScenarioListOpen(true)}
             accessibilityLabel="Edit FIRE methods"
@@ -463,6 +488,12 @@ export function SettingsScreen() {
         onClose={() => setScenarioListOpen(false)}
         onAdd={addScenario}
         onEdit={editScenario}
+      />
+      <FirePlanEditorSheet
+        visible={firePlanEditorOpen}
+        goal={vm.goal ?? null}
+        onClose={() => setFirePlanEditorOpen(false)}
+        onSave={vm.updateGoal}
       />
       <MilestoneEditorSheet
         visible={editingMilestone !== null}

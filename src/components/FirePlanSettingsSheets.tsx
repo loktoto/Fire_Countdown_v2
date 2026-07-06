@@ -347,6 +347,10 @@ export function FirePlanSummarySheet({
 
   const rows = [
     {
+      label: "Current age",
+      value: goal.currentAge == null ? "Not set" : `${goal.currentAge} years old`,
+    },
+    {
       label: "Retirement monthly withdrawal",
       value: money(goal.targetMonthlySpending, currency),
     },
@@ -413,7 +417,9 @@ function FirePlanEditorContent({
   onSave: (goalId: string, patch: FireGoalPatch) => void;
 }) {
   const [name, setName] = useState(goal.name);
-  const [currentAge, setCurrentAge] = useState(String(goal.currentAge ?? 31));
+  const [currentAge, setCurrentAge] = useState(
+    goal.currentAge == null ? "" : String(goal.currentAge),
+  );
   const [targetMonthlySpending, setTargetMonthlySpending] = useState(
     String(goal.targetMonthlySpending),
   );
@@ -427,7 +433,8 @@ function FirePlanEditorContent({
 
   const canSave =
     name.trim().length > 0 &&
-    (currentAge.trim().length === 0 || numberFromText(currentAge) >= 0) &&
+    numberFromText(currentAge) > 0 &&
+    numberFromText(currentAge) <= 120 &&
     numberFromText(targetMonthlySpending) >= 0 &&
     numberFromText(monthlySaving) >= 0 &&
     numberFromText(withdrawalRate) > 0;
@@ -442,8 +449,7 @@ function FirePlanEditorContent({
 
     onSave(goal.id, {
       name: name.trim(),
-      currentAge:
-        currentAge.trim().length > 0 ? Math.max(0, Math.floor(numberFromText(currentAge))) : null,
+      currentAge: Math.max(1, Math.min(120, Math.floor(numberFromText(currentAge)))),
       targetMonthlySpending: numberFromText(targetMonthlySpending),
       monthlySaving: numberFromText(monthlySaving),
       withdrawalRate: numberFromText(withdrawalRate) / 100,

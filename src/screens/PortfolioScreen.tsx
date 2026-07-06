@@ -5,7 +5,9 @@ import { StyleSheet, Text, View } from "react-native";
 
 import { AllocationBar } from "../components/AllocationBar";
 import { AssetEditorSheet } from "../components/AssetEditorSheet";
+import { EditableRow } from "../components/EditableRow";
 import {
+  FirePlanEditorSheet,
   MilestoneEditorSheet,
   MilestoneListSheet,
   ScenarioEditorSheet,
@@ -33,6 +35,7 @@ export function PortfolioScreen() {
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
   const [milestoneListOpen, setMilestoneListOpen] = useState(false);
   const [scenarioListOpen, setScenarioListOpen] = useState(false);
+  const [firePlanEditorOpen, setFirePlanEditorOpen] = useState(false);
   const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null);
   const [creatingMilestone, setCreatingMilestone] = useState(false);
   const [editingScenario, setEditingScenario] = useState<ProjectionScenario | null>(null);
@@ -43,6 +46,8 @@ export function PortfolioScreen() {
   const goalCurrency = vm.goal.baseCurrency;
   const totalAssetValue = assetAmountsHidden ? "***" : money(vm.totalAssets, goalCurrency);
   const includedAssetValue = assetAmountsHidden ? "***" : money(vm.includedAssets, goalCurrency);
+  const currentAgeLabel =
+    vm.goal.currentAge == null ? "Not set" : `${vm.goal.currentAge} years old`;
 
   const replayAllocationMotion = useCallback(() => {
     setAllocationMotionKey((current) => current + 1);
@@ -282,7 +287,28 @@ export function PortfolioScreen() {
             FIRE Settings
           </Text>
         </View>
+        <EditableRow
+          label="Current age"
+          value={currentAgeLabel}
+          onPress={() => setFirePlanEditorOpen(true)}
+        />
         <View style={styles.quickActions}>
+          <MotionPressable
+            onPress={() => setFirePlanEditorOpen(true)}
+            accessibilityLabel="Edit FIRE setup"
+            style={[
+              styles.quickAction,
+              {
+                backgroundColor: colors.backgroundAlt,
+                borderColor: colors.surfaceBorder,
+              },
+            ]}
+          >
+            <MaterialCommunityIcons name="target" size={18} color={colors.primary} />
+            <Text style={[styles.quickActionText, typography.button, { color: colors.text }]}>
+              FIRE setup
+            </Text>
+          </MotionPressable>
           <MotionPressable
             onPress={() => setScenarioListOpen(true)}
             accessibilityLabel="Edit FIRE methods"
@@ -333,6 +359,12 @@ export function PortfolioScreen() {
         onClose={() => setScenarioListOpen(false)}
         onAdd={addScenario}
         onEdit={openScenario}
+      />
+      <FirePlanEditorSheet
+        visible={firePlanEditorOpen}
+        goal={vm.goal}
+        onClose={() => setFirePlanEditorOpen(false)}
+        onSave={vm.updateGoal}
       />
       <AssetEditorSheet
         visible={editingAsset !== null}
