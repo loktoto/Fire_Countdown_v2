@@ -1,0 +1,70 @@
+{
+  "name": "fire-countdown-v2",
+  "version": "1.0.0",
+  "main": "expo-router/entry",
+  "dependencies": {
+    "@expo-google-fonts/outfit": "^0.4.3",
+    "@expo-google-fonts/space-grotesk": "^0.4.1",
+    "@expo/metro-runtime": "~56.0.16",
+    "@expo/vector-icons": "^15.0.2",
+    "@react-native-community/netinfo": "12.0.1",
+    "@tanstack/react-query": "^5.101.2",
+    "expo": "~56.0.13",
+    "expo-blur": "~56.0.3",
+    "expo-constants": "~56.0.19",
+    "expo-file-system": "~56.0.8",
+    "expo-font": "~56.0.7",
+    "expo-haptics": "~56.0.3",
+    "expo-linking": "~56.0.14",
+    "expo-router": "~56.2.12",
+    "expo-secure-store": "~56.0.4",
+    "expo-sharing": "~56.0.19",
+    "expo-sqlite": "~56.0.5",
+    "expo-status-bar": "~56.0.4",
+    "react": "19.2.3",
+    "react-native": "0.85.3",
+    "react-native-gesture-handler": "~2.31.1",
+    "react-native-reanimated": "4.3.1",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "4.25.2",
+    "react-native-svg": "15.15.4",
+    "react-native-worklets": "0.8.3"
+  },
+  "devDependencies": {
+    "@react-native/jest-preset": "^0.85.3",
+    "@testing-library/react-native": "^14.0.1",
+    "@types/jest": "^29.5.14",
+    "@types/react": "~19.2.2",
+    "eslint": "^9.39.4",
+    "eslint-config-expo": "^56.0.4",
+    "jest": "^29.7.0",
+    "jest-expo": "^56.0.5",
+    "prettier": "^3.9.3",
+    "typescript": "~6.0.3"
+  },
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format:check": "prettier --check .",
+    "format": "prettier --write .",
+    "test": "jest"
+  },
+  "jest": {
+    "preset": "jest-expo",
+    "setupFilesAfterEnv": [
+      "<rootDir>/jest.setup.ts"
+    ],
+    "testPathIgnorePatterns": [
+      "\\\\node_modules\\\\",
+      "\\\\_backups\\\\"
+    ],
+    "modulePathIgnorePatterns": [
+      "<rootDir>/_backups"
+    ]
+  },
+  "private": true
+}
