@@ -416,6 +416,7 @@ function FirePlanEditorContent({
   onClose: () => void;
   onSave: (goalId: string, patch: FireGoalPatch) => void;
 }) {
+  const colors = useThemeColors();
   const [name, setName] = useState(goal.name);
   const [currentAge, setCurrentAge] = useState(
     goal.currentAge == null ? "" : String(goal.currentAge),
@@ -429,7 +430,7 @@ function FirePlanEditorContent({
   const [targetAmount, setTargetAmount] = useState(
     goal.targetAmount == null ? "" : String(goal.targetAmount),
   );
-  const [baseCurrency, setBaseCurrency] = useState(goal.baseCurrency);
+  const [advancedOpen, setAdvancedOpen] = useState(goal.targetAmount != null);
 
   const canSave =
     name.trim().length > 0 &&
@@ -455,10 +456,14 @@ function FirePlanEditorContent({
       withdrawalRate: numberFromText(withdrawalRate) / 100,
       inflationRate: numberFromText(inflationRate, 0) / 100,
       targetAmount: targetOverride,
-      baseCurrency: baseCurrency.trim().length > 0 ? baseCurrency.trim().toUpperCase() : "HKD",
     });
     onClose();
   }
+
+  const manualTargetLabel =
+    targetAmount.trim().length > 0
+      ? money(numberFromText(targetAmount), goal.baseCurrency)
+      : "Auto";
 
   return (
     <>
@@ -531,29 +536,44 @@ function FirePlanEditorContent({
             />
           </View>
         </View>
-        <View style={styles.splitFields}>
-          <View style={styles.splitField}>
+        <MotionPressable
+          onPress={() => setAdvancedOpen((current) => !current)}
+          accessibilityLabel={
+            advancedOpen ? "Hide advanced FIRE target" : "Show advanced FIRE target"
+          }
+          accessibilityState={{ expanded: advancedOpen }}
+          style={[styles.advancedRow, { borderColor: colors.surfaceBorder }]}
+        >
+          <View style={styles.listCopy}>
+            <Text style={[styles.listLabel, typography.body, { color: colors.textMuted }]}>
+              Advanced target
+            </Text>
+            <Text style={[styles.listValue, typography.title, { color: colors.text }]}>
+              {manualTargetLabel}
+            </Text>
+          </View>
+          <MaterialCommunityIcons
+            name={advancedOpen ? "chevron-up" : "chevron-down"}
+            size={24}
+            color={colors.textMuted}
+          />
+        </MotionPressable>
+        {advancedOpen ? (
+          <View style={styles.advancedContent}>
             <Field
-              label="Target override"
+              label="Manual FIRE target"
               value={targetAmount}
               onChangeText={(value) => setTargetAmount(normalizeNumberInput(value))}
               keyboardType={Platform.OS === "ios" ? "decimal-pad" : "numeric"}
               inputMode="decimal"
               placeholder="Auto"
-              accessibilityLabel="Target amount override"
+              accessibilityLabel="Manual FIRE target"
             />
+            <Text style={[styles.helperText, typography.body, { color: colors.textMuted }]}>
+              Leave blank to calculate the FIRE target from monthly withdrawal and withdrawal rate.
+            </Text>
           </View>
-          <View style={styles.currencyField}>
-            <Field
-              label="Currency"
-              value={baseCurrency}
-              onChangeText={(value) => setBaseCurrency(value.toUpperCase().slice(0, 3))}
-              maxLength={3}
-              placeholder="HKD"
-              accessibilityLabel="Base currency"
-            />
-          </View>
-        </View>
+        ) : null}
         <SaveButton label="SAVE FIRE PLAN" disabled={!canSave} onPress={save} />
       </ScrollView>
     </>
@@ -1182,8 +1202,22 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
-  currencyField: {
-    width: 98,
+  advancedRow: {
+    minHeight: 58,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: tokens.spacing.md,
+    paddingVertical: tokens.spacing.sm,
+  },
+  advancedContent: {
+    gap: tokens.spacing.sm,
+  },
+  helperText: {
+    fontSize: 12,
+    lineHeight: 17,
   },
   toggleRow: {
     minHeight: 50,
