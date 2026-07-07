@@ -23,6 +23,30 @@ export type ProjectionPoint = {
   reached: boolean;
 };
 
+type ProjectionInput = {
+  assets: Asset[];
+  quotes: AssetQuoteCache[];
+  goal: FireGoal;
+  scenario?: ProjectionScenario;
+  startDate?: string;
+  months?: number;
+  initialFireAssetAdjustment?: number;
+  postFireWithdrawal?: boolean;
+};
+
+type ProjectionRuntime = {
+  months: number;
+  startDate: string;
+  monthlyExpectedReturn: number;
+  monthlyInflationRate: number;
+  monthlySaving: number;
+  monthlyRetirementSpending: number;
+  baseTarget: number;
+  projectedAssets: number;
+  hasReachedFire: boolean;
+  postFireWithdrawal: boolean;
+};
+
 const dayMs = 24 * 60 * 60 * 1000;
 
 function activeTransactions(transactions: Transaction[]) {
@@ -30,9 +54,38 @@ function activeTransactions(transactions: Transaction[]) {
 }
 
 function latestQuote(assetId: string, quotes: AssetQuoteCache[]) {
-  return quotes
-    .filter((quote) => quote.assetId === assetId)
-    .sort((a, b) => Date.parse(b.receivedAt) - Date.parse(a.receivedAt))[0];
+  let latest: AssetQuoteCache | undefined;
+  let latestTime = Number.NEGATIVE_INFINITY;
+
+  quotes.forEach((quote) => {
+    if (quote.assetId !== assetId) {
+      return;
+    }
+
+    const receivedAt = Date.parse(quote.receivedAt);
+    if (receivedAt > latestTime) {
+      latest = quote;
+      latestTime = receivedAt;
+    }
+  });
+
+  return latest;
+}
+
+function latestQuotesByAsset(quotes: AssetQuoteCache[]) {
+  const latest = new Map<string, AssetQuoteCache>();
+  const latestTimes = new Map<string, number>();
+
+  quotes.forEach((quote) => {
+    const receivedAt = Date.parse(quote.receivedAt);
+    const currentTime = latestTimes.get(quote.assetId) ?? Number.NEGATIVE_INFINITY;
+    if (receivedAt > currentTime) {
+      latest.set(quote.assetId, quote);
+      latestTimes.set(quote.assetId, receivedAt);
+    }
+  });
+
+  return latest;
 }
 
 function normalizeCurrency(currency?: string | null) {
@@ -93,12 +146,11 @@ export function monthlySummary(transactions: Transaction[], year: number, month:
     );
 }
 
-export function resolveAssetValue(
+function resolveAssetValueFromQuote(
   asset: Asset,
-  quotes: AssetQuoteCache[],
+  quote: AssetQuoteCache | undefined,
   baseCurrency = asset.currency,
 ): AssetValueResolution {
-  const quote = latestQuote(asset.id, quotes);
   const manualValue = asset.manualValue ?? 0;
   const resolvedCurrency = normalizeCurrency(baseCurrency) || normalizeCurrency(asset.currency);
 
@@ -163,10 +215,27 @@ export function resolveAssetValue(
   };
 }
 
+export function resolveAssetValue(
+  asset: Asset,
+  quotes: AssetQuoteCache[],
+  baseCurrency = asset.currency,
+): AssetValueResolution {
+  return resolveAssetValueFromQuote(asset, latestQuote(asset.id, quotes), baseCurrency);
+}
+
 export function totalAssets(assets: Asset[], quotes: AssetQuoteCache[], baseCurrency?: string) {
-  return assets
-    .filter((asset) => !asset.archivedAt)
-    .reduce((total, asset) => total + resolveAssetValue(asset, quotes, baseCurrency).value, 0);
+  const latestQuotes = latestQuotesByAsset(quotes);
+  let total = 0;
+
+  assets.forEach((asset) => {
+    if (asset.archivedAt) {
+      return;
+    }
+
+    total += resolveAssetValueFromQuote(asset, latestQuotes.get(asset.id), baseCurrency).value;
+  });
+
+  return total;
 }
 
 export function includedFireAssets(
@@ -174,9 +243,18 @@ export function includedFireAssets(
   quotes: AssetQuoteCache[],
   baseCurrency?: string,
 ) {
-  return assets
-    .filter((asset) => !asset.archivedAt && asset.includeInFire)
-    .reduce((total, asset) => total + resolveAssetValue(asset, quotes, baseCurrency).value, 0);
+  const latestQuotes = latestQuotesByAsset(quotes);
+  let total = 0;
+
+  assets.forEach((asset) => {
+    if (asset.archivedAt || !asset.includeInFire) {
+      return;
+    }
+
+    total += resolveAssetValueFromQuote(asset, latestQuotes.get(asset.id), baseCurrency).value;
+  });
+
+  return total;
 }
 
 export function transactionCashflowNet(transactions: Transaction[]) {
@@ -192,22 +270,25 @@ export function weightedExpectedReturn(
   quotes: AssetQuoteCache[],
   baseCurrency?: string,
 ) {
-  const included = assets.filter((asset) => !asset.archivedAt && asset.includeInFire);
-  const denominator = included.reduce(
-    (total, asset) => total + resolveAssetValue(asset, quotes, baseCurrency).value,
-    0,
-  );
+  const latestQuotes = latestQuotesByAsset(quotes);
+  let denominator = 0;
+  let weightedTotal = 0;
+
+  assets.forEach((asset) => {
+    if (asset.archivedAt || !asset.includeInFire) {
+      return;
+    }
+
+    const value = resolveAssetValueFromQuote(asset, latestQuotes.get(asset.id), baseCurrency).value;
+    denominator += value;
+    weightedTotal += value * asset.expectedAnnualReturn;
+  });
 
   if (denominator <= 0) {
     return 0;
   }
 
-  return (
-    included.reduce((total, asset) => {
-      const value = resolveAssetValue(asset, quotes, baseCurrency).value;
-      return total + value * asset.expectedAnnualReturn;
-    }, 0) / denominator
-  );
+  return weightedTotal / denominator;
 }
 
 export function fireTarget(goal: FireGoal, scenario?: ProjectionScenario) {
@@ -216,16 +297,7 @@ export function fireTarget(goal: FireGoal, scenario?: ProjectionScenario) {
   return (spending * 12) / Math.max(withdrawalRate, 0.001);
 }
 
-export function projectionSeries(input: {
-  assets: Asset[];
-  quotes: AssetQuoteCache[];
-  goal: FireGoal;
-  scenario?: ProjectionScenario;
-  startDate?: string;
-  months?: number;
-  initialFireAssetAdjustment?: number;
-  postFireWithdrawal?: boolean;
-}): ProjectionPoint[] {
+function createProjectionRuntime(input: ProjectionInput): ProjectionRuntime {
   const months = input.months ?? 600;
   const startDate = input.startDate ?? new Date().toISOString().slice(0, 10);
   const scenario = input.scenario;
@@ -246,40 +318,78 @@ export function projectionSeries(input: {
     input.goal.targetMonthlySpending + (scenario?.targetSpendingAdjustment ?? 0),
   );
   const baseTarget = fireTarget(input.goal, scenario);
-  let projectedAssets =
+  const projectedAssets =
     includedFireAssets(input.assets, input.quotes, input.goal.baseCurrency) +
     (input.initialFireAssetAdjustment ?? 0);
-  let hasReachedFire = projectedAssets >= baseTarget;
 
-  return Array.from({ length: months + 1 }, (_, monthIndex) => {
-    const target = baseTarget * Math.pow(1 + monthlyInflationRate, monthIndex);
+  return {
+    months,
+    startDate,
+    monthlyExpectedReturn,
+    monthlyInflationRate,
+    monthlySaving,
+    monthlyRetirementSpending,
+    baseTarget,
+    projectedAssets,
+    hasReachedFire: projectedAssets >= baseTarget,
+    postFireWithdrawal: Boolean(input.postFireWithdrawal),
+  };
+}
 
-    if (monthIndex > 0) {
-      if (input.postFireWithdrawal && hasReachedFire) {
-        const growthBase = Math.max(0, projectedAssets);
-        const balanceAfterGrowth = growthBase + growthBase * monthlyExpectedReturn;
-        const inflatedWithdrawal =
-          monthlyRetirementSpending * Math.pow(1 + monthlyInflationRate, monthIndex);
-        projectedAssets = Math.max(0, balanceAfterGrowth - inflatedWithdrawal);
-      } else {
-        const growthBase = Math.max(0, projectedAssets);
-        projectedAssets = projectedAssets + growthBase * monthlyExpectedReturn + monthlySaving;
-      }
+function nextProjectionPoint(runtime: ProjectionRuntime, monthIndex: number): ProjectionPoint {
+  const target = runtime.baseTarget * Math.pow(1 + runtime.monthlyInflationRate, monthIndex);
+
+  if (monthIndex > 0) {
+    if (runtime.postFireWithdrawal && runtime.hasReachedFire) {
+      const growthBase = Math.max(0, runtime.projectedAssets);
+      const balanceAfterGrowth = growthBase + growthBase * runtime.monthlyExpectedReturn;
+      const inflatedWithdrawal =
+        runtime.monthlyRetirementSpending * Math.pow(1 + runtime.monthlyInflationRate, monthIndex);
+      runtime.projectedAssets = Math.max(0, balanceAfterGrowth - inflatedWithdrawal);
+    } else {
+      const growthBase = Math.max(0, runtime.projectedAssets);
+      runtime.projectedAssets =
+        runtime.projectedAssets +
+        growthBase * runtime.monthlyExpectedReturn +
+        runtime.monthlySaving;
     }
+  }
 
-    const reached = projectedAssets >= target;
-    if (reached) {
-      hasReachedFire = true;
-    }
+  const reached = runtime.projectedAssets >= target;
+  if (reached) {
+    runtime.hasReachedFire = true;
+  }
 
-    return {
-      monthIndex,
-      date: isoMonthDate(startDate, monthIndex),
-      projectedAssets,
-      fireTarget: target,
-      reached,
-    };
-  });
+  return {
+    monthIndex,
+    date: isoMonthDate(runtime.startDate, monthIndex),
+    projectedAssets: runtime.projectedAssets,
+    fireTarget: target,
+    reached,
+  };
+}
+
+export function projectionSeries(input: ProjectionInput): ProjectionPoint[] {
+  const runtime = createProjectionRuntime(input);
+  return Array.from({ length: runtime.months + 1 }, (_, monthIndex) =>
+    nextProjectionPoint(runtime, monthIndex),
+  );
+}
+
+function interpolateDaysToFire(
+  previous: ProjectionPoint,
+  reached: ProjectionPoint,
+  startDate: string,
+) {
+  const previousGap = previous.projectedAssets - previous.fireTarget;
+  const reachedGap = reached.projectedAssets - reached.fireTarget;
+  const gapClosed = reachedGap - previousGap;
+  const crossingRatio = gapClosed === 0 ? 1 : Math.min(1, Math.max(0, -previousGap / gapClosed));
+  const previousTime = Date.parse(previous.date);
+  const reachedTime = Date.parse(reached.date);
+  const crossingTime = previousTime + (reachedTime - previousTime) * crossingRatio;
+
+  return Math.max(0, (crossingTime - Date.parse(startDate)) / dayMs);
 }
 
 export function daysToFire(series: ProjectionPoint[], startDate: string) {
@@ -294,59 +404,10 @@ export function daysToFire(series: ProjectionPoint[], startDate: string) {
   }
 
   const previous = series[reachedIndex - 1]!;
-  const previousGap = previous.projectedAssets - previous.fireTarget;
-  const reachedGap = reached.projectedAssets - reached.fireTarget;
-  const gapClosed = reachedGap - previousGap;
-  const crossingRatio = gapClosed === 0 ? 1 : Math.min(1, Math.max(0, -previousGap / gapClosed));
-  const previousTime = Date.parse(previous.date);
-  const reachedTime = Date.parse(reached.date);
-  const crossingTime = previousTime + (reachedTime - previousTime) * crossingRatio;
-
-  return Math.max(0, (crossingTime - Date.parse(startDate)) / dayMs);
+  return interpolateDaysToFire(previous, reached, startDate);
 }
 
-function estimatedDaysToFire(series: ProjectionPoint[], startDate: string) {
-  const exactDays = daysToFire(series, startDate);
-  if (exactDays !== null) {
-    return exactDays;
-  }
-
-  if (series.length < 2) {
-    return null;
-  }
-
-  const last = series[series.length - 1]!;
-  const windowStartIndex = Math.max(0, series.length - 25);
-  const first = series[windowStartIndex]!;
-  const monthSpan = last.monthIndex - first.monthIndex;
-  if (monthSpan <= 0) {
-    return null;
-  }
-
-  const firstGap = first.projectedAssets - first.fireTarget;
-  const lastGap = last.projectedAssets - last.fireTarget;
-  const monthlyGapChange = (lastGap - firstGap) / monthSpan;
-  if (lastGap >= 0 || monthlyGapChange <= 0) {
-    return null;
-  }
-
-  const extraMonths = Math.abs(lastGap) / monthlyGapChange;
-  const projectedDays = (Date.parse(last.date) - Date.parse(startDate)) / dayMs;
-  return Math.max(0, projectedDays + extraMonths * (365.2425 / 12));
-}
-
-function crossingGapClosurePerDay(series: ProjectionPoint[]) {
-  const reached = series.find((point) => point.reached);
-  if (!reached) {
-    return null;
-  }
-
-  const reachedIndex = series.indexOf(reached);
-  if (reachedIndex <= 0) {
-    return null;
-  }
-
-  const previous = series[reachedIndex - 1]!;
+function gapClosurePerDay(previous: ProjectionPoint, reached: ProjectionPoint) {
   const previousGap = previous.projectedAssets - previous.fireTarget;
   const reachedGap = reached.projectedAssets - reached.fireTarget;
   const gapClosed = reachedGap - previousGap;
@@ -357,6 +418,62 @@ function crossingGapClosurePerDay(series: ProjectionPoint[]) {
   }
 
   return gapClosed / days;
+}
+
+function estimateDaysToFire(input: ProjectionInput) {
+  const runtime = createProjectionRuntime(input);
+  let previous: ProjectionPoint | null = null;
+  const trailingWindow: ProjectionPoint[] = [];
+
+  for (let monthIndex = 0; monthIndex <= runtime.months; monthIndex += 1) {
+    const point = nextProjectionPoint(runtime, monthIndex);
+    trailingWindow.push(point);
+    if (trailingWindow.length > 25) {
+      trailingWindow.shift();
+    }
+
+    if (point.reached) {
+      if (!previous) {
+        return {
+          days: Math.max(0, (Date.parse(point.date) - Date.parse(runtime.startDate)) / dayMs),
+          crossingGapClosurePerDay: null,
+        };
+      }
+
+      return {
+        days: interpolateDaysToFire(previous, point, runtime.startDate),
+        crossingGapClosurePerDay: gapClosurePerDay(previous, point),
+      };
+    }
+
+    previous = point;
+  }
+
+  if (trailingWindow.length < 2) {
+    return { days: null, crossingGapClosurePerDay: null };
+  }
+
+  const first = trailingWindow[0]!;
+  const last = trailingWindow[trailingWindow.length - 1]!;
+  const monthSpan = last.monthIndex - first.monthIndex;
+  if (monthSpan <= 0) {
+    return { days: null, crossingGapClosurePerDay: null };
+  }
+
+  const firstGap = first.projectedAssets - first.fireTarget;
+  const lastGap = last.projectedAssets - last.fireTarget;
+  const monthlyGapChange = (lastGap - firstGap) / monthSpan;
+  if (lastGap >= 0 || monthlyGapChange <= 0) {
+    return { days: null, crossingGapClosurePerDay: null };
+  }
+
+  const extraMonths = Math.abs(lastGap) / monthlyGapChange;
+  const projectedDays = (Date.parse(last.date) - Date.parse(runtime.startDate)) / dayMs;
+
+  return {
+    days: Math.max(0, projectedDays + extraMonths * (365.2425 / 12)),
+    crossingGapClosurePerDay: null,
+  };
 }
 
 export function milestoneETAs(input: { milestones: Milestone[]; projection: ProjectionPoint[] }) {
@@ -413,7 +530,7 @@ export function transactionPreviewImpact(input: {
   const months = input.months ?? 2400;
   const savedTransactionDelta = transactionCashflowNet(input.transactions);
   const draftDelta = input.draft.type === "income" ? input.draft.amount : -input.draft.amount;
-  const baseSeries = projectionSeries({
+  const baseEstimate = estimateDaysToFire({
     assets: input.assets,
     quotes: input.quotes,
     goal: input.goal,
@@ -423,7 +540,7 @@ export function transactionPreviewImpact(input: {
     months,
   });
 
-  const simulatedSeries = projectionSeries({
+  const simulatedEstimate = estimateDaysToFire({
     assets: input.assets,
     quotes: input.quotes,
     goal: input.goal,
@@ -433,11 +550,11 @@ export function transactionPreviewImpact(input: {
     months,
   });
 
-  const baseDays = estimatedDaysToFire(baseSeries, startDate);
-  let simulatedDays = estimatedDaysToFire(simulatedSeries, startDate);
+  const baseDays = baseEstimate.days;
+  let simulatedDays = simulatedEstimate.days;
 
   if (baseDays !== null && simulatedDays === null && draftDelta < 0) {
-    const dailyGapClosure = crossingGapClosurePerDay(baseSeries);
+    const dailyGapClosure = baseEstimate.crossingGapClosurePerDay;
     if (dailyGapClosure !== null) {
       simulatedDays = baseDays + Math.abs(draftDelta) / dailyGapClosure;
     }

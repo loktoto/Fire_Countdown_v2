@@ -5,6 +5,7 @@ import {
   includedFireAssets,
   projectionSeries,
   resolveAssetValue,
+  totalAssets,
   transactionPreviewImpact,
   weightedExpectedReturn,
 } from "../fireEngine";
@@ -75,6 +76,29 @@ describe("fireEngine", () => {
 
   it("sums only FIRE-included assets", () => {
     expect(includedFireAssets(seedSnapshot.assets, seedSnapshot.quoteCache)).toBe(422000);
+  });
+
+  it("uses the latest quote for aggregate asset totals", () => {
+    const asset = {
+      ...seedSnapshot.assets[0]!,
+      quantity: 10,
+      manualValue: 1,
+      includeInFire: true,
+    };
+    const oldQuote = {
+      ...seedSnapshot.quoteCache[0]!,
+      assetId: asset.id,
+      price: 1,
+      receivedAt: "2026-06-01T00:00:00.000Z",
+    };
+    const latestQuote = {
+      ...oldQuote,
+      price: 12,
+      receivedAt: "2026-06-30T00:00:00.000Z",
+    };
+
+    expect(totalAssets([asset], [latestQuote, oldQuote], "HKD")).toBe(120);
+    expect(includedFireAssets([asset], [oldQuote, latestQuote], "HKD")).toBe(120);
   });
 
   it("calculates weighted expected return", () => {
