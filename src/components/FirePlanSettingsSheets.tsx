@@ -430,7 +430,7 @@ function FirePlanEditorContent({
   const [targetAmount, setTargetAmount] = useState(
     goal.targetAmount == null ? "" : String(goal.targetAmount),
   );
-  const [advancedOpen, setAdvancedOpen] = useState(goal.targetAmount != null);
+  const [fixedTargetEnabled, setFixedTargetEnabled] = useState(goal.targetAmount != null);
 
   const canSave =
     name.trim().length > 0 &&
@@ -438,15 +438,15 @@ function FirePlanEditorContent({
     numberFromText(currentAge) <= 120 &&
     numberFromText(targetMonthlySpending) >= 0 &&
     numberFromText(monthlySaving) >= 0 &&
-    numberFromText(withdrawalRate) > 0;
+    numberFromText(withdrawalRate) > 0 &&
+    (!fixedTargetEnabled || numberFromText(targetAmount) > 0);
 
   function save() {
     if (!canSave) {
       return;
     }
 
-    const targetOverride =
-      targetAmount.trim().length > 0 ? Math.max(numberFromText(targetAmount), 0) : null;
+    const targetOverride = fixedTargetEnabled ? Math.max(numberFromText(targetAmount), 0) : null;
 
     onSave(goal.id, {
       name: name.trim(),
@@ -461,9 +461,9 @@ function FirePlanEditorContent({
   }
 
   const manualTargetLabel =
-    targetAmount.trim().length > 0
+    fixedTargetEnabled && targetAmount.trim().length > 0
       ? money(numberFromText(targetAmount), goal.baseCurrency)
-      : "Auto";
+      : "Auto from withdrawal rate";
 
   return (
     <>
@@ -537,41 +537,44 @@ function FirePlanEditorContent({
           </View>
         </View>
         <MotionPressable
-          onPress={() => setAdvancedOpen((current) => !current)}
+          onPress={() => setFixedTargetEnabled((current) => !current)}
           accessibilityLabel={
-            advancedOpen ? "Hide advanced FIRE target" : "Show advanced FIRE target"
+            fixedTargetEnabled ? "Use calculated FIRE target" : "Use fixed FIRE target"
           }
-          accessibilityState={{ expanded: advancedOpen }}
-          style={[styles.advancedRow, { borderColor: colors.surfaceBorder }]}
+          accessibilityState={{ selected: fixedTargetEnabled }}
+          style={[
+            styles.targetModeRow,
+            {
+              borderColor: fixedTargetEnabled ? colors.primary : colors.surfaceBorder,
+              backgroundColor: fixedTargetEnabled ? `${colors.primary}12` : colors.backgroundAlt,
+            },
+          ]}
         >
           <View style={styles.listCopy}>
             <Text style={[styles.listLabel, typography.body, { color: colors.textMuted }]}>
-              Advanced target
+              FIRE target
             </Text>
             <Text style={[styles.listValue, typography.title, { color: colors.text }]}>
               {manualTargetLabel}
             </Text>
           </View>
           <MaterialCommunityIcons
-            name={advancedOpen ? "chevron-up" : "chevron-down"}
-            size={24}
-            color={colors.textMuted}
+            name={fixedTargetEnabled ? "toggle-switch" : "toggle-switch-off-outline"}
+            size={32}
+            color={fixedTargetEnabled ? colors.primary : colors.textMuted}
           />
         </MotionPressable>
-        {advancedOpen ? (
-          <View style={styles.advancedContent}>
+        {fixedTargetEnabled ? (
+          <View style={styles.targetAmountContent}>
             <Field
-              label="Manual FIRE target"
+              label="Fixed FIRE target"
               value={targetAmount}
               onChangeText={(value) => setTargetAmount(normalizeNumberInput(value))}
               keyboardType={Platform.OS === "ios" ? "decimal-pad" : "numeric"}
               inputMode="decimal"
-              placeholder="Auto"
-              accessibilityLabel="Manual FIRE target"
+              placeholder="9600000"
+              accessibilityLabel="Fixed FIRE target"
             />
-            <Text style={[styles.helperText, typography.body, { color: colors.textMuted }]}>
-              Leave blank to calculate the FIRE target from monthly withdrawal and withdrawal rate.
-            </Text>
           </View>
         ) : null}
         <SaveButton label="SAVE FIRE PLAN" disabled={!canSave} onPress={save} />
@@ -1202,22 +1205,19 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
-  advancedRow: {
-    minHeight: 58,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
+  targetModeRow: {
+    minHeight: 64,
+    borderWidth: 1,
+    borderRadius: tokens.radius.utility,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: tokens.spacing.md,
+    paddingHorizontal: tokens.spacing.md,
     paddingVertical: tokens.spacing.sm,
   },
-  advancedContent: {
+  targetAmountContent: {
     gap: tokens.spacing.sm,
-  },
-  helperText: {
-    fontSize: 12,
-    lineHeight: 17,
   },
   toggleRow: {
     minHeight: 50,
