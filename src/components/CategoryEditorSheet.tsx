@@ -19,6 +19,7 @@ import { MotionPressable } from "./MotionPressable";
 import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
 import type { Category, TransactionType } from "../features/types";
+import { useI18n } from "../i18n";
 
 const iconPresets = [
   { label: "Meal", value: "emoji:\\u{1F35C}" },
@@ -152,12 +153,13 @@ function CategoryEditorContent({
   onDelete?: (categoryId: string) => void;
 }) {
   const colors = useThemeColors();
+  const t = useI18n();
   const { width } = useWindowDimensions();
   const [name, setName] = useState(category?.name ?? "");
   const [icon, setIcon] = useState(category?.icon ?? defaultIcon(type));
   const [color, setColor] = useState<string>(category?.color ?? defaultCategoryColor);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
-  const title = category ? "Edit category" : "New category";
+  const title = category ? t.categories.editCategory : t.categories.newCategory;
   const canSave = name.trim().length > 0;
   const decodedIcon = useMemo(() => decodeIcon(icon), [icon]);
   const optionGap = 6;
@@ -201,7 +203,7 @@ function CategoryEditorContent({
       <View style={styles.header}>
         <View>
           <Text style={[styles.kicker, typography.button, { color: colors.primary }]}>
-            {type === "income" ? "Income" : "Expense"}
+            {type === "income" ? t.common.income : t.common.expense}
           </Text>
           <Text style={[styles.title, typography.title, { color: colors.text }]}>{title}</Text>
         </View>
@@ -216,7 +218,7 @@ function CategoryEditorContent({
         <TextInput
           value={name}
           onChangeText={setName}
-          placeholder="Category name"
+          placeholder={t.categories.categoryName}
           placeholderTextColor={colors.textMuted}
           selectionColor={colors.primary}
           style={[
@@ -230,12 +232,12 @@ function CategoryEditorContent({
           ]}
           returnKeyType="done"
           onSubmitEditing={save}
-          accessibilityLabel="Category name"
+          accessibilityLabel={t.categories.categoryName}
         />
 
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, typography.button, { color: colors.textMuted }]}>
-            Symbol
+            {t.common.symbol}
           </Text>
           <View style={[styles.options, { columnGap: optionGap, rowGap: optionGap }]}>
             {iconPresets.map((item) => {
@@ -245,7 +247,7 @@ function CategoryEditorContent({
                 <MotionPressable
                   key={item.label}
                   onPress={() => setIcon(item.value)}
-                  accessibilityLabel={`${item.label} category symbol`}
+                  accessibilityLabel={t.categories.symbolA11y(item.label)}
                   accessibilityState={{ selected: active }}
                   style={[
                     styles.iconOption,
@@ -272,7 +274,7 @@ function CategoryEditorContent({
 
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, typography.button, { color: colors.textMuted }]}>
-            Color
+            {t.common.color}
           </Text>
           <View style={[styles.options, { columnGap: 10, rowGap: 10 }]}>
             {colorPresets.map((item) => {
@@ -281,7 +283,7 @@ function CategoryEditorContent({
                 <MotionPressable
                   key={item}
                   onPress={() => setColor(item)}
-                  accessibilityLabel={`Category color ${item}`}
+                  accessibilityLabel={t.categories.colorA11y(item)}
                   accessibilityState={{ selected: active }}
                   style={[
                     styles.swatch,
@@ -304,12 +306,14 @@ function CategoryEditorContent({
           <View style={styles.deleteSection}>
             {deleteConfirm ? (
               <Text style={[styles.deleteHint, typography.body, { color: colors.textMuted }]}>
-                Existing transactions keep this category label. New logs will no longer show it.
+                {t.categories.deleteHint}
               </Text>
             ) : null}
             <MotionPressable
               onPress={deleteCategory}
-              accessibilityLabel={deleteConfirm ? "Confirm delete category" : "Delete category"}
+              accessibilityLabel={
+                deleteConfirm ? t.categories.confirmDeleteCategory : t.categories.deleteCategory
+              }
               style={[
                 styles.deleteButton,
                 {
@@ -324,7 +328,7 @@ function CategoryEditorContent({
                 color={colors.negative}
               />
               <Text style={[styles.deleteText, typography.button, { color: colors.negative }]}>
-                {deleteConfirm ? "CONFIRM DELETE" : "DELETE CATEGORY"}
+                {deleteConfirm ? t.categories.confirmDeleteCta : t.categories.deleteCategoryCta}
               </Text>
             </MotionPressable>
           </View>
@@ -333,7 +337,7 @@ function CategoryEditorContent({
         <MotionPressable
           onPress={save}
           disabled={!canSave}
-          accessibilityLabel="Save category"
+          accessibilityLabel={t.categories.saveCategory}
           accessibilityState={{ disabled: !canSave }}
           style={[
             styles.save,
@@ -349,7 +353,7 @@ function CategoryEditorContent({
               { color: canSave ? colors.onPrimary : colors.textMuted },
             ]}
           >
-            SAVE CATEGORY
+            {t.categories.saveCategoryCta}
           </Text>
         </MotionPressable>
       </ScrollView>

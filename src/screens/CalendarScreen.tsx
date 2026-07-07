@@ -10,10 +10,12 @@ import { TransactionEditorSheet } from "../components/TransactionEditorSheet";
 import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
 import { useCalendarViewModel } from "../hooks/useCalendarViewModel";
+import { useI18n } from "../i18n";
 import { money, signedMoney } from "../utils/format";
 
 export function CalendarScreen() {
   const colors = useThemeColors();
+  const t = useI18n();
   const vm = useCalendarViewModel();
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
   const editingTransaction =
@@ -38,7 +40,7 @@ export function CalendarScreen() {
         <View style={styles.summary}>
           <View style={styles.summaryItem}>
             <Text style={[styles.summaryLabel, typography.body, { color: colors.textMuted }]}>
-              Income
+              {t.common.income}
             </Text>
             <Text
               numberOfLines={1}
@@ -50,7 +52,7 @@ export function CalendarScreen() {
           </View>
           <View style={styles.summaryItem}>
             <Text style={[styles.summaryLabel, typography.body, { color: colors.textMuted }]}>
-              Expense
+              {t.common.expense}
             </Text>
             <Text
               numberOfLines={1}
@@ -62,7 +64,7 @@ export function CalendarScreen() {
           </View>
           <View style={styles.summaryItem}>
             <Text style={[styles.summaryLabel, typography.body, { color: colors.textMuted }]}>
-              Net
+              {t.common.net}
             </Text>
             <Text
               numberOfLines={1}
@@ -80,7 +82,7 @@ export function CalendarScreen() {
           <View style={styles.navCluster}>
             <MotionPressable
               onPress={vm.goToPreviousYear}
-              accessibilityLabel="Previous year"
+              accessibilityLabel={t.calendar.previousYear}
               style={[styles.navButton, { borderColor: colors.surfaceBorder }]}
             >
               <MaterialCommunityIcons
@@ -91,7 +93,7 @@ export function CalendarScreen() {
             </MotionPressable>
             <MotionPressable
               onPress={vm.goToPreviousMonth}
-              accessibilityLabel="Previous month"
+              accessibilityLabel={t.calendar.previousMonth}
               style={[styles.navButton, { borderColor: colors.surfaceBorder }]}
             >
               <MaterialCommunityIcons name="chevron-left" size={20} color={colors.primary} />
@@ -107,26 +109,26 @@ export function CalendarScreen() {
             </Text>
             <MotionPressable
               onPress={vm.goToToday}
-              accessibilityLabel="Jump to today"
+              accessibilityLabel={t.calendar.jumpToday}
               style={[styles.todayButton, { backgroundColor: `${colors.primary}16` }]}
             >
               <MaterialCommunityIcons name="calendar-today" size={14} color={colors.primary} />
               <Text style={[styles.todayText, typography.button, { color: colors.primary }]}>
-                Today
+                {t.common.today}
               </Text>
             </MotionPressable>
           </View>
           <View style={styles.navCluster}>
             <MotionPressable
               onPress={vm.goToNextMonth}
-              accessibilityLabel="Next month"
+              accessibilityLabel={t.calendar.nextMonth}
               style={[styles.navButton, { borderColor: colors.surfaceBorder }]}
             >
               <MaterialCommunityIcons name="chevron-right" size={20} color={colors.primary} />
             </MotionPressable>
             <MotionPressable
               onPress={vm.goToNextYear}
-              accessibilityLabel="Next year"
+              accessibilityLabel={t.calendar.nextYear}
               style={[styles.navButton, { borderColor: colors.surfaceBorder }]}
             >
               <MaterialCommunityIcons
@@ -164,7 +166,10 @@ export function CalendarScreen() {
                   <MotionPressable
                     key={day.key}
                     onPress={() => vm.setSelectedDate(day.date)}
-                    accessibilityLabel={`${day.date}, net ${signedMoney(day.net, vm.currency)}`}
+                    accessibilityLabel={t.calendar.dayNet(
+                      day.date,
+                      signedMoney(day.net, vm.currency),
+                    )}
                     accessibilityState={{ selected }}
                     style={[
                       styles.day,
@@ -205,7 +210,7 @@ export function CalendarScreen() {
         </Text>
         {vm.selectedTransactions.length === 0 ? (
           <Text style={[styles.empty, typography.body, { color: colors.textMuted }]}>
-            No records for this date.
+            {t.calendar.noRecordsForDate}
           </Text>
         ) : (
           <View style={styles.transactionList}>
@@ -220,7 +225,10 @@ export function CalendarScreen() {
                 <MotionPressable
                   key={transaction.id}
                   onPress={() => setEditingTransactionId(transaction.id)}
-                  accessibilityLabel={`Edit ${transaction.category?.name ?? "uncategorized"} ${signedAmount}`}
+                  accessibilityLabel={t.calendar.editTransaction(
+                    transaction.category?.name ?? t.calendar.uncategorized,
+                    signedAmount,
+                  )}
                   style={[
                     styles.transactionRow,
                     {
@@ -239,7 +247,7 @@ export function CalendarScreen() {
                       numberOfLines={1}
                       style={[styles.transactionCategory, typography.title, { color: colors.text }]}
                     >
-                      {transaction.category?.name ?? "Uncategorized"}
+                      {transaction.category?.name ?? t.calendar.uncategorized}
                     </Text>
                     <Text
                       numberOfLines={1}
@@ -249,7 +257,7 @@ export function CalendarScreen() {
                         { color: transaction.note ? colors.textMuted : `${colors.textMuted}99` },
                       ]}
                     >
-                      {transaction.note ?? "No note"}
+                      {transaction.note ?? t.common.noNote}
                     </Text>
                   </View>
                   <View style={styles.transactionMeta}>

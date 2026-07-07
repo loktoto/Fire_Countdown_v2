@@ -17,6 +17,7 @@ import { MotionPressable } from "./MotionPressable";
 import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
 import type { Asset, AssetClass, UpdateMethod } from "../features/types";
+import { useI18n } from "../i18n";
 
 type AssetPatch = Partial<
   Pick<
@@ -120,6 +121,7 @@ function AssetEditorContent({
   onSave: (assetId: string, patch: AssetPatch) => void;
 }) {
   const colors = useThemeColors();
+  const t = useI18n();
   const [name, setName] = useState(asset.name);
   const [assetClass, setAssetClass] = useState<AssetClass>(asset.assetClass);
   const [manualValue, setManualValue] = useState(String(asset.manualValue ?? 0));
@@ -168,18 +170,20 @@ function AssetEditorContent({
       <View style={[styles.grabber, { backgroundColor: colors.surfaceBorder }]} />
       <View style={styles.header}>
         <View style={styles.headerCopy}>
-          <Text style={[styles.kicker, typography.button, { color: colors.primary }]}>Asset</Text>
+          <Text style={[styles.kicker, typography.button, { color: colors.primary }]}>
+            {t.assets.asset}
+          </Text>
           <Text
             numberOfLines={1}
             adjustsFontSizeToFit
             style={[styles.title, typography.title, { color: colors.text }]}
           >
-            Edit asset
+            {t.assets.editAsset}
           </Text>
         </View>
         <MotionPressable
           onPress={onClose}
-          accessibilityLabel="Close asset editor"
+          accessibilityLabel={t.assets.closeEditor}
           style={[styles.closeButton, { backgroundColor: colors.backgroundAlt }]}
         >
           <MaterialCommunityIcons name="close" size={20} color={colors.textMuted} />
@@ -193,12 +197,12 @@ function AssetEditorContent({
       >
         <View style={styles.fieldGroup}>
           <Text style={[styles.fieldLabel, typography.button, { color: colors.textMuted }]}>
-            Name
+            {t.assets.name}
           </Text>
           <TextInput
             value={name}
             onChangeText={setName}
-            placeholder="Asset name"
+            placeholder={t.assets.assetName}
             placeholderTextColor={colors.textMuted}
             selectionColor={colors.primary}
             style={[
@@ -210,22 +214,36 @@ function AssetEditorContent({
                 backgroundColor: colors.backgroundAlt,
               },
             ]}
-            accessibilityLabel="Asset name"
+            accessibilityLabel={t.assets.assetName}
           />
         </View>
 
         <View style={styles.fieldGroup}>
           <Text style={[styles.fieldLabel, typography.button, { color: colors.textMuted }]}>
-            Asset class
+            {t.assets.assetClass}
           </Text>
           <View style={styles.chipWrap}>
             {assetClassOptions.map((option) => {
               const active = option.value === assetClass;
+              const label =
+                option.value === "real_estate"
+                  ? t.assets.classOptions.realEstate
+                  : option.value === "cash"
+                    ? t.assets.classOptions.cash
+                    : option.value === "etf"
+                      ? t.assets.classOptions.etf
+                      : option.value === "stock"
+                        ? t.assets.classOptions.stock
+                        : option.value === "crypto"
+                          ? t.assets.classOptions.crypto
+                          : option.value === "bond"
+                            ? t.assets.classOptions.bond
+                            : t.assets.classOptions.custom;
               return (
                 <MotionPressable
                   key={option.value}
                   onPress={() => setAssetClass(option.value)}
-                  accessibilityLabel={`Asset class ${option.label}`}
+                  accessibilityLabel={`${t.assets.assetClass} ${label}`}
                   accessibilityState={{ selected: active }}
                   style={[
                     styles.choiceChip,
@@ -242,7 +260,7 @@ function AssetEditorContent({
                       { color: active ? colors.primary : colors.textMuted },
                     ]}
                   >
-                    {option.label}
+                    {label}
                   </Text>
                 </MotionPressable>
               );
@@ -253,7 +271,7 @@ function AssetEditorContent({
         <View style={styles.splitFields}>
           <View style={styles.splitField}>
             <Text style={[styles.fieldLabel, typography.button, { color: colors.textMuted }]}>
-              Value
+              {t.assets.value}
             </Text>
             <TextInput
               value={manualValue}
@@ -273,12 +291,12 @@ function AssetEditorContent({
                   backgroundColor: colors.backgroundAlt,
                 },
               ]}
-              accessibilityLabel="Asset value"
+              accessibilityLabel={t.assets.assetValue}
             />
           </View>
           <View style={styles.currencyField}>
             <Text style={[styles.fieldLabel, typography.button, { color: colors.textMuted }]}>
-              Currency
+              {t.assets.currency}
             </Text>
             <TextInput
               value={currency}
@@ -296,14 +314,14 @@ function AssetEditorContent({
                   backgroundColor: colors.backgroundAlt,
                 },
               ]}
-              accessibilityLabel="Asset currency"
+              accessibilityLabel={t.assets.assetCurrency}
             />
           </View>
         </View>
 
         <View style={styles.fieldGroup}>
           <Text style={[styles.fieldLabel, typography.button, { color: colors.textMuted }]}>
-            Expected return %
+            {t.assets.expectedReturn}
           </Text>
           <TextInput
             value={expectedReturn}
@@ -323,22 +341,26 @@ function AssetEditorContent({
                 backgroundColor: colors.backgroundAlt,
               },
             ]}
-            accessibilityLabel="Expected annual return percent"
+            accessibilityLabel={t.assets.expectedAnnualReturnPercent}
           />
         </View>
 
         <View style={styles.fieldGroup}>
           <Text style={[styles.fieldLabel, typography.button, { color: colors.textMuted }]}>
-            Update method
+            {t.assets.updateMethod}
           </Text>
           <View style={styles.chipWrap}>
             {updateMethodOptions.map((option) => {
               const active = option.value === updateMethod;
+              const label =
+                option.value === "manual"
+                  ? t.assets.updateMethods.manual
+                  : t.assets.updateMethods.quoteBackup;
               return (
                 <MotionPressable
                   key={option.value}
                   onPress={() => setUpdateMethod(option.value)}
-                  accessibilityLabel={`Update method ${option.label}`}
+                  accessibilityLabel={`${t.assets.updateMethod} ${label}`}
                   accessibilityState={{ selected: active }}
                   style={[
                     styles.choiceChip,
@@ -355,7 +377,7 @@ function AssetEditorContent({
                       { color: active ? colors.primary : colors.textMuted },
                     ]}
                   >
-                    {option.label}
+                    {label}
                   </Text>
                 </MotionPressable>
               );
@@ -366,7 +388,7 @@ function AssetEditorContent({
         <View style={styles.splitFields}>
           <View style={styles.splitField}>
             <Text style={[styles.fieldLabel, typography.button, { color: colors.textMuted }]}>
-              Ticker
+              {t.assets.ticker}
             </Text>
             <TextInput
               value={ticker}
@@ -384,12 +406,12 @@ function AssetEditorContent({
                   backgroundColor: colors.backgroundAlt,
                 },
               ]}
-              accessibilityLabel="Asset ticker"
+              accessibilityLabel={t.assets.assetTicker}
             />
           </View>
           <View style={styles.splitField}>
             <Text style={[styles.fieldLabel, typography.button, { color: colors.textMuted }]}>
-              Quote symbol
+              {t.assets.quoteSymbol}
             </Text>
             <TextInput
               value={googleFinanceSymbol}
@@ -407,14 +429,14 @@ function AssetEditorContent({
                   backgroundColor: colors.backgroundAlt,
                 },
               ]}
-              accessibilityLabel="Google Finance symbol"
+              accessibilityLabel={t.assets.googleFinanceSymbol}
             />
           </View>
         </View>
 
         <View style={styles.fieldGroup}>
           <Text style={[styles.fieldLabel, typography.button, { color: colors.textMuted }]}>
-            Quantity
+            {t.assets.quantity}
           </Text>
           <TextInput
             value={quantity}
@@ -433,20 +455,20 @@ function AssetEditorContent({
                 backgroundColor: colors.backgroundAlt,
               },
             ]}
-            accessibilityLabel="Asset quantity"
+            accessibilityLabel={t.assets.assetQuantity}
           />
         </View>
 
         <View style={styles.fieldGroup}>
           <Text style={[styles.fieldLabel, typography.button, { color: colors.textMuted }]}>
-            Notes
+            {t.common.notes}
           </Text>
           <TextInput
             value={notes}
             onChangeText={setNotes}
             maxLength={160}
             multiline
-            placeholder="No notes"
+            placeholder={t.assets.noNotes}
             placeholderTextColor={colors.textMuted}
             selectionColor={colors.primary}
             style={[
@@ -459,13 +481,13 @@ function AssetEditorContent({
                 backgroundColor: colors.backgroundAlt,
               },
             ]}
-            accessibilityLabel="Asset notes"
+            accessibilityLabel={t.assets.assetNotes}
           />
         </View>
 
         <MotionPressable
           onPress={() => setIncludeInFire((current) => !current)}
-          accessibilityLabel={includeInFire ? "Exclude from FIRE" : "Include in FIRE"}
+          accessibilityLabel={includeInFire ? t.assets.excludeFromFire : t.assets.includeInFire}
           accessibilityState={{ selected: includeInFire }}
           style={[
             styles.includeToggle,
@@ -487,14 +509,14 @@ function AssetEditorContent({
               { color: includeInFire ? colors.positive : colors.textMuted },
             ]}
           >
-            {includeInFire ? "Included in FIRE" : "Excluded from FIRE"}
+            {includeInFire ? t.assets.includedInFire : t.assets.excludedFromFire}
           </Text>
         </MotionPressable>
 
         <MotionPressable
           onPress={save}
           disabled={!canSave}
-          accessibilityLabel="Save asset"
+          accessibilityLabel={t.assets.saveAsset}
           accessibilityState={{ disabled: !canSave }}
           style={[
             styles.save,
@@ -508,7 +530,7 @@ function AssetEditorContent({
               { color: canSave ? colors.onPrimary : colors.textMuted },
             ]}
           >
-            SAVE ASSET
+            {t.assets.saveAssetCta}
           </Text>
         </MotionPressable>
       </ScrollView>

@@ -31,6 +31,7 @@ import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
 import type { FireSnapshot, Milestone, ProjectionScenario } from "../features/types";
 import { useSettingsViewModel } from "../hooks/useSettingsViewModel";
+import { useI18n } from "../i18n";
 import { buildCsvExport, buildGoogleSheetsExport } from "../utils/exportData";
 
 const currencyOptions = ["HKD", "USD", "TWD", "JPY", "EUR", "GBP", "CNY", "SGD"].map(
@@ -46,33 +47,24 @@ const languageOptions: { label: string; value: FireSnapshot["language"] }[] = [
 ];
 
 function languageLabel(language: FireSnapshot["language"]) {
-  return language === "zhHant" ? "\u7e41\u9ad4\u4e2d\u6587" : "English";
+  return language === "zhHant" ? "繁體中文" : "English";
 }
 
 type ExportFormat = "csv" | "sheets";
 
-const exportOptions: { label: string; value: ExportFormat }[] = [
-  { label: "CSV file", value: "csv" },
-  { label: "Google Sheets file", value: "sheets" },
-];
-
-const exportFileConfig: Record<
-  ExportFormat,
-  { extension: string; mimeType: string; title: string; uti: string }
-> = {
-  csv: {
-    extension: "csv",
-    mimeType: "text/csv",
-    title: "Fire Countdown CSV export",
-    uti: "public.comma-separated-values-text",
-  },
-  sheets: {
-    extension: "tsv",
-    mimeType: "text/tab-separated-values",
-    title: "Fire Countdown Google Sheets export",
-    uti: "public.tab-separated-values-text",
-  },
-};
+const exportFileConfig: Record<ExportFormat, { extension: string; mimeType: string; uti: string }> =
+  {
+    csv: {
+      extension: "csv",
+      mimeType: "text/csv",
+      uti: "public.comma-separated-values-text",
+    },
+    sheets: {
+      extension: "tsv",
+      mimeType: "text/tab-separated-values",
+      uti: "public.tab-separated-values-text",
+    },
+  };
 
 function PreferenceOptionSheet({
   visible,
@@ -92,11 +84,12 @@ function PreferenceOptionSheet({
   onSelect: (value: string) => void;
 }) {
   const colors = useThemeColors();
+  const t = useI18n();
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable
-        accessibilityLabel="Close setting picker"
+        accessibilityLabel={t.settings.closePicker}
         style={styles.optionBackdrop}
         onPress={onClose}
       />
@@ -121,7 +114,7 @@ function PreferenceOptionSheet({
             </View>
             <MotionPressable
               onPress={onClose}
-              accessibilityLabel={`Close ${title}`}
+              accessibilityLabel={t.settings.closePickerTitle(title)}
               style={[styles.optionClose, { backgroundColor: colors.backgroundAlt }]}
             >
               <MaterialCommunityIcons name="close" size={24} color={colors.textMuted} />
@@ -139,7 +132,7 @@ function PreferenceOptionSheet({
                 <MotionPressable
                   key={option.value}
                   onPress={() => onSelect(option.value)}
-                  accessibilityLabel={`Select ${option.label}`}
+                  accessibilityLabel={t.settings.selectOption(option.label)}
                   accessibilityState={{ selected }}
                   style={[
                     styles.optionRow,
@@ -167,6 +160,7 @@ function PreferenceOptionSheet({
 
 export function SettingsScreen() {
   const colors = useThemeColors();
+  const t = useI18n();
   const router = useRouter();
   const vm = useSettingsViewModel();
   const [milestoneListOpen, setMilestoneListOpen] = useState(false);
@@ -182,7 +176,11 @@ export function SettingsScreen() {
   const goalCurrency = vm.goal?.baseCurrency ?? vm.snapshot.currency;
   const scenarioCount = vm.scenarios.length;
   const currentAgeLabel =
-    vm.goal?.currentAge == null ? "Not set" : `${vm.goal.currentAge} years old`;
+    vm.goal?.currentAge == null ? t.common.notSet : t.common.yearsOld(vm.goal.currentAge);
+  const exportOptions: { label: string; value: ExportFormat }[] = [
+    { label: t.settings.csvFile, value: "csv" },
+    { label: t.settings.googleSheetsFile, value: "sheets" },
+  ];
 
   function addMilestone() {
     const milestone = vm.newMilestoneDraft();
@@ -274,6 +272,7 @@ export function SettingsScreen() {
   async function shareExport(format: ExportFormat) {
     setExportPickerOpen(false);
     const config = exportFileConfig[format];
+    const exportTitle = format === "csv" ? t.settings.csvExportTitle : t.settings.sheetsExportTitle;
     const message =
       format === "csv" ? buildCsvExport(vm.snapshot) : buildGoogleSheetsExport(vm.snapshot);
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -286,14 +285,14 @@ export function SettingsScreen() {
           encoding: FileSystem.EncodingType.UTF8,
         });
         await Sharing.shareAsync(fileUri, {
-          dialogTitle: config.title,
+          dialogTitle: exportTitle,
           mimeType: config.mimeType,
           UTI: config.uti,
         });
         return;
       }
 
-      await Share.share({ title: config.title, message });
+      await Share.share({ title: exportTitle, message });
     } catch {
       // Native share can be dismissed or unavailable; keep the Settings flow stable.
     }
@@ -304,21 +303,25 @@ export function SettingsScreen() {
       <View style={styles.header}>
         <View>
           <Text style={[styles.kicker, typography.button, { color: colors.primary }]}>
-            Preferences
+            {t.settings.kicker}
           </Text>
-          <Text style={[styles.title, typography.display, { color: colors.text }]}>Settings</Text>
+          <Text style={[styles.title, typography.display, { color: colors.text }]}>
+            {t.settings.title}
+          </Text>
         </View>
         <MotionPressable onPress={() => router.back()}>
-          <Text style={[typography.button, { color: colors.primary }]}>Done</Text>
+          <Text style={[typography.button, { color: colors.primary }]}>{t.settings.done}</Text>
         </MotionPressable>
       </View>
 
       <GlassCard>
         <Text style={[styles.sectionTitle, typography.title, { color: colors.text }]}>
-          Appearance
+          {t.settings.appearance}
         </Text>
         <View style={styles.switchRow}>
-          <Text style={[styles.rowText, typography.body, { color: colors.text }]}>Dark mode</Text>
+          <Text style={[styles.rowText, typography.body, { color: colors.text }]}>
+            {t.settings.darkMode}
+          </Text>
           <Switch
             value={vm.snapshot.themeMode === "dark"}
             onValueChange={(dark) => vm.setThemeMode(dark ? "dark" : "light")}
@@ -327,12 +330,12 @@ export function SettingsScreen() {
           />
         </View>
         <EditableRow
-          label="Currency"
+          label={t.settings.currency}
           value={vm.snapshot.currency}
           onPress={() => setCurrencyPickerOpen(true)}
         />
         <EditableRow
-          label="Language"
+          label={t.settings.language}
           value={languageLabel(vm.snapshot.language)}
           onPress={() => setLanguagePickerOpen(true)}
         />
@@ -340,17 +343,17 @@ export function SettingsScreen() {
 
       <GlassCard>
         <Text style={[styles.sectionTitle, typography.title, { color: colors.text }]}>
-          FIRE Settings
+          {t.settings.fireSettings}
         </Text>
         <EditableRow
-          label="Current age"
+          label={t.common.currentAge}
           value={currentAgeLabel}
           onPress={() => setFirePlanEditorOpen(true)}
         />
         <View style={styles.quickActions}>
           <MotionPressable
             onPress={() => setFirePlanEditorOpen(true)}
-            accessibilityLabel="Edit FIRE setup"
+            accessibilityLabel={t.firePlan.editFireSetup}
             style={[
               styles.quickAction,
               {
@@ -361,12 +364,12 @@ export function SettingsScreen() {
           >
             <MaterialCommunityIcons name="target" size={18} color={colors.primary} />
             <Text style={[styles.quickActionText, typography.button, { color: colors.text }]}>
-              FIRE setup
+              {t.firePlan.fireSetup}
             </Text>
           </MotionPressable>
           <MotionPressable
             onPress={() => setScenarioListOpen(true)}
-            accessibilityLabel="Edit FIRE methods"
+            accessibilityLabel={t.firePlan.editFireMethods}
             style={[
               styles.quickAction,
               {
@@ -377,12 +380,12 @@ export function SettingsScreen() {
           >
             <MaterialCommunityIcons name="source-branch" size={18} color={colors.primary} />
             <Text style={[styles.quickActionText, typography.button, { color: colors.primary }]}>
-              FIRE methods
+              {t.firePlan.fireMethods}
             </Text>
           </MotionPressable>
           <MotionPressable
             onPress={() => setMilestoneListOpen(true)}
-            accessibilityLabel="Edit milestones"
+            accessibilityLabel={t.firePlan.editMilestones}
             style={[
               styles.quickAction,
               {
@@ -393,7 +396,7 @@ export function SettingsScreen() {
           >
             <MaterialCommunityIcons name="flag-checkered" size={18} color={colors.primary} />
             <Text style={[styles.quickActionText, typography.button, { color: colors.text }]}>
-              Milestones
+              {t.firePlan.milestones}
             </Text>
           </MotionPressable>
         </View>
@@ -401,10 +404,10 @@ export function SettingsScreen() {
 
       <GlassCard>
         <Text style={[styles.sectionTitle, typography.title, { color: colors.text }]}>
-          Quote Bridge
+          {t.settings.quoteBridge}
         </Text>
         <TextInput
-          placeholder="Google Apps Script URL"
+          placeholder={t.settings.googleAppsScriptUrl}
           placeholderTextColor={colors.textMuted}
           value={vm.snapshot.quoteSettings.scriptUrl ?? ""}
           onChangeText={(scriptUrl) => vm.updateQuoteSettings({ scriptUrl })}
@@ -419,7 +422,7 @@ export function SettingsScreen() {
           ]}
         />
         <TextInput
-          placeholder="API token stored in SecureStore"
+          placeholder={t.settings.apiToken}
           placeholderTextColor={colors.textMuted}
           value={vm.tokenDraft}
           onChangeText={vm.setTokenDraft}
@@ -439,37 +442,44 @@ export function SettingsScreen() {
             onPress={() => void vm.saveToken()}
             style={[styles.button, { borderColor: colors.primary }]}
           >
-            <Text style={[typography.button, { color: colors.primary }]}>Save token</Text>
+            <Text style={[typography.button, { color: colors.primary }]}>
+              {t.settings.saveToken}
+            </Text>
           </MotionPressable>
           <MotionPressable
             onPress={() => vm.refreshQuotes.mutate()}
             style={[styles.button, { borderColor: colors.primary }]}
           >
-            <Text style={[typography.button, { color: colors.primary }]}>Test refresh</Text>
+            <Text style={[typography.button, { color: colors.primary }]}>
+              {t.settings.testRefresh}
+            </Text>
           </MotionPressable>
         </View>
         {vm.refreshQuotes.isError ? (
-          <StatusBadge label="Quote refresh failed" tone="negative" />
+          <StatusBadge label={t.settings.quoteRefreshFailed} tone="negative" />
         ) : null}
         {vm.refreshQuotes.isSuccess ? (
-          <StatusBadge label="Quote cache updated" tone="positive" />
+          <StatusBadge label={t.settings.quoteCacheUpdated} tone="positive" />
         ) : null}
       </GlassCard>
 
       <GlassCard>
         <Text style={[styles.sectionTitle, typography.title, { color: colors.text }]}>
-          Maintenance
+          {t.settings.maintenance}
         </Text>
         <EditableRow
-          label="Export data"
-          value="CSV / Google Sheets"
+          label={t.settings.exportData}
+          value={t.settings.exportValue}
           onPress={() => setExportPickerOpen(true)}
         />
-        <EditableRow label="Backup / Restore" value="Coming next" />
-        <EditableRow label="Reset demo data" value="Restore seed" onPress={vm.resetSeed} />
+        <EditableRow label={t.settings.backupRestore} value={t.settings.comingNext} />
+        <EditableRow
+          label={t.settings.resetDemoData}
+          value={t.settings.restoreSeed}
+          onPress={vm.resetSeed}
+        />
         <Text style={[styles.disclaimer, typography.body, { color: colors.textMuted }]}>
-          Financial data stays local by default. Quote Bridge sends only user-enabled asset symbols
-          to the user-owned Apps Script endpoint.
+          {t.settings.localDisclaimer}
         </Text>
       </GlassCard>
       <MilestoneListSheet
@@ -512,8 +522,8 @@ export function SettingsScreen() {
       />
       <PreferenceOptionSheet
         visible={currencyPickerOpen}
-        kicker="Currency"
-        title="Display currency"
+        kicker={t.settings.currency}
+        title={t.settings.displayCurrency}
         options={currencyOptions}
         value={vm.snapshot.currency}
         onClose={() => setCurrencyPickerOpen(false)}
@@ -524,11 +534,9 @@ export function SettingsScreen() {
       />
       <PreferenceOptionSheet
         visible={languagePickerOpen}
-        kicker="Language"
-        title="App language"
-        options={languageOptions.map((option) =>
-          option.value === "zhHant" ? { ...option, label: "\u7e41\u9ad4\u4e2d\u6587" } : option,
-        )}
+        kicker={t.settings.language}
+        title={t.settings.appLanguage}
+        options={languageOptions}
         value={vm.snapshot.language}
         onClose={() => setLanguagePickerOpen(false)}
         onSelect={(language) => {
@@ -538,8 +546,8 @@ export function SettingsScreen() {
       />
       <PreferenceOptionSheet
         visible={exportPickerOpen}
-        kicker="Export"
-        title="Export data"
+        kicker={t.settings.export}
+        title={t.settings.exportData}
         options={exportOptions}
         value=""
         onClose={() => setExportPickerOpen(false)}

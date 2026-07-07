@@ -23,10 +23,12 @@ import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
 import type { Asset, Milestone, ProjectionScenario } from "../features/types";
 import { usePortfolioViewModel } from "../hooks/usePortfolioViewModel";
+import { useI18n } from "../i18n";
 import { money, percent } from "../utils/format";
 
 export function PortfolioScreen() {
   const colors = useThemeColors();
+  const t = useI18n();
   const router = useRouter();
   const navigation = useNavigation() as unknown as {
     addListener: (event: "tabPress", callback: () => void) => () => void;
@@ -42,12 +44,14 @@ export function PortfolioScreen() {
   const [creatingScenario, setCreatingScenario] = useState(false);
   const [assetAmountsHidden, setAssetAmountsHidden] = useState(false);
   const [allocationMotionKey, setAllocationMotionKey] = useState(0);
-  const assetVisibilityLabel = assetAmountsHidden ? "Show asset amounts" : "Hide asset amounts";
+  const assetVisibilityLabel = assetAmountsHidden
+    ? t.common.showAssetAmounts
+    : t.common.hideAssetAmounts;
   const goalCurrency = vm.goal.baseCurrency;
   const totalAssetValue = assetAmountsHidden ? "***" : money(vm.totalAssets, goalCurrency);
   const includedAssetValue = assetAmountsHidden ? "***" : money(vm.includedAssets, goalCurrency);
   const currentAgeLabel =
-    vm.goal.currentAge == null ? "Not set" : `${vm.goal.currentAge} years old`;
+    vm.goal.currentAge == null ? t.common.notSet : t.common.yearsOld(vm.goal.currentAge);
 
   const replayAllocationMotion = useCallback(() => {
     setAllocationMotionKey((current) => current + 1);
@@ -168,12 +172,14 @@ export function PortfolioScreen() {
       <View style={styles.header}>
         <View>
           <Text style={[styles.kicker, typography.button, { color: colors.primary }]}>
-            Asset book
+            {t.portfolio.kicker}
           </Text>
-          <Text style={[styles.title, typography.display, { color: colors.text }]}>Portfolio</Text>
+          <Text style={[styles.title, typography.display, { color: colors.text }]}>
+            {t.portfolio.title}
+          </Text>
         </View>
         <MotionPressable onPress={() => router.push("/settings")} style={styles.settingsButton}>
-          <Text style={[typography.button, { color: colors.primary }]}>Settings</Text>
+          <Text style={[typography.button, { color: colors.primary }]}>{t.portfolio.settings}</Text>
         </MotionPressable>
       </View>
 
@@ -184,20 +190,20 @@ export function PortfolioScreen() {
         hitSlop={8}
       >
         <HeroMetric
-          label="Total assets"
+          label={t.portfolio.totalAssets}
           value={totalAssetValue}
-          caption={`Included in FIRE ${includedAssetValue} | ${percent(vm.weightedReturn)} return`}
+          caption={t.portfolio.includedCaption(includedAssetValue, percent(vm.weightedReturn))}
         />
       </MotionPressable>
 
       <MotionPressable
         onPress={replayAllocationMotion}
-        accessibilityLabel="Replay allocation animation"
+        accessibilityLabel={t.portfolio.replayAllocation}
         style={styles.allocationButton}
       >
         <GlassCard>
           <Text style={[styles.sectionTitle, typography.title, { color: colors.text }]}>
-            Allocation
+            {t.portfolio.allocation}
           </Text>
           <AllocationBar motionKey={allocationMotionKey} segments={vm.allocation} />
         </GlassCard>
@@ -206,10 +212,10 @@ export function PortfolioScreen() {
       <GlassCard>
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, typography.title, { color: colors.text }]}>
-            Assets
+            {t.portfolio.assets}
           </Text>
           <MotionPressable onPress={vm.addManualAsset}>
-            <Text style={[typography.button, { color: colors.primary }]}>Add</Text>
+            <Text style={[typography.button, { color: colors.primary }]}>{t.common.add}</Text>
           </MotionPressable>
         </View>
         {vm.assets.map((asset) => {
@@ -221,22 +227,22 @@ export function PortfolioScreen() {
             >
               <MotionPressable
                 onPress={() => openAssetEditor(asset)}
-                accessibilityLabel={`Edit ${asset.name}`}
+                accessibilityLabel={t.portfolio.editAsset(asset.name)}
                 style={styles.assetMain}
               >
                 <Text style={[styles.assetName, typography.title, { color: colors.text }]}>
                   {asset.name}
                 </Text>
                 <Text style={[styles.assetMeta, typography.body, { color: colors.textMuted }]}>
-                  {asset.assetClass} | {percent(asset.expectedAnnualReturn)} expected
+                  {asset.assetClass} | {percent(asset.expectedAnnualReturn)} {t.portfolio.expected}
                 </Text>
                 <StatusBadge
                   label={
                     resolved.source === "quote"
-                      ? "Google Sheet quote"
+                      ? t.portfolio.googleSheetQuote
                       : resolved.source === "manual_fallback"
-                        ? "Manual fallback"
-                        : "Manual value"
+                        ? t.portfolio.manualFallback
+                        : t.portfolio.manualValue
                   }
                   tone={resolved.source === "quote" ? "primary" : "neutral"}
                 />
@@ -244,7 +250,7 @@ export function PortfolioScreen() {
               <View style={styles.assetSide}>
                 <MotionPressable
                   onPress={() => openAssetEditor(asset)}
-                  accessibilityLabel={`Edit ${asset.name} value`}
+                  accessibilityLabel={t.portfolio.editAssetValue(asset.name)}
                   hitSlop={8}
                   style={styles.assetValueButton}
                 >
@@ -261,8 +267,8 @@ export function PortfolioScreen() {
                   onPress={() => vm.updateAsset(asset.id, { includeInFire: !asset.includeInFire })}
                   accessibilityLabel={
                     asset.includeInFire
-                      ? `Exclude ${asset.name} from FIRE`
-                      : `Include ${asset.name} in FIRE`
+                      ? t.portfolio.excludeAsset(asset.name)
+                      : t.portfolio.includeAsset(asset.name)
                   }
                   accessibilityState={{ selected: asset.includeInFire }}
                 >
@@ -272,7 +278,7 @@ export function PortfolioScreen() {
                       { color: asset.includeInFire ? colors.positive : colors.textMuted },
                     ]}
                   >
-                    {asset.includeInFire ? "Included" : "Excluded"}
+                    {asset.includeInFire ? t.common.included : t.common.excluded}
                   </Text>
                 </MotionPressable>
               </View>
@@ -284,18 +290,18 @@ export function PortfolioScreen() {
       <GlassCard>
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, typography.title, { color: colors.text }]}>
-            FIRE Settings
+            {t.portfolio.fireSettings}
           </Text>
         </View>
         <EditableRow
-          label="Current age"
+          label={t.common.currentAge}
           value={currentAgeLabel}
           onPress={() => setFirePlanEditorOpen(true)}
         />
         <View style={styles.quickActions}>
           <MotionPressable
             onPress={() => setFirePlanEditorOpen(true)}
-            accessibilityLabel="Edit FIRE setup"
+            accessibilityLabel={t.firePlan.editFireSetup}
             style={[
               styles.quickAction,
               {
@@ -306,12 +312,12 @@ export function PortfolioScreen() {
           >
             <MaterialCommunityIcons name="target" size={18} color={colors.primary} />
             <Text style={[styles.quickActionText, typography.button, { color: colors.text }]}>
-              FIRE setup
+              {t.portfolio.fireSetup}
             </Text>
           </MotionPressable>
           <MotionPressable
             onPress={() => setScenarioListOpen(true)}
-            accessibilityLabel="Edit FIRE methods"
+            accessibilityLabel={t.firePlan.editFireMethods}
             style={[
               styles.quickAction,
               {
@@ -322,12 +328,12 @@ export function PortfolioScreen() {
           >
             <MaterialCommunityIcons name="source-branch" size={18} color={colors.primary} />
             <Text style={[styles.quickActionText, typography.button, { color: colors.primary }]}>
-              FIRE methods
+              {t.portfolio.fireMethods}
             </Text>
           </MotionPressable>
           <MotionPressable
             onPress={() => setMilestoneListOpen(true)}
-            accessibilityLabel="Edit milestones"
+            accessibilityLabel={t.firePlan.editMilestones}
             style={[
               styles.quickAction,
               {
@@ -338,7 +344,7 @@ export function PortfolioScreen() {
           >
             <MaterialCommunityIcons name="flag-checkered" size={18} color={colors.primary} />
             <Text style={[styles.quickActionText, typography.button, { color: colors.text }]}>
-              Milestones
+              {t.portfolio.milestones}
             </Text>
           </MotionPressable>
         </View>

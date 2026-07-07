@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 
 import { dailyNet, monthlySummary } from "../engine/fireEngine";
 import { useFireStore } from "../data/fireStore";
+import { getI18n } from "../i18n";
 import type { Transaction } from "../features/types";
 import {
   addIsoDays,
@@ -29,6 +30,7 @@ export function useCalendarViewModel() {
   const [selectedDate, setSelectedDateState] = useState(() => todayIso());
   const [visibleMonth, setVisibleMonth] = useState(() => monthStart(todayIso()));
   const visibleParts = isoDateParts(visibleMonth);
+  const t = getI18n(snapshot.language);
   const categoriesById = useMemo(
     () => new Map(snapshot.categories.map((category) => [category.id, category])),
     [snapshot.categories],
@@ -84,10 +86,10 @@ export function useCalendarViewModel() {
   }
 
   return {
-    monthLabel: formatMonthYear(visibleMonth),
+    monthLabel: formatMonthYear(visibleMonth, t.locale),
     currency: snapshot.currency,
     summary: monthlySummary(snapshot.transactions, visibleParts.year, visibleParts.month),
-    weekdays: calendarWeekdays,
+    weekdays: snapshot.language === "zhHant" ? t.dates.weekdays : calendarWeekdays,
     calendarCells,
     selectedDate,
     selectedTransactions: selectedTransactionDetails,

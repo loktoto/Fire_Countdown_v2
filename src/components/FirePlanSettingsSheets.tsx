@@ -17,6 +17,7 @@ import { MotionPressable } from "./MotionPressable";
 import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
 import type { FireGoal, Milestone, ProjectionScenario } from "../features/types";
+import { useI18n } from "../i18n";
 import { money, percent } from "../utils/format";
 
 type FireGoalPatch = Partial<
@@ -340,6 +341,7 @@ export function FirePlanSummarySheet({
   onEdit: () => void;
 }) {
   const colors = useThemeColors();
+  const t = useI18n();
 
   if (!visible || !goal) {
     return null;
@@ -347,19 +349,19 @@ export function FirePlanSummarySheet({
 
   const rows = [
     {
-      label: "Current age",
-      value: goal.currentAge == null ? "Not set" : `${goal.currentAge} years old`,
+      label: t.firePlan.currentAge,
+      value: goal.currentAge == null ? t.common.notSet : t.common.yearsOld(goal.currentAge),
     },
     {
-      label: "Retirement monthly withdrawal",
+      label: t.firePlan.retirementMonthlyWithdrawal,
       value: money(goal.targetMonthlySpending, currency),
     },
     {
-      label: "Monthly saving",
+      label: t.common.monthlySaving,
       value: money(goal.monthlySaving, currency),
     },
     {
-      label: "Safe withdrawal rate",
+      label: t.common.withdrawalRate,
       value: percent(goal.withdrawalRate),
     },
   ];
@@ -367,9 +369,9 @@ export function FirePlanSummarySheet({
   return (
     <BaseSheet visible={visible} onClose={onClose}>
       <SheetHeader
-        kicker="Fire setup"
-        title="Current FIRE settings"
-        closeLabel="Close FIRE settings"
+        kicker={t.firePlan.fireSetup}
+        title={t.firePlan.currentFireSettings}
+        closeLabel={t.firePlan.closeFireSettings}
         onClose={onClose}
       />
       <ScrollView
@@ -381,7 +383,7 @@ export function FirePlanSummarySheet({
           <MotionPressable
             key={row.label}
             onPress={onEdit}
-            accessibilityLabel={`Edit ${row.label}`}
+            accessibilityLabel={`${t.common.edit} ${row.label}`}
             style={styles.listRow}
           >
             <View style={styles.listCopy}>
@@ -416,6 +418,7 @@ function FirePlanEditorContent({
   onClose: () => void;
   onSave: (goalId: string, patch: FireGoalPatch) => void;
 }) {
+  const t = useI18n();
   const [name, setName] = useState(goal.name);
   const [currentAge, setCurrentAge] = useState(
     goal.currentAge == null ? "" : String(goal.currentAge),
@@ -455,9 +458,9 @@ function FirePlanEditorContent({
   return (
     <>
       <SheetHeader
-        kicker="Fire plan"
-        title="Edit FIRE plan"
-        closeLabel="Close FIRE plan editor"
+        kicker={t.firePlan.firePlan}
+        title={t.firePlan.editFirePlan}
+        closeLabel={t.firePlan.closeFirePlanEditor}
         onClose={onClose}
       />
       <ScrollView
@@ -466,64 +469,64 @@ function FirePlanEditorContent({
         contentContainerStyle={styles.content}
       >
         <Field
-          label="Plan name"
+          label={t.firePlan.planName}
           value={name}
           onChangeText={setName}
-          placeholder="Main FIRE Goal"
-          accessibilityLabel="FIRE plan name"
+          placeholder={t.firePlan.mainFireGoal}
+          accessibilityLabel={t.firePlan.planName}
         />
         <Field
-          label="Current age"
+          label={t.firePlan.currentAge}
           value={currentAge}
           onChangeText={(value) => setCurrentAge(normalizeNumberInput(value))}
           keyboardType={Platform.OS === "ios" ? "decimal-pad" : "numeric"}
           inputMode="numeric"
-          placeholder="Enter age"
-          accessibilityLabel="Current age"
+          placeholder={t.firePlan.enterAge}
+          accessibilityLabel={t.firePlan.currentAge}
         />
         <Field
-          label="Retirement monthly withdrawal"
+          label={t.firePlan.retirementMonthlyWithdrawal}
           value={targetMonthlySpending}
           onChangeText={(value) => setTargetMonthlySpending(normalizeNumberInput(value))}
           keyboardType={Platform.OS === "ios" ? "decimal-pad" : "numeric"}
           inputMode="decimal"
           placeholder="28000"
-          accessibilityLabel="Retirement monthly withdrawal"
+          accessibilityLabel={t.firePlan.retirementMonthlyWithdrawal}
         />
         <Field
-          label="Monthly saving"
+          label={t.common.monthlySaving}
           value={monthlySaving}
           onChangeText={(value) => setMonthlySaving(normalizeNumberInput(value))}
           keyboardType={Platform.OS === "ios" ? "decimal-pad" : "numeric"}
           inputMode="decimal"
           placeholder="18000"
-          accessibilityLabel="Monthly saving"
+          accessibilityLabel={t.common.monthlySaving}
         />
         <View style={styles.splitFields}>
           <View style={styles.splitField}>
             <Field
-              label="Withdrawal rate %"
+              label={`${t.common.withdrawalRate} %`}
               value={withdrawalRate}
               onChangeText={(value) => setWithdrawalRate(normalizeNumberInput(value))}
               keyboardType={Platform.OS === "ios" ? "decimal-pad" : "numeric"}
               inputMode="decimal"
               placeholder="3.5"
-              accessibilityLabel="Withdrawal rate percent"
+              accessibilityLabel={`${t.common.withdrawalRate} %`}
             />
           </View>
           <View style={styles.splitField}>
             <Field
-              label="Inflation %"
+              label={`${t.common.inflation} %`}
               value={inflationRate}
               onChangeText={(value) => setInflationRate(normalizeNumberInput(value, true))}
               keyboardType={Platform.OS === "ios" ? "numbers-and-punctuation" : "numeric"}
               inputMode="decimal"
               placeholder="2.5"
-              accessibilityLabel="Inflation percent"
+              accessibilityLabel={`${t.common.inflation} %`}
             />
           </View>
         </View>
-        <SaveButton label="SAVE FIRE PLAN" disabled={!canSave} onPress={save} />
+        <SaveButton label={t.firePlan.saveFirePlan} disabled={!canSave} onPress={save} />
       </ScrollView>
     </>
   );
@@ -575,6 +578,7 @@ export function MilestoneListSheet({
   onEdit: (milestone: Milestone) => void;
 }) {
   const colors = useThemeColors();
+  const t = useI18n();
 
   if (!visible) {
     return null;
@@ -583,9 +587,9 @@ export function MilestoneListSheet({
   return (
     <BaseSheet visible={visible} onClose={onClose}>
       <SheetHeader
-        kicker="Milestones"
-        title="Milestone settings"
-        closeLabel="Close milestone settings"
+        kicker={t.firePlan.milestones}
+        title={t.firePlan.milestoneSettings}
+        closeLabel={t.firePlan.closeMilestoneSettings}
         onClose={onClose}
       />
       <ScrollView
@@ -593,15 +597,19 @@ export function MilestoneListSheet({
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
       >
-        <SaveButton label="ADD MILESTONE" disabled={false} onPress={onAdd} />
+        <SaveButton label={t.firePlan.addMilestone} disabled={false} onPress={onAdd} />
         {milestones.length > 0 ? (
           milestones.map((milestone, index) => {
-            const state = milestone.isHidden ? "Hidden" : milestone.isActive ? "Active" : "Paused";
+            const state = milestone.isHidden
+              ? t.firePlan.hidden
+              : milestone.isActive
+                ? t.firePlan.active
+                : t.firePlan.paused;
             return (
               <MotionPressable
                 key={milestone.id}
                 onPress={() => onEdit(milestone)}
-                accessibilityLabel={`Edit milestone ${milestone.name}`}
+                accessibilityLabel={`${t.firePlan.editMilestone} ${milestone.name}`}
                 style={styles.listRow}
               >
                 <View style={styles.listCopy}>
@@ -609,7 +617,7 @@ export function MilestoneListSheet({
                     numberOfLines={1}
                     style={[styles.listLabel, typography.body, { color: colors.textMuted }]}
                   >
-                    Milestone {index + 1} | {state}
+                    {t.firePlan.milestoneRow(index + 1, state)}
                   </Text>
                   <Text
                     numberOfLines={2}
@@ -626,7 +634,7 @@ export function MilestoneListSheet({
           })
         ) : (
           <Text style={[styles.emptyText, typography.body, { color: colors.textMuted }]}>
-            No milestones yet.
+            {t.firePlan.noMilestonesYet}
           </Text>
         )}
       </ScrollView>
@@ -652,6 +660,7 @@ export function ScenarioListSheet({
   onEdit: (scenario: ProjectionScenario) => void;
 }) {
   const colors = useThemeColors();
+  const t = useI18n();
   const canAddScenario = scenarios.length < 3;
 
   if (!visible) {
@@ -661,9 +670,9 @@ export function ScenarioListSheet({
   return (
     <BaseSheet visible={visible} onClose={onClose}>
       <SheetHeader
-        kicker="Fire methods"
-        title="FIRE method settings"
-        closeLabel="Close FIRE method settings"
+        kicker={t.firePlan.fireMethods}
+        title={t.firePlan.fireMethodSettings}
+        closeLabel={t.firePlan.closeFireMethodSettings}
         onClose={onClose}
       />
       <ScrollView
@@ -672,7 +681,7 @@ export function ScenarioListSheet({
         contentContainerStyle={styles.content}
       >
         <SaveButton
-          label={canAddScenario ? "ADD FIRE METHOD" : "MAX 3 FIRE METHODS"}
+          label={canAddScenario ? t.firePlan.addFireMethod : t.firePlan.maxFireMethods}
           disabled={!canAddScenario}
           onPress={onAdd}
         />
@@ -682,7 +691,7 @@ export function ScenarioListSheet({
             <MotionPressable
               key={scenario.id}
               onPress={() => onEdit(scenario)}
-              accessibilityLabel={`Edit FIRE method ${scenario.name}`}
+              accessibilityLabel={`${t.firePlan.editFireMethod} ${scenario.name}`}
               style={styles.listRow}
             >
               <View style={styles.listCopy}>
@@ -690,7 +699,7 @@ export function ScenarioListSheet({
                   numberOfLines={1}
                   style={[styles.listLabel, typography.body, { color: colors.textMuted }]}
                 >
-                  {scenario.isDefault ? "Default dashboard method" : "FIRE method"}
+                  {scenario.isDefault ? t.firePlan.defaultDashboardMethod : t.firePlan.fireMethod}
                 </Text>
                 <Text
                   numberOfLines={2}
@@ -698,15 +707,17 @@ export function ScenarioListSheet({
                   adjustsFontSizeToFit
                   style={[styles.listValue, typography.title, { color: colors.text }]}
                 >
-                  {scenario.name} | {money(assumptions.targetMonthlySpending, currency)}/mo |{" "}
-                  {percent(assumptions.withdrawalRate)} SWR
+                  {scenario.name} | {money(assumptions.targetMonthlySpending, currency)}
+                  {t.firePlan.monthlySuffix} | {percent(assumptions.withdrawalRate)} SWR
                 </Text>
                 <Text
                   numberOfLines={1}
                   style={[styles.listMeta, typography.body, { color: colors.textMuted }]}
                 >
-                  Save {money(assumptions.monthlySaving, currency)} | Return{" "}
-                  {signedPercentText(scenario.expectedReturnAdjustment)}
+                  {t.firePlan.saveReturn(
+                    money(assumptions.monthlySaving, currency),
+                    signedPercentText(scenario.expectedReturnAdjustment),
+                  )}
                 </Text>
               </View>
               <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textMuted} />
@@ -765,6 +776,7 @@ function ScenarioEditorContent({
   onArchive?: (scenarioId: string) => void;
 }) {
   const colors = useThemeColors();
+  const t = useI18n();
   const assumptions = scenarioAssumptions(goal, scenario);
   const [name, setName] = useState(scenario.name);
   const [targetMonthlySpending, setTargetMonthlySpending] = useState(
@@ -821,9 +833,9 @@ function ScenarioEditorContent({
   return (
     <>
       <SheetHeader
-        kicker="Fire method"
-        title="Edit FIRE method"
-        closeLabel="Close FIRE method editor"
+        kicker={t.firePlan.fireMethod}
+        title={t.firePlan.editFireMethod}
+        closeLabel={t.firePlan.closeFireMethodEditor}
         onClose={onClose}
       />
       <ScrollView
@@ -832,74 +844,74 @@ function ScenarioEditorContent({
         contentContainerStyle={styles.content}
       >
         <Field
-          label="Method name"
+          label={t.firePlan.methodName}
           value={name}
           onChangeText={setName}
-          placeholder="Conservative FIRE"
-          accessibilityLabel="FIRE method name"
+          placeholder={t.firePlan.conservativeFire}
+          accessibilityLabel={t.firePlan.methodName}
         />
         <Field
-          label="Retirement monthly withdrawal"
+          label={t.firePlan.retirementMonthlyWithdrawal}
           value={targetMonthlySpending}
           onChangeText={(value) => setTargetMonthlySpending(normalizeNumberInput(value))}
           keyboardType={Platform.OS === "ios" ? "decimal-pad" : "numeric"}
           inputMode="decimal"
           placeholder="28000"
-          accessibilityLabel="Method retirement monthly withdrawal"
+          accessibilityLabel={t.firePlan.retirementMonthlyWithdrawal}
         />
         <Field
-          label="Monthly saving"
+          label={t.common.monthlySaving}
           value={monthlySaving}
           onChangeText={(value) => setMonthlySaving(normalizeNumberInput(value))}
           keyboardType={Platform.OS === "ios" ? "decimal-pad" : "numeric"}
           inputMode="decimal"
           placeholder="18000"
-          accessibilityLabel="Method monthly saving"
+          accessibilityLabel={t.common.monthlySaving}
         />
         <View style={styles.splitFields}>
           <View style={styles.splitField}>
             <Field
-              label="Safe withdrawal rate %"
+              label={t.firePlan.safeWithdrawalRate}
               value={withdrawalRate}
               onChangeText={(value) => setWithdrawalRate(normalizeNumberInput(value))}
               keyboardType={Platform.OS === "ios" ? "numbers-and-punctuation" : "numeric"}
               inputMode="decimal"
               placeholder="3.5"
-              accessibilityLabel="Method safe withdrawal rate percent"
+              accessibilityLabel={t.firePlan.safeWithdrawalRate}
             />
           </View>
           <View style={styles.splitField}>
             <Field
-              label="Inflation %"
+              label={`${t.common.inflation} %`}
               value={inflationRate}
               onChangeText={(value) => setInflationRate(normalizeNumberInput(value, true))}
               keyboardType={Platform.OS === "ios" ? "numbers-and-punctuation" : "numeric"}
               inputMode="decimal"
               placeholder="2.5"
-              accessibilityLabel="Method inflation percent"
+              accessibilityLabel={`${t.common.inflation} %`}
             />
           </View>
         </View>
         <Field
-          label="Return adjustment %"
+          label={t.firePlan.returnAdjustment}
           value={expectedReturnAdjustment}
           onChangeText={(value) => setExpectedReturnAdjustment(normalizeNumberInput(value, true))}
           keyboardType={Platform.OS === "ios" ? "numbers-and-punctuation" : "numeric"}
           inputMode="decimal"
           placeholder="-2"
-          accessibilityLabel="Expected return adjustment percent"
+          accessibilityLabel={t.firePlan.returnAdjustment}
         />
         <ToggleRow
-          label="Default dashboard version"
+          label={t.firePlan.defaultDashboardVersion}
           value={isDefault}
           onPress={() => setIsDefault((current) => !current)}
         />
-        <SaveButton label="SAVE FIRE VERSION" disabled={!canSave} onPress={save} />
+        <SaveButton label={t.firePlan.saveFireVersion} disabled={!canSave} onPress={save} />
         {onArchive ? (
           <MotionPressable
             onPress={archive}
             accessibilityLabel={
-              confirmingArchive ? "Confirm delete FIRE method" : "Delete FIRE method"
+              confirmingArchive ? t.firePlan.confirmDeleteFireMethod : t.firePlan.deleteFireMethod
             }
             style={[
               styles.archive,
@@ -916,7 +928,7 @@ function ScenarioEditorContent({
                 { color: confirmingArchive ? colors.negative : colors.textMuted },
               ]}
             >
-              {confirmingArchive ? "CONFIRM DELETE" : "DELETE FIRE METHOD"}
+              {confirmingArchive ? t.common.confirmDelete : t.firePlan.deleteFireMethod}
             </Text>
           </MotionPressable>
         ) : null}
@@ -937,6 +949,7 @@ function MilestoneEditorContent({
   onArchive?: (milestoneId: string) => void;
 }) {
   const colors = useThemeColors();
+  const t = useI18n();
   const [name, setName] = useState(milestone.name);
   const [targetAmount, setTargetAmount] = useState(String(milestone.targetAmount));
   const [targetDate, setTargetDate] = useState(milestone.targetDate ?? "");
@@ -985,9 +998,9 @@ function MilestoneEditorContent({
   return (
     <>
       <SheetHeader
-        kicker="Milestone"
-        title="Edit milestone"
-        closeLabel="Close milestone editor"
+        kicker={t.firePlan.milestones}
+        title={t.firePlan.editMilestone}
+        closeLabel={t.firePlan.closeMilestoneEditor}
         onClose={onClose}
       />
       <ScrollView
@@ -996,58 +1009,60 @@ function MilestoneEditorContent({
         contentContainerStyle={styles.content}
       >
         <Field
-          label="Milestone name"
+          label={t.firePlan.milestoneName}
           value={name}
           onChangeText={setName}
-          placeholder="Coast FIRE"
-          accessibilityLabel="Milestone name"
+          placeholder={t.firePlan.coastFire}
+          accessibilityLabel={t.firePlan.milestoneName}
         />
         <Field
-          label="Target amount"
+          label={t.firePlan.targetAmount}
           value={targetAmount}
           onChangeText={(value) => setTargetAmount(normalizeNumberInput(value))}
           keyboardType={Platform.OS === "ios" ? "decimal-pad" : "numeric"}
           inputMode="decimal"
           placeholder="450000"
-          accessibilityLabel="Milestone target amount"
+          accessibilityLabel={t.firePlan.targetAmount}
         />
         <View style={styles.splitFields}>
           <View style={styles.splitField}>
             <Field
-              label="Target date"
+              label={t.firePlan.targetDate}
               value={targetDate}
               onChangeText={(value) => setTargetDate(normalizeDateInput(value))}
               placeholder="YYYY-MM-DD"
-              accessibilityLabel="Milestone target date"
+              accessibilityLabel={t.firePlan.targetDate}
             />
           </View>
           <View style={styles.splitField}>
             <Field
-              label="Return override %"
+              label={t.firePlan.returnOverride}
               value={expectedReturnOverride}
               onChangeText={(value) => setExpectedReturnOverride(normalizeNumberInput(value, true))}
               keyboardType={Platform.OS === "ios" ? "numbers-and-punctuation" : "numeric"}
               inputMode="decimal"
               placeholder="-"
-              accessibilityLabel="Milestone return override percent"
+              accessibilityLabel={t.firePlan.returnOverride}
             />
           </View>
         </View>
         <ToggleRow
-          label="Active milestone"
+          label={t.firePlan.activeMilestone}
           value={isActive}
           onPress={() => setIsActive((current) => !current)}
         />
         <ToggleRow
-          label="Show on FIRE path"
+          label={t.firePlan.showOnFirePath}
           value={showOnPath}
           onPress={() => setShowOnPath((current) => !current)}
         />
-        <SaveButton label="SAVE MILESTONE" disabled={!canSave} onPress={save} />
+        <SaveButton label={t.firePlan.saveMilestone} disabled={!canSave} onPress={save} />
         {onArchive ? (
           <MotionPressable
             onPress={archive}
-            accessibilityLabel={confirmingArchive ? "Confirm delete milestone" : "Delete milestone"}
+            accessibilityLabel={
+              confirmingArchive ? t.firePlan.confirmDeleteMilestone : t.firePlan.deleteMilestone
+            }
             style={[
               styles.archive,
               {
@@ -1063,7 +1078,7 @@ function MilestoneEditorContent({
                 { color: confirmingArchive ? colors.negative : colors.textMuted },
               ]}
             >
-              {confirmingArchive ? "CONFIRM DELETE" : "DELETE MILESTONE"}
+              {confirmingArchive ? t.common.confirmDelete : t.firePlan.deleteMilestone}
             </Text>
           </MotionPressable>
         ) : null}

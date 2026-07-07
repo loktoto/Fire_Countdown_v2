@@ -12,6 +12,7 @@ import Animated, {
 import { useReducedMotion } from "../hooks/useReducedMotion";
 import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
+import { useI18n } from "../i18n";
 
 const FIRE_EMOJI = "\u{1F525}";
 const CRYING_EMOJI = "\u{1F622}";
@@ -65,6 +66,7 @@ function impactPercentToMeterStrength(percent: number) {
 
 export function FireImpactCard({ amount, impact }: { amount: number; impact: Impact }) {
   const colors = useThemeColors();
+  const t = useI18n();
   const reducedMotion = useReducedMotion();
   const meter = useSharedValue(0);
   const walkPhase = useSharedValue(0);
@@ -91,7 +93,7 @@ export function FireImpactCard({ amount, impact }: { amount: number; impact: Imp
       return {
         color: colors.primary,
         soft: `${colors.primary}18`,
-        headline: "No FIRE impact yet",
+        headline: t.fireImpact.noImpactYet,
       };
     }
 
@@ -99,7 +101,7 @@ export function FireImpactCard({ amount, impact }: { amount: number; impact: Imp
       return {
         color: colors.textMuted,
         soft: `${colors.textMuted}14`,
-        headline: "FIRE stays out of range",
+        headline: t.fireImpact.outOfRange,
       };
     }
 
@@ -107,7 +109,7 @@ export function FireImpactCard({ amount, impact }: { amount: number; impact: Imp
       return {
         color: colors.negative,
         soft: `${colors.negative}18`,
-        headline: `FIRE moves out of range ${CRYING_EMOJI}`,
+        headline: t.fireImpact.movesOutOfRange(CRYING_EMOJI),
       };
     }
 
@@ -115,7 +117,7 @@ export function FireImpactCard({ amount, impact }: { amount: number; impact: Imp
       return {
         color: colors.positive,
         soft: `${colors.positive}18`,
-        headline: `FIRE is back in range ${FIRE_EMOJI}`,
+        headline: t.fireImpact.backInRange(FIRE_EMOJI),
       };
     }
 
@@ -123,7 +125,7 @@ export function FireImpactCard({ amount, impact }: { amount: number; impact: Imp
       return {
         color: colors.positive,
         soft: `${colors.positive}18`,
-        headline: `FIRE is closer by ${resultDaysLabel(absoluteDays)} ${FIRE_EMOJI}`,
+        headline: t.fireImpact.closer(resultDaysLabel(absoluteDays), FIRE_EMOJI),
       };
     }
 
@@ -131,14 +133,14 @@ export function FireImpactCard({ amount, impact }: { amount: number; impact: Imp
       return {
         color: colors.negative,
         soft: `${colors.negative}18`,
-        headline: `FIRE is behind by ${resultDaysLabel(absoluteDays)} ${CRYING_EMOJI}`,
+        headline: t.fireImpact.behind(resultDaysLabel(absoluteDays), CRYING_EMOJI),
       };
     }
 
     return {
       color: colors.primary,
       soft: `${colors.primary}18`,
-      headline: "FIRE date is unchanged",
+      headline: t.fireImpact.unchanged,
     };
   }, [
     absoluteDays,
@@ -151,6 +153,7 @@ export function FireImpactCard({ amount, impact }: { amount: number; impact: Imp
     direction,
     impact.baseDays,
     impact.simulatedDays,
+    t.fireImpact,
   ]);
 
   useEffect(() => {
@@ -206,7 +209,7 @@ export function FireImpactCard({ amount, impact }: { amount: number; impact: Imp
 
   return (
     <View
-      accessibilityLabel={`${tone.headline}. FIRE impact ${percentLabel}`}
+      accessibilityLabel={t.fireImpact.accessibility(tone.headline, percentLabel)}
       style={[
         styles.card,
         {
@@ -232,7 +235,7 @@ export function FireImpactCard({ amount, impact }: { amount: number; impact: Imp
       <View style={styles.chartRow}>
         <View style={styles.percentHeader}>
           <Text style={[styles.percentLabel, typography.button, { color: colors.textMuted }]}>
-            FIRE %
+            {t.fireImpact.firePercent}
           </Text>
           <Text style={[styles.percentValue, typography.button, { color: tone.color }]}>
             {percentLabel}

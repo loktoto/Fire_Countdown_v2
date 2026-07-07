@@ -19,6 +19,7 @@ import { SegmentedControl } from "./SegmentedControl";
 import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
 import type { Category, Transaction, TransactionType } from "../features/types";
+import { useI18n } from "../i18n";
 
 type CalendarTransaction = Transaction & {
   category: Category | null;
@@ -119,6 +120,7 @@ function TransactionEditorContent({
   onArchive: (id: string) => void;
 }) {
   const colors = useThemeColors();
+  const t = useI18n();
   const [amountText, setAmountText] = useState(String(transaction.amount));
   const [type, setType] = useState<TransactionType>(transaction.type);
   const [categoryId, setCategoryId] = useState(transaction.categoryId);
@@ -157,13 +159,15 @@ function TransactionEditorContent({
       <View style={styles.header}>
         <View>
           <Text style={[styles.kicker, typography.button, { color: colors.primary }]}>
-            Transaction
+            {t.transactions.transaction}
           </Text>
-          <Text style={[styles.title, typography.title, { color: colors.text }]}>Edit record</Text>
+          <Text style={[styles.title, typography.title, { color: colors.text }]}>
+            {t.transactions.editRecord}
+          </Text>
         </View>
         <MotionPressable
           onPress={onClose}
-          accessibilityLabel="Close transaction editor"
+          accessibilityLabel={t.transactions.closeEditor}
           style={[styles.closeButton, { backgroundColor: colors.backgroundAlt }]}
         >
           <MaterialCommunityIcons name="close" size={20} color={colors.textMuted} />
@@ -185,14 +189,14 @@ function TransactionEditorContent({
             }
           }}
           options={[
-            { label: "Expense", value: "expense" },
-            { label: "Income", value: "income" },
+            { label: t.common.expense, value: "expense" },
+            { label: t.common.income, value: "income" },
           ]}
         />
 
         <View style={styles.fieldGroup}>
           <Text style={[styles.fieldLabel, typography.button, { color: colors.textMuted }]}>
-            Amount
+            {t.transactions.amount}
           </Text>
           <View
             style={[
@@ -213,14 +217,14 @@ function TransactionEditorContent({
               placeholder="0"
               placeholderTextColor={colors.textMuted}
               style={[styles.amountInput, typography.display, { color: colors.text }]}
-              accessibilityLabel="Transaction amount"
+              accessibilityLabel={t.log.transactionAmount}
             />
           </View>
         </View>
 
         <View style={styles.fieldGroup}>
           <Text style={[styles.fieldLabel, typography.button, { color: colors.textMuted }]}>
-            Category
+            {t.common.category}
           </Text>
           <View style={styles.categoryWrap}>
             {categoriesForType.map((category) => {
@@ -230,7 +234,7 @@ function TransactionEditorContent({
                 <MotionPressable
                   key={category.id}
                   onPress={() => setCategoryId(category.id)}
-                  accessibilityLabel={`${category.name} category`}
+                  accessibilityLabel={t.log.categoryA11y(category.name)}
                   accessibilityState={{ selected: active }}
                   style={[
                     styles.category,
@@ -259,7 +263,7 @@ function TransactionEditorContent({
 
         <View style={styles.fieldGroup}>
           <Text style={[styles.fieldLabel, typography.button, { color: colors.textMuted }]}>
-            Date
+            {t.common.date}
           </Text>
           <TextInput
             value={date}
@@ -277,20 +281,20 @@ function TransactionEditorContent({
                 backgroundColor: colors.backgroundAlt,
               },
             ]}
-            accessibilityLabel="Transaction date"
+            accessibilityLabel={t.transactions.transactionDate}
           />
         </View>
 
         <View style={styles.fieldGroup}>
           <Text style={[styles.fieldLabel, typography.button, { color: colors.textMuted }]}>
-            Notes
+            {t.common.notes}
           </Text>
           <TextInput
             value={note}
             onChangeText={setNote}
             maxLength={120}
             multiline
-            placeholder="No note yet"
+            placeholder={t.log.noNoteYet}
             placeholderTextColor={colors.textMuted}
             selectionColor={colors.primary}
             style={[
@@ -303,27 +307,27 @@ function TransactionEditorContent({
                 backgroundColor: colors.backgroundAlt,
               },
             ]}
-            accessibilityLabel="Transaction note"
+            accessibilityLabel={t.log.transactionNote}
           />
         </View>
 
         <View style={styles.actions}>
           <MotionPressable
             onPress={archive}
-            accessibilityLabel="Archive transaction"
+            accessibilityLabel={t.transactions.archiveTransaction}
             style={[styles.secondaryAction, { borderColor: colors.negative }]}
           >
             <MaterialCommunityIcons name="archive-outline" size={18} color={colors.negative} />
             <Text
               style={[styles.secondaryActionText, typography.button, { color: colors.negative }]}
             >
-              ARCHIVE
+              {t.common.archive}
             </Text>
           </MotionPressable>
           <MotionPressable
             onPress={save}
             disabled={!canSave}
-            accessibilityLabel="Save transaction"
+            accessibilityLabel={t.transactions.saveTransaction}
             accessibilityState={{ disabled: !canSave }}
             style={[
               styles.primaryAction,
@@ -337,7 +341,7 @@ function TransactionEditorContent({
                 { color: canSave ? colors.onPrimary : colors.textMuted },
               ]}
             >
-              SAVE
+              {t.common.save}
             </Text>
           </MotionPressable>
         </View>

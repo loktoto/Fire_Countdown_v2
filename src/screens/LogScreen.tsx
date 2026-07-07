@@ -15,6 +15,7 @@ import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
 import type { Category } from "../features/types";
 import { useLogViewModel } from "../hooks/useLogViewModel";
+import { useI18n } from "../i18n";
 
 function formatDateInputLabel(date: string) {
   const [year, month, day] = date.split("-");
@@ -23,6 +24,7 @@ function formatDateInputLabel(date: string) {
 
 export function LogScreen() {
   const colors = useThemeColors();
+  const t = useI18n();
   const vm = useLogViewModel();
   const amountRef = useRef<TextInput>(null);
   const [categorySheetVisible, setCategorySheetVisible] = useState(false);
@@ -70,7 +72,7 @@ export function LogScreen() {
     <ScreenContainer>
       <GlassCard compact style={styles.amountCard}>
         <Text style={[styles.amountLabel, typography.button, { color: colors.textMuted }]}>
-          AMOUNT
+          {t.log.amount}
         </Text>
         <View style={styles.amountInputRow}>
           <Text style={[styles.currency, typography.display, { color: colors.textMuted }]}>
@@ -89,15 +91,15 @@ export function LogScreen() {
             placeholder="0"
             placeholderTextColor={colors.textMuted}
             style={[styles.amountInput, typography.display, { color: colors.text }]}
-            accessibilityLabel="Transaction amount"
+            accessibilityLabel={t.log.transactionAmount}
           />
         </View>
         <SegmentedControl
           value={vm.type}
           onChange={vm.setType}
           options={[
-            { label: "Expense", value: "expense" },
-            { label: "Income", value: "income" },
+            { label: t.common.expense, value: "expense" },
+            { label: t.common.income, value: "income" },
           ]}
         />
         <View style={styles.dateBlock}>
@@ -109,7 +111,7 @@ export function LogScreen() {
           >
             <MotionPressable
               onPress={() => vm.moveSelectedDate(-1)}
-              accessibilityLabel="Previous day"
+              accessibilityLabel={t.log.previousDay}
               style={styles.dateArrow}
               hitSlop={8}
             >
@@ -117,7 +119,7 @@ export function LogScreen() {
             </MotionPressable>
             <MotionPressable
               onPress={() => setDatePickerVisible(true)}
-              accessibilityLabel="Pick transaction day"
+              accessibilityLabel={t.log.pickTransactionDay}
               style={styles.dateCopy}
             >
               <View style={styles.dateValueRow}>
@@ -137,7 +139,7 @@ export function LogScreen() {
             </MotionPressable>
             <MotionPressable
               onPress={() => vm.moveSelectedDate(1)}
-              accessibilityLabel="Next day"
+              accessibilityLabel={t.log.nextDay}
               style={styles.dateArrow}
               hitSlop={8}
             >
@@ -158,10 +160,10 @@ export function LogScreen() {
             maxLength={120}
             returnKeyType="done"
             selectionColor={colors.primary}
-            placeholder="No note yet"
+            placeholder={t.log.noNoteYet}
             placeholderTextColor={colors.textMuted}
             style={[styles.noteInput, typography.body, { color: colors.text }]}
-            accessibilityLabel="Transaction note"
+            accessibilityLabel={t.log.transactionNote}
           />
         </View>
       </GlassCard>
@@ -170,17 +172,17 @@ export function LogScreen() {
 
       <View style={styles.categoryHeader}>
         <Text style={[styles.sectionTitle, typography.title, { color: colors.text }]}>
-          Category
+          {t.common.category}
         </Text>
         {selectedCategory ? (
           <MotionPressable
             onPress={() => openEditCategory(selectedCategory)}
-            accessibilityLabel="Edit selected category"
+            accessibilityLabel={t.log.editSelectedCategory}
             style={[styles.editButton, { borderColor: colors.surfaceBorder }]}
           >
             <MaterialCommunityIcons name="pencil-outline" size={16} color={colors.primary} />
             <Text style={[styles.editText, typography.button, { color: colors.primary }]}>
-              Edit
+              {t.common.edit}
             </Text>
           </MotionPressable>
         ) : null}
@@ -194,7 +196,7 @@ export function LogScreen() {
               key={category.id}
               onPress={() => vm.setCategoryId(category.id)}
               onLongPress={() => openEditCategory(category)}
-              accessibilityLabel={`${category.name} category`}
+              accessibilityLabel={t.log.categoryA11y(category.name)}
               accessibilityState={{ selected: active }}
               style={[
                 styles.category,
@@ -219,7 +221,7 @@ export function LogScreen() {
         })}
         <MotionPressable
           onPress={openNewCategory}
-          accessibilityLabel="Add category"
+          accessibilityLabel={t.log.addCategory}
           style={[
             styles.category,
             styles.addCategory,
@@ -228,7 +230,7 @@ export function LogScreen() {
         >
           <MaterialCommunityIcons name="plus" size={24} color={colors.primary} />
           <Text style={[styles.categoryText, typography.button, { color: colors.primary }]}>
-            Add
+            {t.common.add}
           </Text>
         </MotionPressable>
       </View>
@@ -236,10 +238,10 @@ export function LogScreen() {
       <MotionPressable
         onPress={vm.confirm}
         style={[styles.confirm, { backgroundColor: colors.primary, shadowColor: colors.primary }]}
-        accessibilityLabel="Confirm transaction"
+        accessibilityLabel={t.log.confirmTransaction}
       >
         <Text style={[styles.confirmText, typography.button, { color: colors.onPrimary }]}>
-          CONFIRM TRANSACTION
+          {t.log.confirmTransactionCta}
         </Text>
       </MotionPressable>
 

@@ -16,6 +16,7 @@ import Svg, {
 import type { ProjectionPoint } from "../engine/fireEngine";
 import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
+import { useI18n } from "../i18n";
 
 const viewBox = {
   width: 328,
@@ -200,6 +201,7 @@ export function WealthCrossoverChart({
   currentAge?: number | null;
 }) {
   const colors = useThemeColors();
+  const t = useI18n();
   const [chartWidth, setChartWidth] = useState(0);
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const reached = projection.find((point) => point.reached);
@@ -263,13 +265,13 @@ export function WealthCrossoverChart({
         <View style={styles.legendItem}>
           <View style={[styles.legendLine, { backgroundColor: colors.primary }]} />
           <Text style={[styles.legendText, typography.bodyMedium, { color: colors.text }]}>
-            Portfolio
+            {t.chart.portfolio}
           </Text>
         </View>
         <View style={styles.legendItem}>
           <View style={[styles.legendLine, { backgroundColor: colors.negative }]} />
           <Text style={[styles.legendText, typography.bodyMedium, { color: colors.text }]}>
-            FIRE target
+            {t.chart.fireTarget}
           </Text>
         </View>
       </View>
@@ -284,11 +286,8 @@ export function WealthCrossoverChart({
         <Svg
           accessibilityLabel={
             reached
-              ? `Wealth crossover chart. Portfolio reaches the required FIRE target in ${reached.date.slice(
-                  0,
-                  7,
-                )}. After FIRE, monthly savings stop and retirement withdrawals are modeled.`
-              : "Wealth crossover chart. Portfolio does not reach the required FIRE target in the modeled window."
+              ? t.chart.reachedAccessibility(reached.date.slice(0, 7))
+              : t.chart.notReachedAccessibility
           }
           width="100%"
           height={viewBox.height}
@@ -344,7 +343,7 @@ export function WealthCrossoverChart({
                 fontSize="10"
                 fontWeight="600"
               >
-                Now
+                {t.chart.now}
               </SvgText>
             </>
           ) : null}
@@ -382,7 +381,7 @@ export function WealthCrossoverChart({
                 fontSize="10"
                 fontWeight="800"
               >
-                FIRE
+                {t.chart.fire}
               </SvgText>
             </>
           ) : null}
@@ -422,7 +421,7 @@ export function WealthCrossoverChart({
                 fontSize="11"
                 fontWeight="800"
               >
-                Projection
+                {t.chart.projection}
               </SvgText>
               <SvgText
                 x={selectedTooltip.x + 12}
@@ -431,7 +430,7 @@ export function WealthCrossoverChart({
                 fontSize="10"
                 fontWeight="700"
               >
-                {selectedAge === null ? "Age not set" : `Age ${selectedAge}`}
+                {selectedAge === null ? t.chart.ageNotSet : t.chart.age(selectedAge)}
               </SvgText>
               <SvgText
                 x={selectedTooltip.x + 12}
@@ -456,12 +455,7 @@ export function WealthCrossoverChart({
         </Svg>
       </View>
       <Text style={[styles.summary, typography.body, { color: colors.textMuted }]}>
-        {reached
-          ? `Crossover: ${reached.date.slice(
-              0,
-              7,
-            )} | after FIRE, savings stop and withdrawals are modeled.`
-          : "Projection does not reach FIRE in the modeled window."}
+        {reached ? t.chart.reachedSummary(reached.date.slice(0, 7)) : t.chart.notReachedSummary}
       </Text>
     </View>
   );

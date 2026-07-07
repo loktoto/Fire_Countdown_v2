@@ -64,9 +64,9 @@ export function daysInIsoMonth(date: string) {
   return new Date(parts.year, parts.month, 0).getDate();
 }
 
-export function formatMonthYear(date: string) {
+export function formatMonthYear(date: string, locale?: string) {
   const parts = isoDateParts(date);
-  return new Date(parts.year, parts.month - 1, 1).toLocaleDateString(undefined, {
+  return new Date(parts.year, parts.month - 1, 1).toLocaleDateString(locale, {
     month: "long",
     year: "numeric",
   });

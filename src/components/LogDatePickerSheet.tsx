@@ -6,6 +6,7 @@ import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from "react-nati
 import { MotionPressable } from "./MotionPressable";
 import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
+import { useI18n } from "../i18n";
 import {
   addIsoDays,
   addIsoMonths,
@@ -47,6 +48,7 @@ function VisibleLogDatePickerSheet({
   onToday,
 }: LogDatePickerSheetProps) {
   const colors = useThemeColors();
+  const t = useI18n();
   const [visibleMonth, setVisibleMonth] = useState(() => monthStart(selectedDate));
   const today = todayIso();
   const monthParts = isoDateParts(visibleMonth);
@@ -112,7 +114,7 @@ function VisibleLogDatePickerSheet({
           <View style={styles.header}>
             <MotionPressable
               onPress={onClose}
-              accessibilityLabel="Close date picker"
+              accessibilityLabel={t.datePicker.close}
               style={[styles.closeButton, { backgroundColor: colors.backgroundAlt }]}
             >
               <MaterialCommunityIcons name="close" size={20} color={colors.textMuted} />
@@ -121,7 +123,7 @@ function VisibleLogDatePickerSheet({
 
           <MotionPressable
             onPress={selectToday}
-            accessibilityLabel="Use today"
+            accessibilityLabel={t.datePicker.useToday}
             style={[
               styles.todayButton,
               { borderColor: colors.primary, backgroundColor: `${colors.primary}18` },
@@ -133,7 +135,7 @@ function VisibleLogDatePickerSheet({
               color={colors.primary}
             />
             <Text style={[styles.todayText, typography.button, { color: colors.primary }]}>
-              TODAY
+              {t.common.today}
             </Text>
           </MotionPressable>
 
@@ -141,7 +143,7 @@ function VisibleLogDatePickerSheet({
             <View style={styles.navCluster}>
               <MotionPressable
                 onPress={() => setVisibleMonth((current) => addIsoMonths(current, -12))}
-                accessibilityLabel="Previous year"
+                accessibilityLabel={t.calendar.previousYear}
                 style={[styles.navButton, { borderColor: colors.surfaceBorder }]}
               >
                 <MaterialCommunityIcons
@@ -152,7 +154,7 @@ function VisibleLogDatePickerSheet({
               </MotionPressable>
               <MotionPressable
                 onPress={() => setVisibleMonth((current) => addIsoMonths(current, -1))}
-                accessibilityLabel="Previous month"
+                accessibilityLabel={t.calendar.previousMonth}
                 style={[styles.navButton, { borderColor: colors.surfaceBorder }]}
               >
                 <MaterialCommunityIcons name="chevron-left" size={20} color={colors.primary} />
@@ -163,19 +165,19 @@ function VisibleLogDatePickerSheet({
               adjustsFontSizeToFit
               style={[styles.monthLabel, typography.title, { color: colors.text }]}
             >
-              {formatMonthYear(visibleMonth)}
+              {formatMonthYear(visibleMonth, t.locale)}
             </Text>
             <View style={styles.navCluster}>
               <MotionPressable
                 onPress={() => setVisibleMonth((current) => addIsoMonths(current, 1))}
-                accessibilityLabel="Next month"
+                accessibilityLabel={t.calendar.nextMonth}
                 style={[styles.navButton, { borderColor: colors.surfaceBorder }]}
               >
                 <MaterialCommunityIcons name="chevron-right" size={20} color={colors.primary} />
               </MotionPressable>
               <MotionPressable
                 onPress={() => setVisibleMonth((current) => addIsoMonths(current, 12))}
-                accessibilityLabel="Next year"
+                accessibilityLabel={t.calendar.nextYear}
                 style={[styles.navButton, { borderColor: colors.surfaceBorder }]}
               >
                 <MaterialCommunityIcons
@@ -188,7 +190,7 @@ function VisibleLogDatePickerSheet({
           </View>
 
           <View style={styles.weekdayRow}>
-            {weekdays.map((weekday) => (
+            {(t.locale === "zh-Hant-HK" ? t.dates.weekdays : weekdays).map((weekday) => (
               <Text
                 key={weekday}
                 style={[styles.weekday, typography.button, { color: colors.textMuted }]}
@@ -207,7 +209,7 @@ function VisibleLogDatePickerSheet({
                     <MotionPressable
                       key={day.key}
                       onPress={() => selectDate(day.date)}
-                      accessibilityLabel={`Use ${day.date}`}
+                      accessibilityLabel={t.datePicker.useDate(day.date)}
                       accessibilityState={{ selected: active }}
                       style={[
                         styles.day,

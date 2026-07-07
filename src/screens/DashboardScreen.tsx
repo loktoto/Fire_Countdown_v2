@@ -12,6 +12,7 @@ import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
 import type { CategoryCashflowLeader } from "../engine/selectors";
 import { useDashboardViewModel } from "../hooks/useDashboardViewModel";
+import { useI18n } from "../i18n";
 import { money, percent, signedMoney } from "../utils/format";
 
 function SummaryLeaderCard({
@@ -28,6 +29,7 @@ function SummaryLeaderCard({
   currency: string;
 }) {
   const colors = useThemeColors();
+  const t = useI18n();
   const color = leader?.categoryColor ?? (tone === "positive" ? colors.positive : colors.negative);
   const amount = leader ? money(leader.amount, currency) : money(0, currency);
 
@@ -65,7 +67,7 @@ function SummaryLeaderCard({
         {amount}
       </Text>
       <Text style={[styles.summaryMeta, typography.body, { color: colors.textMuted }]}>
-        {leader ? `${leader.transactionCount} records this month` : "No records this month"}
+        {leader ? t.common.recordsThisMonth(leader.transactionCount) : t.common.noRecordsThisMonth}
       </Text>
     </View>
   );
@@ -111,12 +113,13 @@ function ProjectionMetric({
 
 export function DashboardScreen() {
   const colors = useThemeColors();
+  const t = useI18n();
   const router = useRouter();
   const vm = useDashboardViewModel();
   const goalCurrency = vm.goal.baseCurrency;
   const years =
-    vm.projectedFireDays === null ? "No" : Math.max(0, vm.projectedFireDays / 365.25).toFixed(1);
-  const projectedFireMonth = vm.projectedFireDate?.slice(0, 7) ?? "Not reached";
+    vm.projectedFireDays === null ? null : Math.max(0, vm.projectedFireDays / 365.25).toFixed(1);
+  const projectedFireMonth = vm.projectedFireDate?.slice(0, 7) ?? t.dashboard.notReached;
   const projectedFireAge =
     vm.projectedFireDays === null || vm.goal.currentAge == null
       ? null
@@ -126,10 +129,10 @@ export function DashboardScreen() {
     <ScreenContainer>
       <View>
         <Text style={[styles.kicker, typography.button, { color: colors.primary }]}>
-          Projection lab
+          {t.dashboard.kicker}
         </Text>
         <Text style={[styles.title, typography.display, { color: colors.text }]}>
-          FIRE trajectory
+          {t.dashboard.title}
         </Text>
       </View>
 
@@ -152,7 +155,7 @@ export function DashboardScreen() {
         <View style={styles.heroHeader}>
           <View style={styles.heroCopy}>
             <Text style={[styles.liveLabel, typography.body, { color: colors.textMuted }]}>
-              Projected FIRE
+              {t.dashboard.projectedFire}
             </Text>
             <Text
               numberOfLines={1}
@@ -162,31 +165,39 @@ export function DashboardScreen() {
               {projectedFireMonth}
             </Text>
             <Text style={[styles.heroMeta, typography.body, { color: colors.textMuted }]}>
-              {vm.scenario?.name ?? "Base"} method | {money(vm.target, goalCurrency)} target |{" "}
-              {vm.projectedFireDays === null ? "No crossover" : `${years} years`}
+              {vm.scenario?.name ?? t.dashboard.base} {t.dashboard.method} |{" "}
+              {money(vm.target, goalCurrency)} {t.dashboard.target} |{" "}
+              {years === null ? t.dashboard.noCrossover : t.dashboard.years(years)}
             </Text>
           </View>
           <StatusBadge
             label={
               vm.projectedFireDays === null
-                ? "No crossover"
+                ? t.dashboard.noCrossover
                 : projectedFireAge == null
-                  ? "Age not set"
-                  : `Age ${projectedFireAge}`
+                  ? t.dashboard.ageNotSet
+                  : t.dashboard.age(projectedFireAge)
             }
             tone={vm.projectedFireDays === null ? "warning" : "primary"}
           />
         </View>
         <View style={styles.projectionGrid}>
-          <ProjectionMetric label="Progress" value={percent(vm.progress)} tone="primary" />
-          <ProjectionMetric label="Included FIRE" value={money(vm.includedAssets, goalCurrency)} />
           <ProjectionMetric
-            label="Saved cashflow"
+            label={t.dashboard.progress}
+            value={percent(vm.progress)}
+            tone="primary"
+          />
+          <ProjectionMetric
+            label={t.dashboard.includedFire}
+            value={money(vm.includedAssets, goalCurrency)}
+          />
+          <ProjectionMetric
+            label={t.dashboard.savedCashflow}
             value={signedMoney(vm.transactionAdjustment, goalCurrency)}
             tone={vm.transactionAdjustment >= 0 ? "positive" : "negative"}
           />
           <ProjectionMetric
-            label="Month net"
+            label={t.dashboard.monthNet}
             value={signedMoney(vm.monthSummary.net, goalCurrency)}
             tone={vm.monthSummary.net >= 0 ? "positive" : "negative"}
           />
@@ -196,25 +207,25 @@ export function DashboardScreen() {
       <GlassCard compact>
         <View style={styles.compactHeader}>
           <Text style={[styles.sectionTitle, typography.title, { color: colors.text }]}>
-            Cashflow leaders
+            {t.dashboard.cashflowLeaders}
           </Text>
           <StatusBadge
-            label={`Today ${signedMoney(vm.todayImpact, goalCurrency)}`}
+            label={t.dashboard.today(signedMoney(vm.todayImpact, goalCurrency))}
             tone={vm.todayImpact >= 0 ? "positive" : "negative"}
           />
         </View>
         <View style={styles.summaryGrid}>
           <SummaryLeaderCard
-            title="Most spending"
+            title={t.dashboard.mostSpending}
             leader={vm.monthLeaders.expense}
-            fallback="No spending"
+            fallback={t.dashboard.noSpending}
             tone="negative"
             currency={goalCurrency}
           />
           <SummaryLeaderCard
-            title="Most earning"
+            title={t.dashboard.mostEarning}
             leader={vm.monthLeaders.income}
-            fallback="No earning"
+            fallback={t.dashboard.noEarning}
             tone="positive"
             currency={goalCurrency}
           />
@@ -223,7 +234,7 @@ export function DashboardScreen() {
 
       <GlassCard>
         <Text style={[styles.sectionTitle, typography.title, { color: colors.text }]}>
-          Wealth Crossover
+          {t.dashboard.wealthCrossover}
         </Text>
         <WealthCrossoverChart
           projection={vm.chartProjection}
@@ -234,18 +245,21 @@ export function DashboardScreen() {
 
       <GlassCard>
         <Text style={[styles.sectionTitle, typography.title, { color: colors.text }]}>
-          Assumptions
+          {t.dashboard.assumptions}
         </Text>
         <View style={styles.chips}>
           {[
-            ["FIRE method", vm.scenario?.name ?? "Base"],
-            ["Included assets", money(vm.includedAssets, goalCurrency)],
-            ["Method return", percent(vm.effectiveAssumptions.expectedReturn)],
-            ["Monthly saving", money(vm.effectiveAssumptions.monthlySaving, goalCurrency)],
-            ["Withdrawal rate", percent(vm.effectiveAssumptions.withdrawalRate)],
-            ["Inflation", percent(vm.effectiveAssumptions.inflationRate)],
-            ["Target spending", money(vm.effectiveAssumptions.targetMonthlySpending, goalCurrency)],
-            ["FIRE target", money(vm.effectiveAssumptions.targetAmount, goalCurrency)],
+            [t.dashboard.fireMethod, vm.scenario?.name ?? t.dashboard.base],
+            [t.dashboard.includedAssets, money(vm.includedAssets, goalCurrency)],
+            [t.dashboard.methodReturn, percent(vm.effectiveAssumptions.expectedReturn)],
+            [t.common.monthlySaving, money(vm.effectiveAssumptions.monthlySaving, goalCurrency)],
+            [t.common.withdrawalRate, percent(vm.effectiveAssumptions.withdrawalRate)],
+            [t.common.inflation, percent(vm.effectiveAssumptions.inflationRate)],
+            [
+              t.dashboard.targetSpending,
+              money(vm.effectiveAssumptions.targetMonthlySpending, goalCurrency),
+            ],
+            [t.dashboard.fireTarget, money(vm.effectiveAssumptions.targetAmount, goalCurrency)],
           ].map(([label, value]) => (
             <MotionPressable
               key={label}

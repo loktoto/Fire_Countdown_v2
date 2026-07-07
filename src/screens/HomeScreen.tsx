@@ -11,10 +11,12 @@ import { StatusBadge } from "../components/StatusBadge";
 import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
 import { useHomeViewModel } from "../hooks/useHomeViewModel";
+import { useI18n } from "../i18n";
 import { money, percent, signedMoney } from "../utils/format";
 
 export function HomeScreen() {
   const colors = useThemeColors();
+  const t = useI18n();
   const navigation = useNavigation() as unknown as {
     addListener: (event: "tabPress", callback: () => void) => () => void;
   };
@@ -22,8 +24,10 @@ export function HomeScreen() {
   const [assetAmountsHidden, setAssetAmountsHidden] = useState(false);
   const [ringMotionKey, setRingMotionKey] = useState(0);
   const days = vm.projectedFireDays === null ? null : Math.max(0, Math.round(vm.projectedFireDays));
-  const daysLabel = days == null ? "No date" : days.toLocaleString();
-  const assetVisibilityLabel = assetAmountsHidden ? "Show asset amounts" : "Hide asset amounts";
+  const daysLabel = days == null ? t.common.noDate : days.toLocaleString();
+  const assetVisibilityLabel = assetAmountsHidden
+    ? t.common.showAssetAmounts
+    : t.common.hideAssetAmounts;
   const goalCurrency = vm.goal.baseCurrency;
   const totalAssetValue = assetAmountsHidden ? "***" : money(vm.totalAssets, goalCurrency);
   const includedAssetValue = assetAmountsHidden ? "***" : money(vm.includedAssets, goalCurrency);
@@ -52,30 +56,30 @@ export function HomeScreen() {
       <View style={styles.topBar}>
         <View>
           <Text style={[styles.kicker, typography.button, { color: colors.primary }]}>
-            Fire Countdown
+            {t.home.kicker}
           </Text>
           <Text style={[styles.title, typography.display, { color: colors.text }]}>
-            Distance to FIRE
+            {t.home.title}
           </Text>
         </View>
       </View>
 
       <MotionPressable
         onPress={replayRingMotion}
-        accessibilityLabel="Replay FIRE countdown animation"
+        accessibilityLabel={t.home.replayCountdown}
         style={styles.ringReplay}
       >
         <FireProgressRing
-          accessibilityLabel={`Days to FIRE ${daysLabel}. ${percent(vm.progress)} complete.`}
+          accessibilityLabel={`${t.home.daysToFire} ${daysLabel}. ${percent(vm.progress)}.`}
           motionKey={ringMotionKey}
           progress={vm.progress}
-          centerLabel="Days to FIRE"
+          centerLabel={t.home.daysToFire}
           centerValue={daysLabel}
         />
       </MotionPressable>
 
       <Text style={[styles.ringCaption, typography.body, { color: colors.textMuted }]}>
-        {percent(vm.progress)} complete | Target {money(vm.target, goalCurrency)}
+        {t.home.completeTarget(percent(vm.progress), money(vm.target, goalCurrency))}
       </Text>
 
       <GlassCard>
@@ -88,7 +92,7 @@ export function HomeScreen() {
             style={styles.statItem}
           >
             <Text style={[styles.statLabel, typography.body, { color: colors.textMuted }]}>
-              Net worth
+              {t.home.netWorth}
             </Text>
             <Text
               numberOfLines={1}
@@ -106,7 +110,7 @@ export function HomeScreen() {
             style={styles.statItem}
           >
             <Text style={[styles.statLabel, typography.body, { color: colors.textMuted }]}>
-              Included FIRE
+              {t.home.includedFire}
             </Text>
             <Text
               numberOfLines={1}
@@ -118,14 +122,14 @@ export function HomeScreen() {
           </MotionPressable>
         </View>
         <StatusBadge
-          label={`Today impact ${signedMoney(vm.todayImpact, goalCurrency)}`}
+          label={t.home.todayImpact(signedMoney(vm.todayImpact, goalCurrency))}
           tone={vm.todayImpact >= 0 ? "positive" : "negative"}
         />
       </GlassCard>
 
       <GlassCard>
         <Text style={[styles.sectionTitle, typography.title, { color: colors.text }]}>
-          Milestone Journey
+          {t.home.milestoneJourney}
         </Text>
         <MilestoneJourney
           currency={goalCurrency}

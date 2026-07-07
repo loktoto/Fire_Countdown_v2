@@ -14,6 +14,7 @@ import Animated, {
 import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
 import { useReducedMotion } from "../hooks/useReducedMotion";
+import { useI18n } from "../i18n";
 import { money, percent } from "../utils/format";
 
 type JourneyItem = {
@@ -37,8 +38,8 @@ function clamp01(value: number) {
   return Math.min(1, Math.max(0, value));
 }
 
-function monthLabel(date: string | null) {
-  return date ? date.slice(0, 7) : "Pending";
+function monthLabel(date: string | null, pendingLabel: string) {
+  return date ? date.slice(0, 7) : pendingLabel;
 }
 
 function statusForItem(item: JourneyItem, index: number, activeIndex: number): MilestoneState {
@@ -230,6 +231,7 @@ export function MilestoneJourney({
   items: JourneyItem[];
 }) {
   const colors = useThemeColors();
+  const t = useI18n();
   const reducedMotion = useReducedMotion();
   const [rowLayouts, setRowLayouts] = useState<Record<string, RowLayout>>({});
   const activeIndexRaw = items.findIndex((entry) => !entry.isReached);
@@ -253,7 +255,7 @@ export function MilestoneJourney({
   if (items.length === 0 || !activeItem) {
     return (
       <Text style={[styles.empty, typography.body, { color: colors.textMuted }]}>
-        No milestones yet.
+        {t.milestoneJourney.noMilestonesYet}
       </Text>
     );
   }
@@ -272,7 +274,7 @@ export function MilestoneJourney({
         <View style={styles.summaryTop}>
           <View style={styles.summaryCopy}>
             <Text style={[styles.eyebrow, typography.button, { color: colors.primary }]}>
-              Next checkpoint
+              {t.milestoneJourney.nextCheckpoint}
             </Text>
             <Text
               numberOfLines={1}
@@ -298,7 +300,7 @@ export function MilestoneJourney({
                 { color: activeDone ? colors.positive : colors.primary },
               ]}
             >
-              {activeDone ? "Complete" : "Next"}
+              {activeDone ? t.milestoneJourney.complete : t.milestoneJourney.next}
             </Text>
           </View>
         </View>
@@ -306,20 +308,20 @@ export function MilestoneJourney({
         <View style={styles.metricRow}>
           <View style={styles.metric}>
             <Text style={[styles.metricLabel, typography.body, { color: colors.textMuted }]}>
-              To go
+              {t.milestoneJourney.toGo}
             </Text>
             <Text
               numberOfLines={1}
               adjustsFontSizeToFit
               style={[styles.metricValue, typography.title, { color: colors.text }]}
             >
-              {activeDone ? "Done" : money(activeGap, currency)}
+              {activeDone ? t.milestoneJourney.done : money(activeGap, currency)}
             </Text>
           </View>
           <View style={[styles.metricDivider, { backgroundColor: colors.surfaceBorder }]} />
           <View style={styles.metric}>
             <Text style={[styles.metricLabel, typography.body, { color: colors.textMuted }]}>
-              Stage
+              {t.milestoneJourney.stage}
             </Text>
             <Text style={[styles.metricValue, typography.title, { color: colors.text }]}>
               {percent(stageProgress, 0)}
@@ -328,14 +330,14 @@ export function MilestoneJourney({
           <View style={[styles.metricDivider, { backgroundColor: colors.surfaceBorder }]} />
           <View style={styles.metric}>
             <Text style={[styles.metricLabel, typography.body, { color: colors.textMuted }]}>
-              ETA
+              {t.milestoneJourney.eta}
             </Text>
             <Text
               numberOfLines={1}
               adjustsFontSizeToFit
               style={[styles.metricValue, typography.title, { color: colors.text }]}
             >
-              {monthLabel(activeItem.estimatedDate)}
+              {monthLabel(activeItem.estimatedDate, t.milestoneJourney.pending)}
             </Text>
           </View>
         </View>
@@ -343,7 +345,7 @@ export function MilestoneJourney({
 
       <View style={styles.timelineHeader}>
         <Text style={[styles.timelineLabel, typography.button, { color: colors.textMuted }]}>
-          Journey progress
+          {t.milestoneJourney.journeyProgress}
         </Text>
         <Text style={[styles.timelineValue, typography.button, { color: colors.primary }]}>
           {percent(journeyProgress, 0)}
@@ -371,7 +373,11 @@ export function MilestoneJourney({
                 ? colors.primary
                 : colors.textMuted;
           const statusLabel =
-            state === "reached" ? "Reached" : state === "active" ? "Next" : "Later";
+            state === "reached"
+              ? t.milestoneJourney.reached
+              : state === "active"
+                ? t.milestoneJourney.next
+                : t.milestoneJourney.later;
           const itemGap = Math.max(0, item.targetAmount - currentAmount);
 
           return (
@@ -470,8 +476,10 @@ export function MilestoneJourney({
                       adjustsFontSizeToFit
                       style={[styles.cardMeta, typography.body, { color: colors.textMuted }]}
                     >
-                      {money(item.targetAmount, currency)} target | ETA{" "}
-                      {monthLabel(item.estimatedDate)}
+                      {t.milestoneJourney.targetEta(
+                        money(item.targetAmount, currency),
+                        monthLabel(item.estimatedDate, t.milestoneJourney.pending),
+                      )}
                     </Text>
                   </View>
                   <View
@@ -506,7 +514,9 @@ export function MilestoneJourney({
                     adjustsFontSizeToFit
                     style={[styles.cardGap, typography.body, { color: colors.textMuted }]}
                   >
-                    {state === "reached" ? "Completed" : `${money(itemGap, currency)} left`}
+                    {state === "reached"
+                      ? t.milestoneJourney.completed
+                      : t.milestoneJourney.left(money(itemGap, currency))}
                   </Text>
                 </View>
               </View>

@@ -4,16 +4,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { MotionPressable } from "./MotionPressable";
 import { typography, useThemeColors } from "../design/theme";
+import { useI18n } from "../i18n";
 
-const tabMeta: Record<
-  string,
-  { label: string; icon: keyof typeof MaterialCommunityIcons.glyphMap }
-> = {
-  home: { label: "Home", icon: "view-dashboard-outline" },
-  calendar: { label: "Calendar", icon: "calendar-month-outline" },
-  log: { label: "+", icon: "plus" },
-  dashboard: { label: "Dashboard", icon: "chart-timeline-variant" },
-  portfolio: { label: "Portfolio", icon: "wallet-outline" },
+const tabMeta: Record<string, { icon: keyof typeof MaterialCommunityIcons.glyphMap }> = {
+  home: { icon: "view-dashboard-outline" },
+  calendar: { icon: "calendar-month-outline" },
+  log: { icon: "plus" },
+  dashboard: { icon: "chart-timeline-variant" },
+  portfolio: { icon: "wallet-outline" },
 };
 
 type TabBarProps = {
@@ -32,6 +30,14 @@ type TabBarProps = {
 export function BottomNavPill({ state, navigation }: TabBarProps) {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
+  const t = useI18n();
+  const tabLabels: Record<string, string> = {
+    home: t.tabs.home,
+    calendar: t.tabs.calendar,
+    log: t.tabs.log,
+    dashboard: t.tabs.dashboard,
+    portfolio: t.tabs.portfolio,
+  };
 
   return (
     <View pointerEvents="box-none" style={[styles.wrap, { bottom: Math.max(insets.bottom, 14) }]}>
@@ -39,7 +45,8 @@ export function BottomNavPill({ state, navigation }: TabBarProps) {
         style={[styles.pill, { backgroundColor: colors.nav, borderColor: colors.surfaceBorder }]}
       >
         {state.routes.map((route, index) => {
-          const meta = tabMeta[route.name] ?? { label: route.name, icon: "circle-outline" };
+          const meta = tabMeta[route.name] ?? { icon: "circle-outline" };
+          const label = tabLabels[route.name] ?? route.name;
           const focused = state.index === index;
           const isLog = route.name === "log";
           const pressTab = () => {
@@ -57,7 +64,7 @@ export function BottomNavPill({ state, navigation }: TabBarProps) {
           return (
             <MotionPressable
               key={route.key}
-              accessibilityLabel={`${meta.label} tab`}
+              accessibilityLabel={label}
               onPress={pressTab}
               style={[
                 styles.item,
@@ -81,7 +88,7 @@ export function BottomNavPill({ state, navigation }: TabBarProps) {
                     { color: focused ? colors.primary : colors.textMuted },
                   ]}
                 >
-                  {meta.label}
+                  {label}
                 </Text>
               ) : null}
             </MotionPressable>
