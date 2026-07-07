@@ -88,6 +88,10 @@ describe("fireEngine", () => {
     expect(fireTarget(goal)).toBe(9600000);
   });
 
+  it("ignores stored FIRE target overrides and recalculates the target", () => {
+    expect(fireTarget({ ...goal, targetAmount: 1000 })).toBe(9600000);
+  });
+
   it("lets a FIRE method override withdrawal rate", () => {
     expect(
       fireTarget(goal, { ...seedSnapshot.scenarios[1]!, withdrawalRateAdjustment: 0.005 }),
@@ -111,14 +115,13 @@ describe("fireEngine", () => {
       ...seedSnapshot.assets[1]!,
       expectedAnnualReturn: 0,
       includeInFire: true,
-      manualValue: 1000,
+      manualValue: 100000,
       updateMethod: "manual" as const,
     };
     const retirementGoal = {
       ...goal,
       inflationRate: 0,
       monthlySaving: 500,
-      targetAmount: 1000,
       targetMonthlySpending: 100,
     };
 
@@ -138,8 +141,8 @@ describe("fireEngine", () => {
       postFireWithdrawal: true,
     });
 
-    expect(accumulation[1]!.projectedAssets).toBe(1500);
-    expect(retirement[1]!.projectedAssets).toBe(900);
+    expect(accumulation[1]!.projectedAssets).toBe(100500);
+    expect(retirement[1]!.projectedAssets).toBe(99900);
   });
 
   it("applies growth before monthly retirement withdrawal in post-FIRE projection", () => {
@@ -149,14 +152,13 @@ describe("fireEngine", () => {
       ...seedSnapshot.assets[1]!,
       expectedAnnualReturn: annualReturn,
       includeInFire: true,
-      manualValue: 1000,
+      manualValue: 100000,
       updateMethod: "manual" as const,
     };
     const retirementGoal = {
       ...goal,
       inflationRate: 0,
       monthlySaving: 500,
-      targetAmount: 1000,
       targetMonthlySpending: 100,
     };
 
@@ -176,8 +178,8 @@ describe("fireEngine", () => {
       postFireWithdrawal: true,
     });
 
-    expect(accumulation[1]!.projectedAssets).toBeCloseTo(1000 * monthlyReturnFactor + 500, 4);
-    expect(retirement[1]!.projectedAssets).toBeCloseTo(1000 * monthlyReturnFactor - 100, 4);
+    expect(accumulation[1]!.projectedAssets).toBeCloseTo(100000 * monthlyReturnFactor + 500, 4);
+    expect(retirement[1]!.projectedAssets).toBeCloseTo(100000 * monthlyReturnFactor - 100, 4);
     expect(retirement[1]!.projectedAssets).toBeLessThan(accumulation[1]!.projectedAssets);
   });
 
@@ -194,8 +196,7 @@ describe("fireEngine", () => {
       ...goal,
       inflationRate: 0,
       monthlySaving: 5000,
-      targetAmount: 100000,
-      targetMonthlySpending: 300,
+      targetMonthlySpending: 290,
     };
 
     const retirement = projectionSeries({
@@ -290,9 +291,10 @@ describe("fireEngine", () => {
       quotes: seedSnapshot.quoteCache,
       goal: {
         ...goal,
-        targetAmount: 1000000,
         inflationRate: 0,
         monthlySaving: 20000,
+        targetMonthlySpending: 3500,
+        withdrawalRate: 0.042,
       },
       startDate: "2026-06-29",
       months: 3,

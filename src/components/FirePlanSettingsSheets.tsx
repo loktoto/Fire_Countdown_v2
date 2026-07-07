@@ -416,7 +416,6 @@ function FirePlanEditorContent({
   onClose: () => void;
   onSave: (goalId: string, patch: FireGoalPatch) => void;
 }) {
-  const colors = useThemeColors();
   const [name, setName] = useState(goal.name);
   const [currentAge, setCurrentAge] = useState(
     goal.currentAge == null ? "" : String(goal.currentAge),
@@ -427,10 +426,6 @@ function FirePlanEditorContent({
   const [monthlySaving, setMonthlySaving] = useState(String(goal.monthlySaving));
   const [withdrawalRate, setWithdrawalRate] = useState(percentText(goal.withdrawalRate));
   const [inflationRate, setInflationRate] = useState(percentText(goal.inflationRate));
-  const [targetAmount, setTargetAmount] = useState(
-    goal.targetAmount == null ? "" : String(goal.targetAmount),
-  );
-  const [fixedTargetEnabled, setFixedTargetEnabled] = useState(goal.targetAmount != null);
 
   const canSave =
     name.trim().length > 0 &&
@@ -438,15 +433,12 @@ function FirePlanEditorContent({
     numberFromText(currentAge) <= 120 &&
     numberFromText(targetMonthlySpending) >= 0 &&
     numberFromText(monthlySaving) >= 0 &&
-    numberFromText(withdrawalRate) > 0 &&
-    (!fixedTargetEnabled || numberFromText(targetAmount) > 0);
+    numberFromText(withdrawalRate) > 0;
 
   function save() {
     if (!canSave) {
       return;
     }
-
-    const targetOverride = fixedTargetEnabled ? Math.max(numberFromText(targetAmount), 0) : null;
 
     onSave(goal.id, {
       name: name.trim(),
@@ -455,15 +447,10 @@ function FirePlanEditorContent({
       monthlySaving: numberFromText(monthlySaving),
       withdrawalRate: numberFromText(withdrawalRate) / 100,
       inflationRate: numberFromText(inflationRate, 0) / 100,
-      targetAmount: targetOverride,
+      targetAmount: null,
     });
     onClose();
   }
-
-  const manualTargetLabel =
-    fixedTargetEnabled && targetAmount.trim().length > 0
-      ? money(numberFromText(targetAmount), goal.baseCurrency)
-      : "Auto from withdrawal rate";
 
   return (
     <>
@@ -536,47 +523,6 @@ function FirePlanEditorContent({
             />
           </View>
         </View>
-        <MotionPressable
-          onPress={() => setFixedTargetEnabled((current) => !current)}
-          accessibilityLabel={
-            fixedTargetEnabled ? "Use calculated FIRE target" : "Use fixed FIRE target"
-          }
-          accessibilityState={{ selected: fixedTargetEnabled }}
-          style={[
-            styles.targetModeRow,
-            {
-              borderColor: fixedTargetEnabled ? colors.primary : colors.surfaceBorder,
-              backgroundColor: fixedTargetEnabled ? `${colors.primary}12` : colors.backgroundAlt,
-            },
-          ]}
-        >
-          <View style={styles.listCopy}>
-            <Text style={[styles.listLabel, typography.body, { color: colors.textMuted }]}>
-              FIRE target
-            </Text>
-            <Text style={[styles.listValue, typography.title, { color: colors.text }]}>
-              {manualTargetLabel}
-            </Text>
-          </View>
-          <MaterialCommunityIcons
-            name={fixedTargetEnabled ? "toggle-switch" : "toggle-switch-off-outline"}
-            size={32}
-            color={fixedTargetEnabled ? colors.primary : colors.textMuted}
-          />
-        </MotionPressable>
-        {fixedTargetEnabled ? (
-          <View style={styles.targetAmountContent}>
-            <Field
-              label="Fixed FIRE target"
-              value={targetAmount}
-              onChangeText={(value) => setTargetAmount(normalizeNumberInput(value))}
-              keyboardType={Platform.OS === "ios" ? "decimal-pad" : "numeric"}
-              inputMode="decimal"
-              placeholder="9600000"
-              accessibilityLabel="Fixed FIRE target"
-            />
-          </View>
-        ) : null}
         <SaveButton label="SAVE FIRE PLAN" disabled={!canSave} onPress={save} />
       </ScrollView>
     </>
@@ -1204,20 +1150,6 @@ const styles = StyleSheet.create({
   splitField: {
     flex: 1,
     minWidth: 0,
-  },
-  targetModeRow: {
-    minHeight: 64,
-    borderWidth: 1,
-    borderRadius: tokens.radius.utility,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: tokens.spacing.md,
-    paddingHorizontal: tokens.spacing.md,
-    paddingVertical: tokens.spacing.sm,
-  },
-  targetAmountContent: {
-    gap: tokens.spacing.sm,
   },
   toggleRow: {
     minHeight: 50,

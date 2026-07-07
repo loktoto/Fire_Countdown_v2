@@ -211,10 +211,6 @@ export function weightedExpectedReturn(
 }
 
 export function fireTarget(goal: FireGoal, scenario?: ProjectionScenario) {
-  if (goal.targetAmount && goal.targetAmount > 0) {
-    return goal.targetAmount;
-  }
-
   const spending = goal.targetMonthlySpending + (scenario?.targetSpendingAdjustment ?? 0);
   const withdrawalRate = goal.withdrawalRate + (scenario?.withdrawalRateAdjustment ?? 0);
   return (spending * 12) / Math.max(withdrawalRate, 0.001);
