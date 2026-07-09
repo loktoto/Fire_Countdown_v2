@@ -124,26 +124,23 @@ function TimelineRail({
   trackColor: string;
 }) {
   const hasCenters = centers.length > 1 && centers.every(Number.isFinite);
-  const firstCenter = hasCenters ? (centers[0] ?? 0) : 0;
-  const lastCenter = hasCenters ? (centers[centers.length - 1] ?? firstCenter) : firstCenter;
-  const firstRailTop = firstCenter + TIMELINE_NODE_RADIUS;
-  const lastRailBottom = Math.max(firstRailTop, lastCenter - TIMELINE_NODE_RADIUS);
-  const completedEndIndex = activeDone
-    ? centers.length - 1
-    : Math.max(0, Math.min(activeIndex, centers.length - 1));
-  const completedEndCenter = centers[completedEndIndex] ?? firstCenter;
-  const completedBottom = Math.max(firstRailTop, completedEndCenter - TIMELINE_NODE_RADIUS);
-  const completedHeight = hasCenters ? Math.max(0, completedBottom - firstRailTop) : 0;
-  const activeEndIndex = activeIndex + 1;
-  const hasActiveSegment = hasCenters && !activeDone && activeEndIndex < centers.length;
-  const activeTop = hasActiveSegment
-    ? (centers[activeIndex] ?? firstCenter) + TIMELINE_NODE_RADIUS
-    : firstRailTop;
-  const activeBottom = hasActiveSegment
-    ? Math.max(activeTop, (centers[activeEndIndex] ?? activeTop) - TIMELINE_NODE_RADIUS)
-    : activeTop;
-  const activeTargetHeight = hasActiveSegment
-    ? Math.max(0, (activeBottom - activeTop) * clamp01(stageProgress))
+  const segments = hasCenters
+    ? centers.slice(0, -1).map((center, index) => {
+        const nextCenter = centers[index + 1] ?? center;
+        const top = center + TIMELINE_NODE_RADIUS;
+        const bottom = nextCenter - TIMELINE_NODE_RADIUS;
+
+        return {
+          index,
+          top,
+          height: Math.max(0, bottom - top),
+        };
+      })
+    : [];
+  const completedSegments = activeDone ? segments.length : Math.max(0, activeIndex);
+  const activeSegment = !activeDone ? segments[activeIndex] : undefined;
+  const activeTargetHeight = activeSegment
+    ? Math.max(0, activeSegment.height * clamp01(stageProgress))
     : 0;
   const activeFillStyle = useLoopedHeightStyle(activeTargetHeight, activeTargetHeight > 0);
 
@@ -153,37 +150,41 @@ function TimelineRail({
 
   return (
     <>
-      <View
-        pointerEvents="none"
-        style={[
-          styles.timelineRail,
-          {
-            top: firstRailTop,
-            height: Math.max(0, lastRailBottom - firstRailTop),
-            backgroundColor: trackColor,
-          },
-        ]}
-      />
-      {completedHeight > 0 ? (
+      {segments.map((segment) => (
         <View
+          key={`track-${segment.index}`}
           pointerEvents="none"
           style={[
             styles.timelineRail,
             {
-              top: firstRailTop,
-              height: completedHeight,
+              top: segment.top,
+              height: segment.height,
+              backgroundColor: trackColor,
+            },
+          ]}
+        />
+      ))}
+      {segments.slice(0, completedSegments).map((segment) => (
+        <View
+          key={`complete-${segment.index}`}
+          pointerEvents="none"
+          style={[
+            styles.timelineRail,
+            {
+              top: segment.top,
+              height: segment.height,
               backgroundColor: positiveColor,
             },
           ]}
         />
-      ) : null}
-      {activeTargetHeight > 0 ? (
+      ))}
+      {activeSegment && activeTargetHeight > 0 ? (
         <Animated.View
           pointerEvents="none"
           style={[
             styles.timelineRail,
             {
-              top: activeTop,
+              top: activeSegment.top,
               backgroundColor: primaryColor,
             },
             activeFillStyle,
