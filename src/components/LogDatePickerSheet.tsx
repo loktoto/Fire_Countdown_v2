@@ -302,11 +302,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: tokens.spacing.md,
+    gap: tokens.spacing.sm,
   },
   navCluster: {
+    width: 74,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     gap: 6,
   },
   navButton: {
@@ -320,6 +322,7 @@ const styles = StyleSheet.create({
   monthLabel: {
     flex: 1,
     minWidth: 0,
+    paddingHorizontal: tokens.spacing.sm,
     textAlign: "center",
     fontSize: 17,
     lineHeight: 21,
