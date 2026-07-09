@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 
-import { deriveFireView, mainGoal } from "../engine/selectors";
+import { monthlySummary } from "../engine/fireEngine";
+import { deriveFireView, mainGoal, monthlyCategoryLeaders } from "../engine/selectors";
 import { useFireStore } from "../data/fireStore";
 import { todayIso } from "../utils/format";
 
@@ -14,6 +15,27 @@ export function useDashboardViewModel() {
   const scenario =
     scenarios.find((entry) => entry.id === selectedScenarioId) ?? defaultScenario ?? scenarios[0];
   const today = todayIso();
+  const latestTransaction = useMemo(
+    () =>
+      snapshot.transactions
+        .filter((transaction) => !transaction.archivedAt)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null,
+    [snapshot.transactions],
+  );
+  const activityDate = latestTransaction?.date ?? today;
+  const activityMonthSummary = useMemo(
+    () =>
+      monthlySummary(
+        snapshot.transactions,
+        Number.parseInt(activityDate.slice(0, 4), 10),
+        Number.parseInt(activityDate.slice(5, 7), 10),
+      ),
+    [activityDate, snapshot.transactions],
+  );
+  const activityMonthLeaders = useMemo(
+    () => monthlyCategoryLeaders(snapshot, activityDate),
+    [activityDate, snapshot],
+  );
   const base = useMemo(
     () => (goal ? deriveFireView(snapshot, today, scenario) : null),
     [goal, scenario, snapshot, today],
@@ -42,6 +64,10 @@ export function useDashboardViewModel() {
     effectiveAssumptions,
     scenario,
     scenarioId: scenario?.id,
+    latestTransaction,
+    activityDate,
+    activityMonthSummary,
+    activityMonthLeaders,
     setScenarioId,
     scenarios,
     updateGoal,

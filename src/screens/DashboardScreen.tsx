@@ -20,7 +20,7 @@ import type { CategoryCashflowLeader } from "../engine/selectors";
 import type { ProjectionScenario } from "../features/types";
 import { useDashboardViewModel } from "../hooks/useDashboardViewModel";
 import { useI18n } from "../i18n";
-import { money, percent, signedMoney } from "../utils/format";
+import { formatMonthYear, money, percent, signedMoney } from "../utils/format";
 
 function SummaryLeaderCard({
   title,
@@ -136,6 +136,7 @@ export function DashboardScreen() {
       ? null
       : Math.floor(vm.goal.currentAge + vm.projectedFireDays / 365.25);
   const scenarioCount = vm.scenarios.length;
+  const activityMonthLabel = formatMonthYear(vm.activityDate, t.locale);
 
   function openFirePlanEditor() {
     setFirePlanEditorOpen(true);
@@ -314,8 +315,8 @@ export function DashboardScreen() {
           />
           <ProjectionMetric
             label={t.dashboard.monthNet}
-            value={signedMoney(vm.monthSummary.net, goalCurrency)}
-            tone={vm.monthSummary.net >= 0 ? "positive" : "negative"}
+            value={signedMoney(vm.activityMonthSummary.net, goalCurrency)}
+            tone={vm.activityMonthSummary.net >= 0 ? "positive" : "negative"}
           />
         </View>
       </GlassCard>
@@ -325,22 +326,25 @@ export function DashboardScreen() {
           <Text style={[styles.sectionTitle, typography.title, { color: colors.text }]}>
             {t.dashboard.cashflowLeaders}
           </Text>
-          <StatusBadge
-            label={t.dashboard.today(signedMoney(vm.todayImpact, goalCurrency))}
-            tone={vm.todayImpact >= 0 ? "positive" : "negative"}
-          />
+          <View style={styles.headerBadges}>
+            <StatusBadge label={activityMonthLabel} tone="primary" />
+            <StatusBadge
+              label={t.dashboard.today(signedMoney(vm.todayImpact, goalCurrency))}
+              tone={vm.todayImpact >= 0 ? "positive" : "negative"}
+            />
+          </View>
         </View>
         <View style={styles.summaryGrid}>
           <SummaryLeaderCard
             title={t.dashboard.mostSpending}
-            leader={vm.monthLeaders.expense}
+            leader={vm.activityMonthLeaders.expense}
             fallback={t.dashboard.noSpending}
             tone="negative"
             currency={goalCurrency}
           />
           <SummaryLeaderCard
             title={t.dashboard.mostEarning}
-            leader={vm.monthLeaders.income}
+            leader={vm.activityMonthLeaders.income}
             fallback={t.dashboard.noEarning}
             tone="positive"
             currency={goalCurrency}
@@ -472,6 +476,13 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     rowGap: tokens.spacing.sm,
     columnGap: tokens.spacing.md,
+  },
+  headerBadges: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
+    rowGap: tokens.spacing.xs,
+    columnGap: tokens.spacing.xs,
   },
   liveLabel: {
     fontSize: 11,
