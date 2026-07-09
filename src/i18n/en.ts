@@ -277,6 +277,8 @@ export const en = {
     editFireSetup: "Edit FIRE setup",
     editFireMethods: "Edit FIRE methods",
     editMilestones: "Edit milestones",
+    methodShortcut: "Methods",
+    milestoneShortcut: "Milestones",
     firePlan: "Fire plan",
     editFirePlan: "Edit FIRE plan",
     closeFirePlanEditor: "Close FIRE plan editor",

@@ -342,31 +342,20 @@ export function SettingsScreen() {
       </GlassCard>
 
       <GlassCard>
-        <Text style={[styles.sectionTitle, typography.title, { color: colors.text }]}>
-          {t.settings.fireSettings}
-        </Text>
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, typography.title, { color: colors.text }]}>
+            {t.settings.fireSettings}
+          </Text>
+          <MotionPressable onPress={() => setFirePlanEditorOpen(true)} style={styles.headerAction}>
+            <Text style={[typography.button, { color: colors.primary }]}>{t.common.edit}</Text>
+          </MotionPressable>
+        </View>
         <EditableRow
           label={t.common.currentAge}
           value={currentAgeLabel}
           onPress={() => setFirePlanEditorOpen(true)}
         />
         <View style={styles.quickActions}>
-          <MotionPressable
-            onPress={() => setFirePlanEditorOpen(true)}
-            accessibilityLabel={t.firePlan.editFireSetup}
-            style={[
-              styles.quickAction,
-              {
-                backgroundColor: colors.backgroundAlt,
-                borderColor: colors.surfaceBorder,
-              },
-            ]}
-          >
-            <MaterialCommunityIcons name="target" size={18} color={colors.primary} />
-            <Text style={[styles.quickActionText, typography.button, { color: colors.text }]}>
-              {t.firePlan.fireSetup}
-            </Text>
-          </MotionPressable>
           <MotionPressable
             onPress={() => setScenarioListOpen(true)}
             accessibilityLabel={t.firePlan.editFireMethods}
@@ -379,8 +368,12 @@ export function SettingsScreen() {
             ]}
           >
             <MaterialCommunityIcons name="source-branch" size={18} color={colors.primary} />
-            <Text style={[styles.quickActionText, typography.button, { color: colors.primary }]}>
-              {t.firePlan.fireMethods}
+            <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              style={[styles.quickActionText, typography.button, { color: colors.primary }]}
+            >
+              {t.firePlan.methodShortcut}
             </Text>
           </MotionPressable>
           <MotionPressable
@@ -395,8 +388,12 @@ export function SettingsScreen() {
             ]}
           >
             <MaterialCommunityIcons name="flag-checkered" size={18} color={colors.primary} />
-            <Text style={[styles.quickActionText, typography.button, { color: colors.text }]}>
-              {t.firePlan.milestones}
+            <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              style={[styles.quickActionText, typography.button, { color: colors.text }]}
+            >
+              {t.firePlan.milestoneShortcut}
             </Text>
           </MotionPressable>
         </View>
@@ -579,6 +576,17 @@ const styles = StyleSheet.create({
     fontSize: 20,
     lineHeight: 26,
   },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: tokens.spacing.md,
+  },
+  headerAction: {
+    minHeight: 36,
+    justifyContent: "center",
+    paddingHorizontal: tokens.spacing.xs,
+  },
   switchRow: {
     minHeight: 56,
     flexDirection: "row",
@@ -594,15 +602,15 @@ const styles = StyleSheet.create({
   },
   quickActions: {
     flexDirection: "row",
-    gap: tokens.spacing.sm,
+    gap: tokens.spacing.md,
   },
   quickAction: {
-    minHeight: 42,
+    minHeight: 46,
     flex: 1,
     minWidth: 0,
     borderWidth: 1,
     borderRadius: tokens.radius.pill,
-    paddingHorizontal: tokens.spacing.sm,
+    paddingHorizontal: tokens.spacing.md,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -610,8 +618,8 @@ const styles = StyleSheet.create({
   },
   quickActionText: {
     flexShrink: 1,
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 15,
+    lineHeight: 20,
     textAlign: "center",
   },
   input: {

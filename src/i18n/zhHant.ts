@@ -277,6 +277,8 @@ export const zhHant: I18nStrings = {
     editFireSetup: "編輯 FIRE 設定",
     editFireMethods: "編輯 FIRE 方法",
     editMilestones: "編輯里程碑",
+    methodShortcut: "方法",
+    milestoneShortcut: "里程碑",
     firePlan: "FIRE 計劃",
     editFirePlan: "編輯 FIRE 計劃",
     closeFirePlanEditor: "關閉 FIRE 計劃編輯",
