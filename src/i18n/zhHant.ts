@@ -244,7 +244,11 @@ export const zhHant: I18nStrings = {
     },
     updateMethods: {
       manual: "手動",
-      quoteBackup: "報價 + 後備",
+      quoteBackup: "自動報價",
+    },
+    updateMethodHelp: {
+      manual: "使用你輸入的手動價值。",
+      autoQuote: "優先使用最新報價；如果報價失敗，就改用手動價值。",
     },
   },
   categories: {

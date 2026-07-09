@@ -244,7 +244,11 @@ export const en = {
     },
     updateMethods: {
       manual: "Manual",
-      quoteBackup: "Quote + backup",
+      quoteBackup: "Auto quote",
+    },
+    updateMethodHelp: {
+      manual: "Uses the manual value you enter.",
+      autoQuote: "Uses the latest quote first. If quote data fails, it falls back to manual value.",
     },
   },
   categories: {

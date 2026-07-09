@@ -48,7 +48,7 @@ const assetClassOptions: { label: string; value: AssetClass }[] = [
 
 const updateMethodOptions: { label: string; value: UpdateMethod }[] = [
   { label: "Manual", value: "manual" },
-  { label: "Quote + backup", value: "google_sheet_quote" },
+  { label: "Auto quote", value: "google_sheet_quote" },
 ];
 
 function normalizeNumberInput(raw: string, allowNegative = false) {
@@ -383,6 +383,11 @@ function AssetEditorContent({
               );
             })}
           </View>
+          <Text style={[styles.helperText, typography.body, { color: colors.textMuted }]}>
+            {updateMethod === "manual"
+              ? t.assets.updateMethodHelp.manual
+              : t.assets.updateMethodHelp.autoQuote}
+          </Text>
         </View>
 
         <View style={styles.splitFields}>
@@ -629,6 +634,10 @@ const styles = StyleSheet.create({
   },
   choiceText: {
     fontSize: 13,
+  },
+  helperText: {
+    fontSize: 12,
+    lineHeight: 17,
   },
   splitFields: {
     flexDirection: "row",
