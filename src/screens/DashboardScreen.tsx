@@ -142,6 +142,17 @@ export function DashboardScreen() {
         options={vm.scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))}
       />
 
+      <GlassCard>
+        <Text style={[styles.sectionTitle, typography.title, { color: colors.text }]}>
+          {t.dashboard.wealthCrossover}
+        </Text>
+        <WealthCrossoverChart
+          projection={vm.chartProjection}
+          currency={goalCurrency}
+          currentAge={vm.goal.currentAge}
+        />
+      </GlassCard>
+
       <GlassCard
         style={[
           styles.heroCard,
@@ -230,17 +241,6 @@ export function DashboardScreen() {
             currency={goalCurrency}
           />
         </View>
-      </GlassCard>
-
-      <GlassCard>
-        <Text style={[styles.sectionTitle, typography.title, { color: colors.text }]}>
-          {t.dashboard.wealthCrossover}
-        </Text>
-        <WealthCrossoverChart
-          projection={vm.chartProjection}
-          currency={goalCurrency}
-          currentAge={vm.goal.currentAge}
-        />
       </GlassCard>
 
       <GlassCard>
