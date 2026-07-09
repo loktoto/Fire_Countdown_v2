@@ -30,12 +30,6 @@ export function CalendarScreen() {
 
   return (
     <ScreenContainer>
-      <View>
-        <Text style={[styles.title, typography.display, { color: colors.text }]}>
-          {vm.monthLabel}
-        </Text>
-      </View>
-
       <GlassCard>
         <View style={styles.summary}>
           <View style={styles.summaryItem}>
@@ -294,10 +288,6 @@ export function CalendarScreen() {
 }
 
 const styles = StyleSheet.create({
-  title: {
-    fontSize: 34,
-    lineHeight: 40,
-  },
   summary: {
     flexDirection: "row",
     flexWrap: "wrap",
