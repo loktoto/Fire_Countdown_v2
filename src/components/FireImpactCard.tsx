@@ -17,7 +17,8 @@ import { useI18n } from "../i18n";
 const FIRE_EMOJI = "\u{1F525}";
 const CRYING_EMOJI = "\u{1F622}";
 const WALKER_EMOJI = "\u{1F3C3}";
-const IMPACT_SCALE_MAX_PERCENT = 100;
+const IDLE_PERSON_EMOJI = "\u{1F9CD}";
+const IMPACT_SCALE_MAX_PERCENT = 10;
 const WALKER_TRACK_WIDTH = 230;
 const WALKER_WIDTH = 42;
 
@@ -80,12 +81,12 @@ export function FireImpactCard({ amount, impact }: { amount: number; impact: Imp
   const finitePercent = Number.isFinite(rawImpactPercent);
   const absolutePercent = finitePercent ? Math.abs(rawImpactPercent) : 100;
   const percentDirection = rawImpactPercent > 0 ? 1 : rawImpactPercent < 0 ? -1 : 0;
-  const meterStrength =
-    amount <= 0 || direction === 0
-      ? 0
-      : finitePercent
-        ? impactPercentToMeterStrength(absolutePercent)
-        : 1;
+  const isWalking = amount > 0 && direction !== 0;
+  const meterStrength = !isWalking
+    ? 0
+    : finitePercent
+      ? impactPercentToMeterStrength(absolutePercent)
+      : 1;
   const meterValue = percentDirection * meterStrength;
 
   const tone = useMemo(() => {
@@ -169,7 +170,7 @@ export function FireImpactCard({ amount, impact }: { amount: number; impact: Imp
       easing: Easing.bezier(0.16, 1, 0.3, 1),
     });
 
-    if (amount > 0 && direction !== 0) {
+    if (isWalking) {
       walkPhase.value = withRepeat(
         withTiming(1, { duration: 520, easing: Easing.linear }),
         -1,
@@ -180,7 +181,7 @@ export function FireImpactCard({ amount, impact }: { amount: number; impact: Imp
 
     cancelAnimation(walkPhase);
     walkPhase.value = 0;
-  }, [amount, direction, meter, meterValue, reducedMotion, walkPhase]);
+  }, [isWalking, meter, meterValue, reducedMotion, walkPhase]);
 
   const walkerPositionStyle = useAnimatedStyle(() => {
     const travel = WALKER_TRACK_WIDTH - WALKER_WIDTH;
@@ -256,13 +257,15 @@ export function FireImpactCard({ amount, impact }: { amount: number; impact: Imp
               style={[styles.character, { shadowColor: tone.color }, characterMotionStyle]}
             >
               <View style={[styles.characterGlow, { backgroundColor: tone.color }]} />
-              <View style={styles.motionTrail}>
-                <View style={[styles.trailDotLarge, { backgroundColor: tone.color }]} />
-                <View style={[styles.trailDotMedium, { backgroundColor: tone.color }]} />
-                <View style={[styles.trailDotSmall, { backgroundColor: tone.color }]} />
-              </View>
+              {isWalking ? (
+                <View style={styles.motionTrail}>
+                  <View style={[styles.trailDotLarge, { backgroundColor: tone.color }]} />
+                  <View style={[styles.trailDotMedium, { backgroundColor: tone.color }]} />
+                  <View style={[styles.trailDotSmall, { backgroundColor: tone.color }]} />
+                </View>
+              ) : null}
               <Text maxFontSizeMultiplier={1} style={styles.walkerEmoji}>
-                {WALKER_EMOJI}
+                {isWalking ? WALKER_EMOJI : IDLE_PERSON_EMOJI}
               </Text>
             </Animated.View>
           </Animated.View>
