@@ -1,7 +1,13 @@
 import { useRouter } from "expo-router";
+import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { CategoryGlyph } from "../components/CategoryGlyph";
+import {
+  FirePlanEditorSheet,
+  ScenarioEditorSheet,
+  ScenarioListSheet,
+} from "../components/FirePlanSettingsSheets";
 import { GlassCard } from "../components/GlassCard";
 import { MotionPressable } from "../components/MotionPressable";
 import { ScreenContainer } from "../components/ScreenContainer";
@@ -11,6 +17,7 @@ import { WealthCrossoverChart } from "../components/WealthCrossoverChart";
 import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
 import type { CategoryCashflowLeader } from "../engine/selectors";
+import type { ProjectionScenario } from "../features/types";
 import { useDashboardViewModel } from "../hooks/useDashboardViewModel";
 import { useI18n } from "../i18n";
 import { money, percent, signedMoney } from "../utils/format";
@@ -116,6 +123,10 @@ export function DashboardScreen() {
   const t = useI18n();
   const router = useRouter();
   const vm = useDashboardViewModel();
+  const [firePlanEditorOpen, setFirePlanEditorOpen] = useState(false);
+  const [scenarioListOpen, setScenarioListOpen] = useState(false);
+  const [editingScenario, setEditingScenario] = useState<ProjectionScenario | null>(null);
+  const [creatingScenario, setCreatingScenario] = useState(false);
   const goalCurrency = vm.goal.baseCurrency;
   const years =
     vm.projectedFireDays === null ? null : Math.max(0, vm.projectedFireDays / 365.25).toFixed(1);
@@ -124,6 +135,100 @@ export function DashboardScreen() {
     vm.projectedFireDays === null || vm.goal.currentAge == null
       ? null
       : Math.floor(vm.goal.currentAge + vm.projectedFireDays / 365.25);
+  const scenarioCount = vm.scenarios.length;
+
+  function openFirePlanEditor() {
+    setFirePlanEditorOpen(true);
+  }
+
+  function openScenarioList() {
+    setScenarioListOpen(true);
+  }
+
+  function addScenario() {
+    const scenario = vm.newScenarioDraft();
+    setScenarioListOpen(false);
+    setCreatingScenario(true);
+    setEditingScenario(scenario);
+  }
+
+  function editScenario(scenario: ProjectionScenario) {
+    setScenarioListOpen(false);
+    setCreatingScenario(false);
+    setEditingScenario(scenario);
+  }
+
+  function closeScenarioEditor() {
+    setEditingScenario(null);
+    setCreatingScenario(false);
+  }
+
+  function saveScenario(scenarioId: string, patch: Partial<ProjectionScenario>) {
+    if (creatingScenario && editingScenario) {
+      const draft = { ...editingScenario, ...patch };
+      vm.createScenario({
+        archivedAt: draft.archivedAt ?? null,
+        expectedReturnAdjustment: draft.expectedReturnAdjustment,
+        inflationAdjustment: draft.inflationAdjustment,
+        isDefault: draft.isDefault,
+        monthlySavingAdjustment: draft.monthlySavingAdjustment,
+        name: draft.name,
+        targetSpendingAdjustment: draft.targetSpendingAdjustment,
+        withdrawalRateAdjustment: draft.withdrawalRateAdjustment ?? 0,
+      });
+    } else {
+      vm.updateScenario(scenarioId, patch);
+    }
+    closeScenarioEditor();
+  }
+
+  function archiveScenario(scenarioId: string) {
+    vm.archiveScenario(scenarioId);
+    closeScenarioEditor();
+  }
+
+  const assumptionChips = [
+    {
+      label: t.dashboard.fireMethod,
+      value: vm.scenario?.name ?? t.dashboard.base,
+      onPress: openScenarioList,
+    },
+    {
+      label: t.dashboard.includedAssets,
+      value: money(vm.includedAssets, goalCurrency),
+      onPress: () => router.push("/portfolio"),
+    },
+    {
+      label: t.dashboard.methodReturn,
+      value: percent(vm.effectiveAssumptions.expectedReturn),
+      onPress: openScenarioList,
+    },
+    {
+      label: t.common.monthlySaving,
+      value: money(vm.effectiveAssumptions.monthlySaving, goalCurrency),
+      onPress: openFirePlanEditor,
+    },
+    {
+      label: t.common.withdrawalRate,
+      value: percent(vm.effectiveAssumptions.withdrawalRate),
+      onPress: openFirePlanEditor,
+    },
+    {
+      label: t.common.inflation,
+      value: percent(vm.effectiveAssumptions.inflationRate),
+      onPress: openFirePlanEditor,
+    },
+    {
+      label: t.dashboard.targetSpending,
+      value: money(vm.effectiveAssumptions.targetMonthlySpending, goalCurrency),
+      onPress: openFirePlanEditor,
+    },
+    {
+      label: t.dashboard.fireTarget,
+      value: money(vm.effectiveAssumptions.targetAmount, goalCurrency),
+      onPress: openFirePlanEditor,
+    },
+  ];
 
   return (
     <ScreenContainer>
@@ -248,29 +353,18 @@ export function DashboardScreen() {
           {t.dashboard.assumptions}
         </Text>
         <View style={styles.chips}>
-          {[
-            [t.dashboard.fireMethod, vm.scenario?.name ?? t.dashboard.base],
-            [t.dashboard.includedAssets, money(vm.includedAssets, goalCurrency)],
-            [t.dashboard.methodReturn, percent(vm.effectiveAssumptions.expectedReturn)],
-            [t.common.monthlySaving, money(vm.effectiveAssumptions.monthlySaving, goalCurrency)],
-            [t.common.withdrawalRate, percent(vm.effectiveAssumptions.withdrawalRate)],
-            [t.common.inflation, percent(vm.effectiveAssumptions.inflationRate)],
-            [
-              t.dashboard.targetSpending,
-              money(vm.effectiveAssumptions.targetMonthlySpending, goalCurrency),
-            ],
-            [t.dashboard.fireTarget, money(vm.effectiveAssumptions.targetAmount, goalCurrency)],
-          ].map(([label, value]) => (
+          {assumptionChips.map((chip) => (
             <MotionPressable
-              key={label}
-              onPress={() => router.push("/settings")}
+              key={chip.label}
+              onPress={chip.onPress}
+              haptic="selection"
               style={[
                 styles.chip,
                 { borderColor: colors.surfaceBorder, backgroundColor: colors.surfaceSolid },
               ]}
             >
               <Text style={[styles.chipLabel, typography.body, { color: colors.textMuted }]}>
-                {label}
+                {chip.label}
               </Text>
               <Text
                 numberOfLines={2}
@@ -278,12 +372,35 @@ export function DashboardScreen() {
                 adjustsFontSizeToFit
                 style={[styles.chipValue, typography.button, { color: colors.text }]}
               >
-                {value}
+                {chip.value}
               </Text>
             </MotionPressable>
           ))}
         </View>
       </GlassCard>
+      <ScenarioListSheet
+        visible={scenarioListOpen}
+        goal={vm.goal}
+        scenarios={vm.scenarios}
+        currency={goalCurrency}
+        onClose={() => setScenarioListOpen(false)}
+        onAdd={addScenario}
+        onEdit={editScenario}
+      />
+      <FirePlanEditorSheet
+        visible={firePlanEditorOpen}
+        goal={vm.goal}
+        onClose={() => setFirePlanEditorOpen(false)}
+        onSave={vm.updateGoal}
+      />
+      <ScenarioEditorSheet
+        visible={editingScenario !== null}
+        goal={vm.goal}
+        scenario={editingScenario}
+        onClose={closeScenarioEditor}
+        onSave={saveScenario}
+        onArchive={creatingScenario || scenarioCount <= 1 ? undefined : archiveScenario}
+      />
     </ScreenContainer>
   );
 }
