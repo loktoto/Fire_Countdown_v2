@@ -50,6 +50,7 @@ const updateMethodOptions: { label: string; value: UpdateMethod }[] = [
   { label: "Manual", value: "manual" },
   { label: "Auto quote", value: "google_sheet_quote" },
 ];
+const baseCurrencyOptions = ["HKD", "USD", "TWD", "JPY", "EUR", "GBP", "CNY", "SGD"];
 
 function normalizeNumberInput(raw: string, allowNegative = false) {
   const cleaned = raw.replace(",", ".").replace(allowNegative ? /[^\d.-]/g : /[^\d.]/g, "");
@@ -138,6 +139,11 @@ function AssetEditorContent({
   const [includeInFire, setIncludeInFire] = useState(asset.includeInFire);
   const [notes, setNotes] = useState(asset.notes ?? "");
   const canSave = name.trim().length > 0 && numberFromText(manualValue) >= 0;
+  const normalizedCurrency = currency.trim().toUpperCase().slice(0, 3);
+  const currencyOptions =
+    normalizedCurrency && !baseCurrencyOptions.includes(normalizedCurrency)
+      ? [normalizedCurrency, ...baseCurrencyOptions]
+      : baseCurrencyOptions;
 
   function save() {
     if (!canSave) {
@@ -268,54 +274,66 @@ function AssetEditorContent({
           </View>
         </View>
 
-        <View style={styles.splitFields}>
-          <View style={styles.splitField}>
-            <Text style={[styles.fieldLabel, typography.button, { color: colors.textMuted }]}>
-              {t.assets.value}
-            </Text>
-            <TextInput
-              value={manualValue}
-              onChangeText={(value) => setManualValue(normalizeNumberInput(value))}
-              keyboardType={Platform.OS === "ios" ? "decimal-pad" : "numeric"}
-              inputMode="decimal"
-              selectTextOnFocus
-              placeholder="0"
-              placeholderTextColor={colors.textMuted}
-              selectionColor={colors.primary}
-              style={[
-                styles.input,
-                typography.body,
-                {
-                  color: colors.text,
-                  borderColor: colors.surfaceBorder,
-                  backgroundColor: colors.backgroundAlt,
-                },
-              ]}
-              accessibilityLabel={t.assets.assetValue}
-            />
-          </View>
-          <View style={styles.currencyField}>
-            <Text style={[styles.fieldLabel, typography.button, { color: colors.textMuted }]}>
-              {t.assets.currency}
-            </Text>
-            <TextInput
-              value={currency}
-              onChangeText={(value) => setCurrency(value.toUpperCase().slice(0, 3))}
-              maxLength={3}
-              placeholder="HKD"
-              placeholderTextColor={colors.textMuted}
-              selectionColor={colors.primary}
-              style={[
-                styles.input,
-                typography.body,
-                {
-                  color: colors.text,
-                  borderColor: colors.surfaceBorder,
-                  backgroundColor: colors.backgroundAlt,
-                },
-              ]}
-              accessibilityLabel={t.assets.assetCurrency}
-            />
+        <View style={styles.fieldGroup}>
+          <Text style={[styles.fieldLabel, typography.button, { color: colors.textMuted }]}>
+            {t.assets.value}
+          </Text>
+          <TextInput
+            value={manualValue}
+            onChangeText={(value) => setManualValue(normalizeNumberInput(value))}
+            keyboardType={Platform.OS === "ios" ? "decimal-pad" : "numeric"}
+            inputMode="decimal"
+            selectTextOnFocus
+            placeholder="0"
+            placeholderTextColor={colors.textMuted}
+            selectionColor={colors.primary}
+            style={[
+              styles.input,
+              typography.body,
+              {
+                color: colors.text,
+                borderColor: colors.surfaceBorder,
+                backgroundColor: colors.backgroundAlt,
+              },
+            ]}
+            accessibilityLabel={t.assets.assetValue}
+          />
+        </View>
+
+        <View style={styles.fieldGroup}>
+          <Text style={[styles.fieldLabel, typography.button, { color: colors.textMuted }]}>
+            {t.assets.currency}
+          </Text>
+          <View style={styles.chipWrap}>
+            {currencyOptions.map((option) => {
+              const active = option === normalizedCurrency;
+              return (
+                <MotionPressable
+                  key={option}
+                  onPress={() => setCurrency(option)}
+                  accessibilityLabel={`${t.assets.assetCurrency} ${option}`}
+                  accessibilityState={{ selected: active }}
+                  haptic="selection"
+                  style={[
+                    styles.currencyChip,
+                    {
+                      borderColor: active ? colors.primary : colors.surfaceBorder,
+                      backgroundColor: active ? `${colors.primary}18` : colors.backgroundAlt,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.choiceText,
+                      typography.button,
+                      { color: active ? colors.primary : colors.textMuted },
+                    ]}
+                  >
+                    {option}
+                  </Text>
+                </MotionPressable>
+              );
+            })}
           </View>
         </View>
 
@@ -635,6 +653,15 @@ const styles = StyleSheet.create({
   choiceText: {
     fontSize: 13,
   },
+  currencyChip: {
+    minWidth: 72,
+    minHeight: 40,
+    borderWidth: 1,
+    borderRadius: tokens.radius.pill,
+    paddingHorizontal: tokens.spacing.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   helperText: {
     fontSize: 12,
     lineHeight: 17,
@@ -646,10 +673,6 @@ const styles = StyleSheet.create({
   splitField: {
     flex: 1,
     minWidth: 0,
-    gap: tokens.spacing.sm,
-  },
-  currencyField: {
-    width: 98,
     gap: tokens.spacing.sm,
   },
   includeToggle: {
