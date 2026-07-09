@@ -19,6 +19,7 @@ export function EditableRow({
     <MotionPressable
       onPress={onPress}
       accessibilityLabel={`${label}, ${value}`}
+      haptic="selection"
       style={[styles.row, { borderBottomColor: colors.surfaceBorder }]}
     >
       <View style={styles.textColumn}>

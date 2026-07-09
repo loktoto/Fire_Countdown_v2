@@ -4,6 +4,7 @@ const now = "2026-06-29T14:00:00.000Z";
 
 export const seedSnapshot: FireSnapshot = {
   themeMode: "dark",
+  hapticsEnabled: true,
   currency: "HKD",
   language: "en",
   categories: [

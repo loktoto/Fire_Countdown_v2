@@ -329,6 +329,17 @@ export function SettingsScreen() {
             thumbColor={vm.snapshot.themeMode === "dark" ? tokens.color.obsidian : colors.text}
           />
         </View>
+        <View style={styles.switchRow}>
+          <Text style={[styles.rowText, typography.body, { color: colors.text }]}>
+            {t.settings.hapticFeedback}
+          </Text>
+          <Switch
+            value={vm.snapshot.hapticsEnabled}
+            onValueChange={vm.setHapticsEnabled}
+            trackColor={{ false: colors.surfaceBorder, true: colors.primary }}
+            thumbColor={vm.snapshot.hapticsEnabled ? tokens.color.obsidian : colors.text}
+          />
+        </View>
         <EditableRow
           label={t.settings.currency}
           value={vm.snapshot.currency}
@@ -346,7 +357,11 @@ export function SettingsScreen() {
           <Text style={[styles.sectionTitle, typography.title, { color: colors.text }]}>
             {t.settings.fireSettings}
           </Text>
-          <MotionPressable onPress={() => setFirePlanEditorOpen(true)} style={styles.headerAction}>
+          <MotionPressable
+            onPress={() => setFirePlanEditorOpen(true)}
+            haptic="selection"
+            style={styles.headerAction}
+          >
             <Text style={[typography.button, { color: colors.primary }]}>{t.common.edit}</Text>
           </MotionPressable>
         </View>
@@ -359,6 +374,7 @@ export function SettingsScreen() {
           <MotionPressable
             onPress={() => setScenarioListOpen(true)}
             accessibilityLabel={t.firePlan.editFireMethods}
+            haptic="selection"
             style={[
               styles.quickAction,
               {
@@ -379,6 +395,7 @@ export function SettingsScreen() {
           <MotionPressable
             onPress={() => setMilestoneListOpen(true)}
             accessibilityLabel={t.firePlan.editMilestones}
+            haptic="selection"
             style={[
               styles.quickAction,
               {

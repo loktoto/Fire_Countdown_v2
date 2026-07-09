@@ -41,6 +41,7 @@ type FireStoreContextValue = {
   updateQuoteSettings: (patch: Partial<QuoteBridgeSettings>) => void;
   saveQuotes: (quotes: AssetQuoteCache[]) => void;
   setThemeMode: (mode: FireSnapshot["themeMode"]) => void;
+  setHapticsEnabled: (enabled: boolean) => void;
   setCurrency: (currency: string) => void;
   setLanguage: (language: FireSnapshot["language"]) => void;
 };
@@ -62,7 +63,12 @@ function readSnapshot(): FireSnapshot {
   }
 
   try {
-    return JSON.parse(stored) as FireSnapshot;
+    const parsed = JSON.parse(stored) as Partial<FireSnapshot>;
+    return {
+      ...seedSnapshot,
+      ...parsed,
+      hapticsEnabled: parsed.hapticsEnabled ?? true,
+    } as FireSnapshot;
   } catch {
     return seedSnapshot;
   }
@@ -333,6 +339,11 @@ export function FireStoreProvider({ children }: { children: React.ReactNode }) {
         commit((current) => ({
           ...current,
           themeMode: mode,
+        })),
+      setHapticsEnabled: (enabled) =>
+        commit((current) => ({
+          ...current,
+          hapticsEnabled: enabled,
         })),
       setCurrency: (currency) =>
         commit((current) => {

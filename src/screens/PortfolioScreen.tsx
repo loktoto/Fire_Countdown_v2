@@ -292,7 +292,11 @@ export function PortfolioScreen() {
           <Text style={[styles.sectionTitle, typography.title, { color: colors.text }]}>
             {t.portfolio.fireSettings}
           </Text>
-          <MotionPressable onPress={() => setFirePlanEditorOpen(true)} style={styles.headerAction}>
+          <MotionPressable
+            onPress={() => setFirePlanEditorOpen(true)}
+            haptic="selection"
+            style={styles.headerAction}
+          >
             <Text style={[typography.button, { color: colors.primary }]}>{t.common.edit}</Text>
           </MotionPressable>
         </View>
@@ -305,6 +309,7 @@ export function PortfolioScreen() {
           <MotionPressable
             onPress={() => setScenarioListOpen(true)}
             accessibilityLabel={t.firePlan.editFireMethods}
+            haptic="selection"
             style={[
               styles.quickAction,
               {
@@ -325,6 +330,7 @@ export function PortfolioScreen() {
           <MotionPressable
             onPress={() => setMilestoneListOpen(true)}
             accessibilityLabel={t.firePlan.editMilestones}
+            haptic="selection"
             style={[
               styles.quickAction,
               {

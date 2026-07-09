@@ -1,3 +1,4 @@
+import * as Haptics from "expo-haptics";
 import { useEffect, useMemo, type ReactNode } from "react";
 import {
   Pressable,
@@ -11,10 +12,12 @@ import {
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 
 import { useThemeColors } from "../design/theme";
+import { useFireStore } from "../data/fireStore";
 import { useReducedMotion } from "../hooks/useReducedMotion";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const AnimatedView = Animated.createAnimatedComponent(View);
+type HapticFeedback = false | "selection" | "light" | "medium" | "heavy";
 
 export function MotionPressable({
   children,
@@ -26,6 +29,7 @@ export function MotionPressable({
   disabled = false,
   hitSlop,
   hoverEffect = true,
+  haptic = false,
 }: {
   children: ReactNode;
   onPress?: () => void;
@@ -36,9 +40,11 @@ export function MotionPressable({
   disabled?: boolean;
   hitSlop?: Insets | number;
   hoverEffect?: boolean;
+  haptic?: HapticFeedback;
 }) {
   const reducedMotion = useReducedMotion();
   const colors = useThemeColors();
+  const { snapshot } = useFireStore();
   const pressScale = useSharedValue(1);
   const hoverLift = useSharedValue(0);
   const hoverRadius = useMemo(() => {
@@ -87,6 +93,28 @@ export function MotionPressable({
     hoverLift.value = withTiming(active ? 1 : 0, { duration: active ? 140 : 120 });
   }
 
+  async function runHaptic() {
+    if (!haptic || !snapshot.hapticsEnabled) {
+      return;
+    }
+
+    try {
+      if (haptic === "selection") {
+        await Haptics.selectionAsync();
+        return;
+      }
+
+      const styles = {
+        light: Haptics.ImpactFeedbackStyle.Light,
+        medium: Haptics.ImpactFeedbackStyle.Medium,
+        heavy: Haptics.ImpactFeedbackStyle.Heavy,
+      };
+      await Haptics.impactAsync(styles[haptic]);
+    } catch {
+      // Haptics can be unavailable on some devices or web targets.
+    }
+  }
+
   return (
     <AnimatedPressable
       accessibilityRole="button"
@@ -94,7 +122,14 @@ export function MotionPressable({
       accessibilityState={accessibilityState}
       disabled={disabled}
       hitSlop={hitSlop}
-      onPress={onPress}
+      onPress={
+        onPress
+          ? () => {
+              void runHaptic();
+              onPress();
+            }
+          : undefined
+      }
       onLongPress={onLongPress}
       onHoverIn={() => setHover(true)}
       onHoverOut={() => setHover(false)}

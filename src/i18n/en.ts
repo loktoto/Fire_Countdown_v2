@@ -174,6 +174,7 @@ export const en = {
     done: "Done",
     appearance: "Appearance",
     darkMode: "Dark mode",
+    hapticFeedback: "Haptic feedback",
     currency: "Currency",
     language: "Language",
     displayCurrency: "Display currency",

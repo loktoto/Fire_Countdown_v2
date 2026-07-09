@@ -174,6 +174,7 @@ export const zhHant: I18nStrings = {
     done: "完成",
     appearance: "外觀",
     darkMode: "深色模式",
+    hapticFeedback: "觸感回饋",
     currency: "貨幣",
     language: "語言",
     displayCurrency: "顯示貨幣",

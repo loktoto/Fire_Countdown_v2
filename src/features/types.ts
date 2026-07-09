@@ -136,6 +136,7 @@ export type FireSnapshot = {
   scenarios: ProjectionScenario[];
   quoteSettings: QuoteBridgeSettings;
   themeMode: "dark" | "light";
+  hapticsEnabled: boolean;
   currency: string;
   language: "en" | "zhHant";
 };

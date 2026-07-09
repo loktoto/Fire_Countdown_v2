@@ -114,6 +114,7 @@ export function LogScreen() {
               accessibilityLabel={t.log.previousDay}
               style={styles.dateArrow}
               hitSlop={8}
+              haptic="selection"
             >
               <MaterialCommunityIcons name="chevron-left" size={22} color={colors.primary} />
             </MotionPressable>
@@ -121,6 +122,7 @@ export function LogScreen() {
               onPress={() => setDatePickerVisible(true)}
               accessibilityLabel={t.log.pickTransactionDay}
               style={styles.dateCopy}
+              haptic="selection"
             >
               <View style={styles.dateValueRow}>
                 <Text
@@ -142,6 +144,7 @@ export function LogScreen() {
               accessibilityLabel={t.log.nextDay}
               style={styles.dateArrow}
               hitSlop={8}
+              haptic="selection"
             >
               <MaterialCommunityIcons name="chevron-right" size={22} color={colors.primary} />
             </MotionPressable>
@@ -198,6 +201,7 @@ export function LogScreen() {
               onLongPress={() => openEditCategory(category)}
               accessibilityLabel={t.log.categoryA11y(category.name)}
               accessibilityState={{ selected: active }}
+              haptic="selection"
               style={[
                 styles.category,
                 {
@@ -222,6 +226,7 @@ export function LogScreen() {
         <MotionPressable
           onPress={openNewCategory}
           accessibilityLabel={t.log.addCategory}
+          haptic="selection"
           style={[
             styles.category,
             styles.addCategory,
@@ -239,6 +244,7 @@ export function LogScreen() {
         onPress={vm.confirm}
         style={[styles.confirm, { backgroundColor: colors.primary, shadowColor: colors.primary }]}
         accessibilityLabel={t.log.confirmTransaction}
+        haptic="medium"
       >
         <Text style={[styles.confirmText, typography.button, { color: colors.onPrimary }]}>
           {t.log.confirmTransactionCta}

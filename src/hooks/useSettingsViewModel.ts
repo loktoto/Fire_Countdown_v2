@@ -10,6 +10,7 @@ export function useSettingsViewModel() {
   const {
     snapshot,
     setThemeMode,
+    setHapticsEnabled,
     setCurrency,
     setLanguage,
     updateQuoteSettings,
@@ -94,6 +95,7 @@ export function useSettingsViewModel() {
     scenarios,
     categories: snapshot.categories.filter((category) => !category.archivedAt),
     setThemeMode,
+    setHapticsEnabled,
     setCurrency,
     setLanguage,
     updateQuoteSettings,

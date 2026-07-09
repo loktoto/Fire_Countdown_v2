@@ -28,6 +28,7 @@ export function SegmentedControl<T extends string>({
           <MotionPressable
             key={option.value}
             onPress={() => onChange(option.value)}
+            haptic="selection"
             style={[
               styles.option,
               {

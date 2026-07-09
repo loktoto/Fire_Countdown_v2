@@ -66,6 +66,7 @@ export function BottomNavPill({ state, navigation }: TabBarProps) {
               key={route.key}
               accessibilityLabel={label}
               onPress={pressTab}
+              haptic={isLog ? "medium" : "selection"}
               style={[
                 styles.item,
                 isLog && [
