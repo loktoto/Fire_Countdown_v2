@@ -80,12 +80,11 @@ function percentText(value: number | null | undefined) {
   return (value * 100).toFixed(2).replace(/\.?0+$/, "");
 }
 
-function signedPercentText(value: number) {
-  const sign = value >= 0 ? "+" : "-";
-  return `${sign}${percentText(Math.abs(value)) || "0"}%`;
-}
-
-function scenarioAssumptions(goal: FireGoal | null, scenario: ProjectionScenario) {
+function scenarioAssumptions(
+  goal: FireGoal | null,
+  scenario: ProjectionScenario,
+  baseExpectedReturn = 0,
+) {
   const targetMonthlySpending = Math.max(
     0,
     (goal?.targetMonthlySpending ?? 0) + scenario.targetSpendingAdjustment,
@@ -96,8 +95,9 @@ function scenarioAssumptions(goal: FireGoal | null, scenario: ProjectionScenario
     (goal?.withdrawalRate ?? 0) + (scenario.withdrawalRateAdjustment ?? 0),
   );
   const inflationRate = (goal?.inflationRate ?? 0) + scenario.inflationAdjustment;
+  const expectedReturn = Math.max(-0.95, baseExpectedReturn + scenario.expectedReturnAdjustment);
 
-  return { inflationRate, monthlySaving, targetMonthlySpending, withdrawalRate };
+  return { expectedReturn, inflationRate, monthlySaving, targetMonthlySpending, withdrawalRate };
 }
 
 function BaseSheet({
@@ -647,6 +647,7 @@ export function ScenarioListSheet({
   goal,
   scenarios,
   currency,
+  baseExpectedReturn,
   onClose,
   onAdd,
   onEdit,
@@ -655,6 +656,7 @@ export function ScenarioListSheet({
   goal: FireGoal | null;
   scenarios: ProjectionScenario[];
   currency: string;
+  baseExpectedReturn?: number;
   onClose: () => void;
   onAdd: () => void;
   onEdit: (scenario: ProjectionScenario) => void;
@@ -686,7 +688,7 @@ export function ScenarioListSheet({
           onPress={onAdd}
         />
         {scenarios.map((scenario) => {
-          const assumptions = scenarioAssumptions(goal, scenario);
+          const assumptions = scenarioAssumptions(goal, scenario, baseExpectedReturn);
           return (
             <MotionPressable
               key={scenario.id}
@@ -716,7 +718,7 @@ export function ScenarioListSheet({
                 >
                   {t.firePlan.saveReturn(
                     money(assumptions.monthlySaving, currency),
-                    signedPercentText(scenario.expectedReturnAdjustment),
+                    percent(assumptions.expectedReturn),
                   )}
                 </Text>
               </View>
@@ -733,6 +735,7 @@ export function ScenarioEditorSheet({
   visible,
   goal,
   scenario,
+  baseExpectedReturn,
   onClose,
   onSave,
   onArchive,
@@ -740,6 +743,7 @@ export function ScenarioEditorSheet({
   visible: boolean;
   goal: FireGoal | null;
   scenario: ProjectionScenario | null;
+  baseExpectedReturn?: number;
   onClose: () => void;
   onSave: (scenarioId: string, patch: ScenarioPatch) => void;
   onArchive?: (scenarioId: string) => void;
@@ -754,6 +758,7 @@ export function ScenarioEditorSheet({
         key={scenario.id}
         goal={goal}
         scenario={scenario}
+        baseExpectedReturn={baseExpectedReturn}
         onClose={onClose}
         onSave={onSave}
         onArchive={onArchive}
@@ -765,19 +770,21 @@ export function ScenarioEditorSheet({
 function ScenarioEditorContent({
   goal,
   scenario,
+  baseExpectedReturn = 0,
   onClose,
   onSave,
   onArchive,
 }: {
   goal: FireGoal | null;
   scenario: ProjectionScenario;
+  baseExpectedReturn?: number;
   onClose: () => void;
   onSave: (scenarioId: string, patch: ScenarioPatch) => void;
   onArchive?: (scenarioId: string) => void;
 }) {
   const colors = useThemeColors();
   const t = useI18n();
-  const assumptions = scenarioAssumptions(goal, scenario);
+  const assumptions = scenarioAssumptions(goal, scenario, baseExpectedReturn);
   const [name, setName] = useState(scenario.name);
   const [targetMonthlySpending, setTargetMonthlySpending] = useState(
     String(assumptions.targetMonthlySpending),
@@ -785,9 +792,7 @@ function ScenarioEditorContent({
   const [monthlySaving, setMonthlySaving] = useState(String(assumptions.monthlySaving));
   const [withdrawalRate, setWithdrawalRate] = useState(percentText(assumptions.withdrawalRate));
   const [inflationRate, setInflationRate] = useState(percentText(assumptions.inflationRate));
-  const [expectedReturnAdjustment, setExpectedReturnAdjustment] = useState(
-    percentText(scenario.expectedReturnAdjustment),
-  );
+  const [expectedReturn, setExpectedReturn] = useState(percentText(assumptions.expectedReturn));
   const [isDefault, setIsDefault] = useState(scenario.isDefault);
   const [confirmingArchive, setConfirmingArchive] = useState(false);
 
@@ -795,7 +800,8 @@ function ScenarioEditorContent({
     name.trim().length > 0 &&
     numberFromText(targetMonthlySpending) >= 0 &&
     numberFromText(monthlySaving) >= 0 &&
-    numberFromText(withdrawalRate) > 0;
+    numberFromText(withdrawalRate) > 0 &&
+    numberFromText(expectedReturn, 0) > -95;
 
   function save() {
     if (!canSave) {
@@ -804,7 +810,7 @@ function ScenarioEditorContent({
 
     onSave(scenario.id, {
       name: name.trim(),
-      expectedReturnAdjustment: numberFromText(expectedReturnAdjustment, 0) / 100,
+      expectedReturnAdjustment: numberFromText(expectedReturn, 0) / 100 - baseExpectedReturn,
       inflationAdjustment: numberFromText(inflationRate, 0) / 100 - (goal?.inflationRate ?? 0),
       monthlySavingAdjustment: numberFromText(monthlySaving, 0) - (goal?.monthlySaving ?? 0),
       targetSpendingAdjustment:
@@ -893,13 +899,13 @@ function ScenarioEditorContent({
           </View>
         </View>
         <Field
-          label={t.firePlan.returnAdjustment}
-          value={expectedReturnAdjustment}
-          onChangeText={(value) => setExpectedReturnAdjustment(normalizeNumberInput(value, true))}
+          label={t.firePlan.expectedReturn}
+          value={expectedReturn}
+          onChangeText={(value) => setExpectedReturn(normalizeNumberInput(value, true))}
           keyboardType={Platform.OS === "ios" ? "numbers-and-punctuation" : "numeric"}
           inputMode="decimal"
-          placeholder="-2"
-          accessibilityLabel={t.firePlan.returnAdjustment}
+          placeholder={percentText(baseExpectedReturn) || "0"}
+          accessibilityLabel={t.firePlan.expectedReturn}
         />
         <ToggleRow
           label={t.firePlan.defaultDashboardVersion}

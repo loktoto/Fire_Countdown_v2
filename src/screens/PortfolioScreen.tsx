@@ -363,6 +363,7 @@ export function PortfolioScreen() {
         goal={vm.goal}
         scenarios={vm.scenarios}
         currency={goalCurrency}
+        baseExpectedReturn={vm.weightedReturn}
         onClose={() => setScenarioListOpen(false)}
         onAdd={addScenario}
         onEdit={openScenario}
@@ -390,6 +391,7 @@ export function PortfolioScreen() {
         visible={editingScenario !== null}
         goal={vm.goal}
         scenario={editingScenario}
+        baseExpectedReturn={vm.weightedReturn}
         onClose={closeScenarioEditor}
         onSave={saveScenario}
         onArchive={creatingScenario || vm.scenarios.length <= 1 ? undefined : archiveScenario}

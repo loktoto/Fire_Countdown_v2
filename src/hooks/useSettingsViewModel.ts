@@ -1,9 +1,10 @@
 import { useMutation } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { getQuotes, saveQuoteToken } from "../features/quoteBridge/client";
 import { useFireStore } from "../data/fireStore";
-import { mainGoal } from "../engine/selectors";
+import { deriveFireView, mainGoal } from "../engine/selectors";
+import { todayIso } from "../utils/format";
 
 export function useSettingsViewModel() {
   const store = useFireStore();
@@ -26,6 +27,8 @@ export function useSettingsViewModel() {
     archiveScenario,
   } = store;
   const goal = mainGoal(snapshot);
+  const today = todayIso();
+  const fire = useMemo(() => deriveFireView(snapshot, today), [snapshot, today]);
   const [tokenDraft, setTokenDraft] = useState("");
   const refreshQuotes = useMutation({
     mutationFn: async () =>
@@ -91,6 +94,7 @@ export function useSettingsViewModel() {
   return {
     snapshot,
     goal,
+    weightedReturn: fire.weightedReturn,
     milestones,
     scenarios,
     categories: snapshot.categories.filter((category) => !category.archivedAt),

@@ -509,6 +509,7 @@ export function SettingsScreen() {
         goal={vm.goal ?? null}
         scenarios={vm.scenarios}
         currency={goalCurrency}
+        baseExpectedReturn={vm.weightedReturn}
         onClose={() => setScenarioListOpen(false)}
         onAdd={addScenario}
         onEdit={editScenario}
@@ -530,6 +531,7 @@ export function SettingsScreen() {
         visible={editingScenario !== null}
         goal={vm.goal ?? null}
         scenario={editingScenario}
+        baseExpectedReturn={vm.weightedReturn}
         onClose={closeScenarioEditor}
         onSave={saveScenario}
         onArchive={creatingScenario || scenarioCount <= 1 ? undefined : archiveScenario}
