@@ -1,415 +1,498 @@
-# Fire Countdown v2 — End-to-End UAT Test Plan
+# Fire Countdown v2 — Focused End-to-End UAT Plan
 
-**Document status:** Ready for execution  
+**Status:** Ready for execution  
 **Prepared:** 2026-07-14  
-**Application:** Fire Countdown v2  
-**Primary platforms:** iOS and Android through Expo Go / development build  
-**Secondary smoke platform:** Web  
-**Suite size:** 100 detailed acceptance tests + 8 complete user journeys
+**Scope:** 48 scenario-based UAT cases covering the complete user experience  
+**Primary platforms:** iOS and Android  
+**Secondary platform:** Web smoke testing
 
 ---
 
 ## 1. Purpose
 
-This document defines release-level user acceptance testing for the full Fire Countdown v2 experience. It validates that a user can record cash flow, review and edit history, understand FIRE progress, manage assets and planning assumptions, configure the app, export data, and recover safely from offline or integration failures.
+This plan validates that a real user can complete the core Fire Countdown experience safely and consistently:
 
-The suite is based on the implemented product rules:
+1. Record income and expenses.
+2. Review, edit, move, and archive transaction history.
+3. Understand current FIRE progress and projected FIRE timing.
+4. Manage assets, FIRE assumptions, milestones, and projection methods.
+5. Configure appearance, language, currency, quote integration, and data export.
+6. Continue using the app after restart, offline use, or quote-service failure.
 
-- Bottom navigation is `Home | Calendar | + | Dashboard | Portfolio`.
-- The center `+` opens Log and is the default landing route.
-- Settings is opened from Portfolio and is not a bottom tab.
-- All user-owned financial inputs that affect FIRE remain editable.
-- FIRE outputs are deterministic and update consistently across screens.
-- Quote failures must preserve Portfolio values through cached or manual fallback data.
-- The app is local-first and must persist user changes across restarts.
+The suite deliberately uses **48 consolidated business scenarios** rather than 100 narrowly separated checks. Each case validates a complete user outcome and may contain several related acceptance points.
 
 ---
 
-## 2. Acceptance decision
+## 2. Release acceptance rules
 
-A build is accepted only when all of the following are true:
+A release candidate is accepted only when:
 
-1. Every **P0** test passes on both iOS and Android.
-2. No open defect causes data loss, incorrect FIRE calculations, navigation dead ends, inaccessible critical controls, or exposure of the quote API token.
-3. At least 95% of **P1** tests pass, with any exception explicitly approved.
-4. The eight end-to-end journeys complete without app restart, manual data repair, or developer intervention.
-5. Web smoke testing has no blocker affecting launch, navigation, transaction entry, Calendar, Dashboard, Portfolio, or Settings.
-
-### Severity
-
-| Severity | Definition |
-|---|---|
-| Blocker | App cannot launch, data is lost/corrupted, core journey cannot complete, or financial output is materially wrong. |
-| Critical | Major feature is unusable or produces inconsistent results, but another part of the app remains usable. |
-| Major | Important behavior is incorrect or confusing; a workaround exists. |
-| Minor | Cosmetic, copy, animation, spacing, or low-impact usability problem. |
+- **All P0 cases pass on iOS and Android.**
+- At least **95% of P1 cases pass**, with no unresolved Critical defect.
+- No open defect causes data loss, incorrect FIRE calculations, navigation dead ends, exposed secrets, or unusable core controls.
+- All six end-to-end journeys complete without developer intervention or manual data repair.
+- Web smoke testing passes launch, navigation, transaction entry, Calendar, Dashboard, Portfolio, and Settings.
 
 ### Priority
 
-| Priority | Execution rule |
+| Priority | Meaning |
 |---|---|
-| P0 | Run on every release candidate on iOS and Android. |
-| P1 | Run on every release candidate; may be risk-based on Web. |
-| P2 | Run before production release and after major UI/data changes. |
+| P0 | Release blocker. Execute on every release candidate on iOS and Android. |
+| P1 | Core regression. Execute on every release candidate; risk-based on Web. |
+| P2 | Extended UX, compatibility, and non-blocking validation. |
+
+### Defect severity
+
+| Severity | Definition |
+|---|---|
+| Blocker | App cannot launch, data is lost or corrupted, or a complete core journey cannot finish. |
+| Critical | Financial result is materially wrong, a major feature is unusable, or sensitive data is exposed. |
+| Major | Important behavior is incorrect or confusing, but a workaround exists. |
+| Minor | Cosmetic, copy, spacing, animation, or low-impact usability issue. |
 
 ---
 
-## 3. Test environment and evidence
+## 3. Test environment
 
-Record the following for every execution:
+Record for each run:
 
-- Build identifier / commit SHA
-- Device model, OS version, and platform
-- Installation type: Expo Go, development build, or Web
-- Network state: online, offline, or unreliable
-- App language and theme
-- Tester, date/time, result (`Pass`, `Fail`, `Blocked`, `Not Run`)
-- Screenshot or screen recording for failures
-- Defect link and severity
+- Build identifier and commit SHA
+- Device model, operating-system version, and platform
+- Expo Go, development build, or Web
+- Online, offline, or unreliable network state
+- English or Traditional Chinese
+- Dark or light theme
+- Tester, date, result, evidence, and linked defect
 
-Recommended coverage:
+Minimum matrix:
 
-| Matrix | Minimum coverage |
+| Dimension | Required coverage |
 |---|---|
-| iOS | One current iPhone-size device; one smaller viewport where available |
-| Android | One current Android device; one smaller viewport where available |
+| iOS | Current iPhone-size device plus one smaller viewport where available |
+| Android | Current Android device plus one smaller viewport where available |
 | Web | Current Chrome or Edge smoke run |
 | Theme | Dark and light |
 | Language | English and Traditional Chinese |
-| Network | Online, offline, failed quote endpoint |
-| Persistence | Warm restart and full app termination/relaunch |
+| Network | Online, offline, and failed quote endpoint |
+| Persistence | Warm restart and full termination/relaunch |
 
 ---
 
-## 4. Baseline test data
+## 4. Baseline test data and calculation checkpoint
 
-Use **Settings → Maintenance → Reset demo data** before a clean baseline run.
+Start the main execution from **Reset Demo Data**, unless a case specifies otherwise.
 
-Expected seed state:
+Expected seed checkpoints:
 
-- Theme: Dark
-- Haptics: Enabled
-- Currency: HKD
-- Language: English
-- Expense categories: Food, Transport
-- Income categories: Salary, Dividend
-- Transactions:
-  - HKD 120 Food expense on 2026-06-29, note `Lunch`
-  - HKD 5,000 Dividend income on 2026-06-28, note `ETF distribution`
-  - HKD 48 Transport expense on 2026-06-27, note `MTR`
-- Assets:
-  - VOO ETF: included in FIRE, quote-capable, HKD 242,000 baseline value
-  - Emergency Cash: included in FIRE, HKD 180,000
-  - Primary Residence: excluded from FIRE, HKD 720,000
-- FIRE goal:
-  - Current age 31
-  - Target monthly spending HKD 28,000
-  - Withdrawal rate 3.5%
-  - Inflation 2.5%
-  - Monthly saving HKD 18,000
-- Scenarios: Conservative, Base, Aggressive; Base is default
-- Milestones: Coast FIRE, Halfway FIRE, Full FIRE
+- Base currency: HKD
+- Included FIRE assets: VOO ETF HKD 242,000 + Emergency Cash HKD 180,000 = **HKD 422,000**
+- Total assets including excluded residence: **HKD 1,142,000**
+- Monthly retirement spending: HKD 28,000
+- Withdrawal rate: 3.5%
+- Derived FIRE target: `28,000 × 12 ÷ 0.035 = HKD 9,600,000`
+- Base scenario is the default projection method
+- Primary Residence is excluded from FIRE
 
-Do not hard-code the projected FIRE date in UAT evidence. Record the baseline displayed value, then verify directional and cross-screen consistency after each controlled change.
+Allow normal display rounding. Any unexplained cross-screen difference is a defect.
 
 ---
 
-## 5. Full end-to-end user journeys
+# 5. UAT test cases
 
-### Journey E2E-01 — Daily expense through full FIRE impact
+## A. Launch and navigation — 4 cases
 
-1. Reset demo data and relaunch.
-2. Confirm Log is the initial route.
-3. Record a new Food expense for today with a note.
-4. Open Calendar and verify the day amount, monthly expense, net, and transaction row.
-5. Open Home and verify Today FIRE impact and progress reflect the expense.
-6. Open Dashboard and verify saved cash flow, month net, Today impact, and category leader update consistently.
-7. Terminate and relaunch the app.
-8. Verify the transaction and all derived outputs persist.
+### UAT-NAV-01 — Launch to the default Log route
 
-**Acceptance:** One transaction is stored once, appears on the correct date, and produces consistent negative FIRE impact across Calendar, Home, and Dashboard after relaunch.
+- **Priority:** P0
+- **Precondition:** App is fully terminated.
+- **Steps:** Launch the app; wait for initial loading to finish.
+- **Expected:** App opens without crash or blank screen; the center `+` / Log route is selected; amount input is usable; no developer error or missing-data state appears.
 
-### Journey E2E-02 — Income correction and historical edit
+### UAT-NAV-02 — Complete bottom-tab navigation
 
-1. Record an income transaction on a historical date.
-2. Open Calendar and navigate to that month/date.
-3. Edit amount, category, note, and date.
-4. Save and verify the transaction moves to the new date.
-5. Verify monthly summaries and Dashboard activity month recalculate.
-6. Archive the transaction and verify it disappears from active totals without affecting unrelated records.
+- **Priority:** P0
+- **Steps:** Open Home, Calendar, Log, Dashboard, and Portfolio in sequence; return to Log.
+- **Expected:** Every tab opens the correct screen; selected-tab state is clear; no stale modal blocks navigation; returning to a screen reflects the latest saved data.
 
-**Acceptance:** Edit and archive operations are reflected everywhere and no duplicate record remains.
+### UAT-NAV-03 — Open and close Settings through Portfolio
 
-### Journey E2E-03 — Category lifecycle
+- **Priority:** P1
+- **Steps:** Open Portfolio; open Settings; select Done/back.
+- **Expected:** Settings opens as a separate screen/modal and is not shown as a sixth bottom tab; closing returns to Portfolio without losing unsaved data elsewhere.
 
-1. Create a new expense category with a name, icon, and color.
-2. Confirm it becomes selected.
-3. Record an expense using it.
-4. Edit the category name/icon/color.
-5. Verify the existing transaction displays the edited category presentation in Calendar and Dashboard.
-6. Archive the category.
-7. Verify it no longer appears for new Log entries while historical transactions remain understandable.
+### UAT-NAV-04 — Recover from an unknown route
 
-**Acceptance:** Category changes propagate without deleting or corrupting historical transactions.
-
-### Journey E2E-04 — Asset and privacy workflow
-
-1. Add a manual asset from Portfolio.
-2. Edit its name, class, value, currency, expected return, FIRE inclusion, and notes.
-3. Verify total assets, included assets, allocation, weighted return, Home, and Dashboard update.
-4. Exclude and re-include the asset.
-5. Hide asset amounts on Portfolio, then Home.
-6. Relaunch and verify financial data persists and no hidden value is exposed while privacy mode is active on each screen.
-
-**Acceptance:** Asset edits drive deterministic FIRE outputs and privacy controls mask values without altering data.
-
-### Journey E2E-05 — FIRE plan, scenario, and milestone workflow
-
-1. Edit current age, spending, savings, withdrawal rate, and inflation.
-2. Create a new scenario with non-zero adjustments and set it as default.
-3. Select the scenario on Dashboard and verify projection changes.
-4. Create and edit a milestone.
-5. Verify Home milestone journey updates.
-6. Archive the scenario and milestone.
-7. Verify a valid default scenario remains and archived items disappear from active UI.
-
-**Acceptance:** Planning inputs remain editable and all dependent outputs update without invalid state.
-
-### Journey E2E-06 — Quote success, failure, and fallback
-
-1. Configure a valid quote bridge URL and token.
-2. Refresh quotes successfully and verify quote-backed assets display updated values/status.
-3. Disable connectivity or configure an invalid endpoint.
-4. Refresh again and verify a failure status is shown.
-5. Open Portfolio, Home, and Dashboard.
-
-**Acceptance:** The app remains usable and asset/FIRE values never blank; cached or manual fallback values remain available.
-
-### Journey E2E-07 — Localization, theme, export, and restart
-
-1. Switch to light mode and Traditional Chinese.
-2. Navigate all five tabs and Settings.
-3. Export CSV and Google Sheets-compatible data.
-4. Verify exported content contains key tables and user data, with no API token.
-5. Terminate and relaunch.
-6. Verify language, theme, currency, and financial data persist.
-
-**Acceptance:** UI remains legible, localized, persistent, and exportable with no secret leakage.
-
-### Journey E2E-08 — Offline local-first operation
-
-1. Launch once online, then disable network.
-2. Record, edit, and archive transactions.
-3. Edit an asset and FIRE assumptions.
-4. Navigate every tab and restart while offline.
-5. Attempt quote refresh.
-6. Re-enable network and confirm local data remains intact.
-
-**Acceptance:** All local features work offline; quote failure is isolated and does not roll back or corrupt local changes.
+- **Priority:** P2
+- **Steps:** Open an invalid/deep route supported by the test environment; use the recovery action.
+- **Expected:** A controlled “route not found” state appears; the user can return to Log; the app does not crash.
 
 ---
 
-# 6. Detailed UAT test cases
+## B. Log transactions — 8 cases
 
-## A. Launch, routing, and navigation — 7 cases
+### UAT-LOG-01 — Record a same-day expense
 
-| ID | P | Preconditions | Steps | Expected result |
-|---|---:|---|---|---|
-| UAT-NAV-001 | P0 | Fresh launch | Open the app from terminated state. | App launches without crash and lands on center `+` / Log. |
-| UAT-NAV-002 | P0 | App launched | Tap Home, Calendar, `+`, Dashboard, Portfolio in sequence. | Each tab opens the correct screen; selected state is clear; no stale overlay blocks navigation. |
-| UAT-NAV-003 | P1 | On any non-Log tab | Tap the center `+`. | Log opens and amount field receives focus after the screen settles. |
-| UAT-NAV-004 | P0 | On Portfolio | Open Settings, then tap Done/back. | Settings opens as a modal/stack screen and returns to Portfolio without resetting state. |
-| UAT-NAV-005 | P1 | Scrollable screen populated | Scroll, change tabs, return. | Screen renders correctly with no overlap from bottom navigation or safe-area clipping. |
-| UAT-NAV-006 | P1 | Any modal/editor open | Use backdrop, close button, and Android back where applicable. | Modal closes predictably; no unsaved change is applied unless Save was used. |
-| UAT-NAV-007 | P2 | Web build | Open direct root URL and navigate all routes. | Root redirects to Log; core screens render without route-not-found or browser console blocker. |
+- **Priority:** P0
+- **Steps:** On Log, choose Expense; enter `128.50`; select Food; enter note `Team lunch`; keep today’s date; confirm.
+- **Expected:** One expense is created with the correct amount, category, note, currency, and date; amount and note fields reset; date returns to today; Calendar, Home, and Dashboard update consistently.
 
-## B. Log transaction entry — 15 cases
+### UAT-LOG-02 — Record a same-day income
 
-| ID | P | Preconditions | Steps | Expected result |
-|---|---:|---|---|---|
-| UAT-LOG-001 | P0 | On Log | Enter `125.50`, choose Food expense, add note, confirm. | One expense is created with exact amount/category/note/date; form resets amount/note/date. |
-| UAT-LOG-002 | P0 | On Log | Switch to Income, choose Salary, enter amount, confirm. | Income record is created and positive totals/impact update. |
-| UAT-LOG-003 | P0 | On Log | Leave amount at 0 and tap Confirm. | No transaction is created and existing data is unchanged. |
-| UAT-LOG-004 | P1 | On Log | Enter letters, currency symbols, spaces, and multiple decimal separators. | Input is normalized to digits and at most one effective decimal value. |
-| UAT-LOG-005 | P1 | On Log | Enter `12.3456`. | Amount is limited to two decimal places for transaction entry. |
-| UAT-LOG-006 | P1 | On Log | Enter more than 12 characters. | Input is capped without crash or layout break. |
-| UAT-LOG-007 | P1 | On Log | Enter `1,25`. | Comma is normalized as decimal separator and saved as 1.25. |
-| UAT-LOG-008 | P0 | On Log | Use previous/next day controls, then save. | Transaction is stored on the displayed selected date. |
-| UAT-LOG-009 | P1 | On Log | Open date picker, select a distant past date, save. | Selected date is retained for the save and Calendar can locate it. |
-| UAT-LOG-010 | P1 | Historical date selected | Use Today action in date picker. | Selected date returns to current local date. |
-| UAT-LOG-011 | P1 | On Log | Enter note containing leading/trailing spaces. | Saved note is trimmed; whitespace-only note becomes no note. |
-| UAT-LOG-012 | P1 | On Log | Enter more than 120 note characters. | Input stops at 120 characters and app remains responsive. |
-| UAT-LOG-013 | P0 | Valid goal/assets exist | Compare impact preview for same amount as expense vs income. | Expense delays FIRE; income advances FIRE; values are finite or clearly indicate no crossover. |
-| UAT-LOG-014 | P1 | On Log with expense selected | Switch to income and back. | Category list changes to matching transaction type and active category is valid. |
-| UAT-LOG-015 | P0 | Rapid interaction | Tap Confirm repeatedly after entering one valid transaction. | The app must not create unintended duplicate transactions; any duplicate behavior is a release defect. |
+- **Priority:** P0
+- **Steps:** Choose Income; enter `5000`; select Salary or Dividend; add a note; confirm.
+- **Expected:** One income record is created; positive cash-flow displays use the positive visual treatment; Home and Dashboard show a favorable change relative to the prior state.
 
-## C. Category lifecycle — 7 cases
+### UAT-LOG-03 — Record a transaction on another date
 
-| ID | P | Preconditions | Steps | Expected result |
-|---|---:|---|---|---|
-| UAT-CAT-001 | P0 | On Log | Add a new expense category with valid name/icon/color. | Category is created, visible, and selected for the current expense type. |
-| UAT-CAT-002 | P1 | New category exists | Save a transaction using it. | Transaction stores the category and displays its glyph/name in Calendar. |
-| UAT-CAT-003 | P0 | Category selected | Edit name, icon, and color. | Updated presentation appears in Log and historical transaction views. |
-| UAT-CAT-004 | P1 | Category editor open | Clear the category name and attempt Save. | Invalid empty category is not saved. |
-| UAT-CAT-005 | P0 | At least two categories of same type | Archive the selected category. | Category disappears from active choices and another valid category becomes selected. |
-| UAT-CAT-006 | P1 | Archived category has historical transaction | Open the historical transaction. | Transaction remains present and data is not deleted; UI handles archived category safely. |
-| UAT-CAT-007 | P1 | Income selected | Create an income category, then switch to expense. | Income category appears only for income; expense list is unaffected. |
+- **Priority:** P1
+- **Steps:** Use previous/next day controls and the date picker to select a non-today date; record an expense.
+- **Expected:** The record is stored on the selected date; Calendar automatically shows it on that date; today’s impact does not incorrectly include it.
 
-## D. Calendar and transaction history — 12 cases
+### UAT-LOG-04 — Amount input normalization
 
-| ID | P | Preconditions | Steps | Expected result |
-|---|---:|---|---|---|
-| UAT-CAL-001 | P0 | Seed data | Open Calendar for June 2026. | Monthly income, expense, and net equal active transactions for that month. |
-| UAT-CAL-002 | P0 | Month contains transactions | Inspect corresponding dates. | Each date cell shows correct signed daily net and color/tone. |
-| UAT-CAL-003 | P1 | On Calendar | Navigate previous/next month. | Month title, grid, and summary change to selected month. |
-| UAT-CAL-004 | P1 | On Calendar | Navigate previous/next year. | Calendar moves exactly 12 months without invalid dates or duplicated heading. |
-| UAT-CAL-005 | P1 | Away from current month | Tap Today. | Calendar selects today and returns to current month. |
-| UAT-CAL-006 | P0 | Select date with records | Tap a transaction row. | Editor opens with exact stored type, amount, category, date, currency, and note. |
-| UAT-CAL-007 | P0 | Transaction editor open | Change amount and note; save. | Row and all affected summaries update once; changes persist. |
-| UAT-CAL-008 | P0 | Transaction editor open | Change expense to income. | Category resets to a valid income category and totals/impact change sign correctly. |
-| UAT-CAL-009 | P0 | Transaction editor open | Move transaction to another valid ISO date. | Editor closes; selected date moves to new date; old date no longer includes record. |
-| UAT-CAL-010 | P1 | Transaction editor open | Enter zero amount or invalid date. | Save is disabled; invalid data is not persisted. |
-| UAT-CAL-011 | P0 | Transaction editor open | Archive transaction. | Transaction disappears from active list, day net, month summary, Home, and Dashboard totals. |
-| UAT-CAL-012 | P1 | Date has no active records | Select date. | Clear empty-state message appears; editor is not opened. |
+- **Priority:** P1
+- **Steps:** Enter values containing a comma decimal, letters, multiple decimal points, and more than two decimal places.
+- **Expected:** Non-numeric characters are removed; comma is treated as a decimal separator; only one normalized decimal value remains; no more than two decimal places are stored; the app does not crash.
 
-## E. Home — 7 cases
+### UAT-LOG-05 — Reject zero or empty amount
 
-| ID | P | Preconditions | Steps | Expected result |
-|---|---:|---|---|---|
-| UAT-HOME-001 | P0 | Seed data | Open Home. | Countdown ring, progress, target caption, net worth, included FIRE assets, Today impact, and milestones render. |
-| UAT-HOME-002 | P1 | Home open | Tap countdown ring. | Animation replays without changing numeric values. |
-| UAT-HOME-003 | P1 | Leave and return to Home | Re-enter Home or tap active tab. | Ring animation can replay and no duplicate component appears. |
-| UAT-HOME-004 | P0 | Home open | Tap net worth/included assets to hide. | Both displayed asset amounts become masked and accessibility state changes. |
-| UAT-HOME-005 | P0 | Values hidden | Tap again. | Exact values return; underlying data is unchanged. |
-| UAT-HOME-006 | P0 | Create expense then income today | Return to Home after each. | Today impact changes in the correct direction and matches Dashboard. |
-| UAT-HOME-007 | P0 | Edit assets/FIRE assumptions/milestones | Return to Home. | Progress, countdown, totals, target caption, and milestone journey reflect current data. |
+- **Priority:** P0
+- **Steps:** Leave amount empty or set it to `0`; press Confirm multiple times.
+- **Expected:** No transaction is created; summaries and history remain unchanged; repeated taps do not create phantom records.
 
-## F. Dashboard — 11 cases
+### UAT-LOG-06 — Expense/income category switching
 
-| ID | P | Preconditions | Steps | Expected result |
-|---|---:|---|---|---|
-| UAT-DASH-001 | P0 | Seed data | Open Dashboard. | Wealth chart, projected FIRE, progress, included assets, cash-flow metrics, leaders, and assumptions render. |
-| UAT-DASH-002 | P0 | Three scenarios active | Select Conservative, Base, Aggressive. | Selected scenario is clear and projection/assumptions update deterministically. |
-| UAT-DASH-003 | P0 | Note baseline | Switch from Conservative to Aggressive. | Projection direction is consistent with higher return/saving and lower target-spending adjustments. |
-| UAT-DASH-004 | P0 | Add current-month expense | Return to Dashboard. | Month net, saved cash flow, Today impact, and most-spending leader update consistently. |
-| UAT-DASH-005 | P0 | Add current-month income | Return to Dashboard. | Month net and most-earning leader update consistently. |
-| UAT-DASH-006 | P1 | Latest transaction is historical month | Open Dashboard. | Activity month badge and category leaders reflect the latest active transaction’s month. |
-| UAT-DASH-007 | P0 | Tap Included Assets assumption | Follow navigation. | Portfolio opens; editing inclusion changes Dashboard value after return. |
-| UAT-DASH-008 | P0 | Tap savings/rate/inflation/spending/target chip | Edit and save. | Correct FIRE plan editor opens and Dashboard recalculates. |
-| UAT-DASH-009 | P0 | Open scenario list | Create/edit a scenario. | New values appear in selection controls and affect projection. |
-| UAT-DASH-010 | P1 | Projection cannot cross target under extreme valid assumptions | Save assumptions. | Dashboard clearly shows no crossover/not reached without NaN, Infinity, or crash. |
-| UAT-DASH-011 | P1 | Current age unset | Open Dashboard. | Projection remains available where possible; age badge shows not set rather than invalid age. |
+- **Priority:** P1
+- **Steps:** Select an expense category; switch to Income; switch back to Expense.
+- **Expected:** Only categories valid for the selected transaction type are shown; a valid category is automatically selected; a transaction cannot be saved against a category of the wrong type.
 
-## G. Portfolio and assets — 14 cases
+### UAT-LOG-07 — FIRE impact preview responds to the draft
 
-| ID | P | Preconditions | Steps | Expected result |
-|---|---:|---|---|---|
-| UAT-PORT-001 | P0 | Seed data | Open Portfolio. | Total assets include all active assets; included FIRE amount excludes Primary Residence. |
-| UAT-PORT-002 | P0 | Seed data | Inspect VOO, cash, residence. | Value source badges correctly identify quote, manual fallback, or manual source. |
-| UAT-PORT-003 | P1 | Portfolio open | Tap allocation card and re-enter tab. | Allocation animation replays; allocation totals remain unchanged. |
-| UAT-PORT-004 | P0 | Portfolio open | Tap Add. | A new Manual Asset is created with default data and appears once. |
-| UAT-PORT-005 | P0 | Manual Asset exists | Edit name, class, value, currency, expected return, notes. | Saved values display correctly and persist. |
-| UAT-PORT-006 | P1 | Asset editor open | Blank the name. | Save is disabled or ignored; empty-name asset is not persisted. |
-| UAT-PORT-007 | P1 | Asset editor open | Enter negative manual value. | Invalid negative value cannot be saved. |
-| UAT-PORT-008 | P1 | Asset editor open | Enter negative expected return and valid value. | Negative return is accepted as a percentage and is reflected in weighted return. |
-| UAT-PORT-009 | P0 | Asset included | Tap Included/Excluded control. | Included FIRE assets, Home, and Dashboard update immediately; total assets remain unchanged. |
-| UAT-PORT-010 | P0 | Asset excluded | Re-include asset. | Included FIRE assets and projections restore consistently. |
-| UAT-PORT-011 | P0 | Portfolio open | Hide asset amounts. | Hero and asset values are masked without changing inclusion or calculations. |
-| UAT-PORT-012 | P1 | Quote-capable asset | Change update method between Manual and Auto quote. | Relevant fields/status are retained safely and chosen source is reflected after save. |
-| UAT-PORT-013 | P1 | Auto quote selected | Enter ticker, Google Finance symbol, and quantity. | Fields save, reopen correctly, and no secret/token is stored in asset notes. |
-| UAT-PORT-014 | P0 | Edit asset value or expected return | Check Portfolio, Home, Dashboard. | Total, included amount, allocation, weighted return, progress, and projection remain mutually consistent. |
+- **Priority:** P1
+- **Steps:** Enter a material expense; note the preview; switch to Income with the same amount; change the amount.
+- **Expected:** Preview recalculates immediately; expense and income move projected FIRE impact in opposite directions; zero amount shows neutral/no impact; no `NaN`, infinity, or broken label appears.
 
-## H. FIRE plan, scenarios, and milestones — 11 cases
+### UAT-LOG-08 — Prevent duplicate submission
 
-| ID | P | Preconditions | Steps | Expected result |
-|---|---:|---|---|---|
-| UAT-FIRE-001 | P0 | Open FIRE plan editor | Change current age and save. | Age appears in Portfolio/Settings and projected FIRE age recalculates. |
-| UAT-FIRE-002 | P0 | FIRE plan editor | Change target monthly spending. | Derived FIRE target updates from spending and withdrawal rate; projections update. |
-| UAT-FIRE-003 | P0 | FIRE plan editor | Change monthly saving. | Higher saving does not delay FIRE under otherwise identical data. |
-| UAT-FIRE-004 | P0 | FIRE plan editor | Change withdrawal rate. | Target amount and projection update consistently; rate cannot produce divide-by-zero output. |
-| UAT-FIRE-005 | P1 | FIRE plan editor | Enter commas, symbols, excessive decimals, and long numeric strings. | Inputs normalize within field limits; saved model contains finite numbers. |
-| UAT-FIRE-006 | P0 | Scenario list | Create a named scenario with all adjustments. | Scenario appears once and can be selected on Dashboard. |
-| UAT-FIRE-007 | P0 | Multiple scenarios | Set a non-default scenario as default. | Exactly one active default remains. |
-| UAT-FIRE-008 | P0 | Default scenario selected | Archive it. | Another active scenario becomes default and Dashboard remains usable. |
-| UAT-FIRE-009 | P0 | Only one active scenario remains | Open editor. | Archive action is unavailable; app cannot reach zero active scenarios. |
-| UAT-FIRE-010 | P0 | Milestone list | Create/edit name, target amount, date, return override, active/hidden state. | Home milestone journey reflects only active, visible, non-archived milestones in order. |
-| UAT-FIRE-011 | P0 | Existing milestone | Archive milestone. | It disappears from active lists/Home without changing unrelated goal or scenario data. |
-
-## I. Settings, quote bridge, export, and reset — 10 cases
-
-| ID | P | Preconditions | Steps | Expected result |
-|---|---:|---|---|---|
-| UAT-SET-001 | P0 | Settings open | Toggle dark/light. | Theme changes immediately; light mode uses readable off-white surfaces and sufficient contrast. |
-| UAT-SET-002 | P1 | Physical device | Toggle haptics off/on and use pressable controls. | Haptics follow setting; controls still work when disabled. |
-| UAT-SET-003 | P0 | Settings open | Change display/base currency. | Snapshot and goal base currency change; displays use selected currency consistently without changing raw asset records unexpectedly. |
-| UAT-SET-004 | P0 | Settings open | Switch English ↔ Traditional Chinese. | All primary navigation, screens, editors, and actions update; no mixed-language blocker or truncation. |
-| UAT-SET-005 | P0 | Quote bridge configured | Save API token. | Token field clears after save; token is not displayed, exported, logged, or persisted in ordinary snapshot data. |
-| UAT-SET-006 | P0 | Valid endpoint/token | Tap Test refresh. | Positive status appears and quote cache/assets update without duplicate cache rows. |
-| UAT-SET-007 | P0 | Invalid endpoint/offline | Tap Test refresh. | Negative status appears; Portfolio values remain available from cache/manual fallback. |
-| UAT-SET-008 | P0 | User data modified | Export CSV. | Share/file flow opens; CSV contains key FIRE tables and current user data, with no token. |
-| UAT-SET-009 | P1 | User data modified | Export Google Sheets-compatible file. | TSV/share flow opens and tabular content is importable, with no token. |
-| UAT-SET-010 | P0 | Data modified | Tap Reset demo data, then inspect all screens. | Snapshot returns to documented seed state; app remains stable and old active data is gone. |
-
-## J. Persistence, resilience, privacy, accessibility, and cross-platform — 6 cases
-
-| ID | P | Preconditions | Steps | Expected result |
-|---|---:|---|---|---|
-| UAT-NFR-001 | P0 | Modify transactions/assets/settings | Fully terminate and relaunch. | All committed changes persist; unsaved editor drafts do not. |
-| UAT-NFR-002 | P0 | App loaded once | Disable network; create/edit/archive local data and restart. | Local operations and navigation remain functional offline. |
-| UAT-NFR-003 | P0 | Corrupt or unavailable quote response | Refresh and navigate Portfolio/Home/Dashboard. | No blank asset portfolio, NaN, Infinity, crash, or lost manual fallback. |
-| UAT-NFR-004 | P1 | Screen reader enabled | Navigate tabs and critical controls. | Controls have meaningful labels, selected/disabled states, and logical focus order. |
-| UAT-NFR-005 | P1 | Large text / small viewport | Navigate all screens and open editors. | Critical values/actions remain reachable; no unrecoverable clipping or overlap. |
-| UAT-NFR-006 | P1 | iOS, Android, Web smoke | Execute E2E-01 and E2E-04. | Core behavior is functionally equivalent; platform-specific keyboard/share/back behavior is safe. |
+- **Priority:** P0
+- **Steps:** Enter one valid transaction; rapidly tap Confirm several times.
+- **Expected:** Only one transaction is saved for the intentional submission; the form reset prevents duplicate copies.
 
 ---
 
-## 7. Deterministic FIRE consistency checks
+## C. Category lifecycle — 4 cases
 
-For controlled changes, record values before and after and confirm these invariants:
+### UAT-CAT-01 — Create and immediately use a category
 
-1. **Expense:** current cash-flow adjustment decreases and projected FIRE should not improve.
-2. **Income:** current cash-flow adjustment increases and projected FIRE should not worsen.
-3. **Higher included asset value:** included FIRE assets increase and progress should not decrease.
-4. **Exclude asset:** total assets stay constant while included FIRE assets fall.
-5. **Higher monthly saving:** projected FIRE should not move later under identical assumptions.
-6. **Higher target spending:** FIRE target rises and projected FIRE should not improve.
-7. **Higher withdrawal rate:** derived target falls, subject to the minimum valid rate.
-8. **Scenario switch:** all displayed assumptions and projection use the same selected scenario.
-9. **Archive:** archived transactions/categories/scenarios/milestones are excluded from active calculations and lists as designed.
-10. **Cross-screen equality:** Home, Dashboard, and Portfolio must show the same included asset total and compatible progress/target values.
+- **Priority:** P1
+- **Steps:** From Log, add a new expense category with a unique name, icon, and colour; save it; record an expense using it.
+- **Expected:** Category appears in the correct type list, becomes selectable, preserves its icon/colour, and is attached to the saved transaction.
 
-Any NaN, Infinity, negative target caused by valid UI input, stale derived value, or disagreement across screens is a **Blocker/Critical** defect.
+### UAT-CAT-02 — Edit a category used by existing transactions
 
----
+- **Priority:** P1
+- **Steps:** Edit the new category’s name, icon, and colour; open Calendar for the transaction date.
+- **Expected:** Updated category presentation appears in Log and transaction history; transaction amount, date, and note remain unchanged.
 
-## 8. Exploratory charters
+### UAT-CAT-03 — Archive a selected category safely
 
-After scripted execution, spend at least 20 minutes on each charter:
+- **Priority:** P1
+- **Steps:** Select a category; archive/delete it from the category editor.
+- **Expected:** Category is removed from new-entry choices; Log selects another valid category; existing historical transaction remains readable and the app does not crash.
 
-1. **Rapid interaction:** fast tab switching, repeated taps, modal open/close, keyboard show/hide.
-2. **Boundary finance data:** zero, very large values, negative expected returns, extreme valid rates, many assets/transactions.
-3. **Date boundaries:** month-end, year-end, leap day, timezone transition, future and historical dates.
-4. **Data longevity:** create 50+ transactions, 20+ assets, 10+ scenarios/milestones; assess responsiveness and correctness.
-5. **Privacy:** screenshots, app switcher, masked amounts, secure token field, exports.
-6. **Localization:** Traditional Chinese on small display with large text.
-7. **Offline recovery:** launch offline, edit repeatedly, reconnect, refresh quotes.
+### UAT-CAT-04 — Validate category editor input
+
+- **Priority:** P2
+- **Steps:** Attempt to save a blank or whitespace-only name; cancel an edit after making changes.
+- **Expected:** Invalid category is not created; cancel leaves the original category unchanged; no partial update is persisted.
 
 ---
 
-## 9. Execution record template
+## D. Calendar and transaction history — 6 cases
 
-Copy this row for each test result or track results in the pull request/checklist:
+### UAT-CAL-01 — Monthly totals and daily net are correct
 
-| Test ID | Platform/device | Build SHA | Result | Evidence | Defect | Tester | Date |
-|---|---|---|---|---|---|---|---|
-| UAT-XXX-000 |  |  | Not Run |  |  |  |  |
+- **Priority:** P0
+- **Steps:** In one month, create at least two incomes and two expenses on different days; open Calendar.
+- **Expected:** Monthly income equals the sum of active income records; expense equals the sum of active expense records; net equals income minus expense; each day cell shows the correct signed daily net.
 
-### Final sign-off
+### UAT-CAL-02 — Navigate month, year, and Today
 
-| Role | Name | Decision | Date | Notes |
-|---|---|---|---|---|
-| Product owner |  |  |  |  |
-| QA/UAT lead |  |  |  |  |
-| Engineering |  |  |  |  |
+- **Priority:** P1
+- **Steps:** Move backward and forward by month and year; select Today.
+- **Expected:** Month heading, weekday grid, day count, and out-of-month cells remain correct; Today returns to the current date and month.
 
-**Release decision:** `Accepted / Accepted with conditions / Rejected`
+### UAT-CAL-03 — Edit all transaction-owned fields
+
+- **Priority:** P0
+- **Steps:** Open a transaction; change type, amount, category, date, and note; save.
+- **Expected:** All changes persist; changing type selects a valid category; original record is updated rather than duplicated; old and new day/month totals recalculate.
+
+### UAT-CAL-04 — Reject invalid transaction edits
+
+- **Priority:** P0
+- **Steps:** In the transaction editor, enter zero amount and invalid dates such as incomplete text or impossible formats; attempt to save.
+- **Expected:** Save remains unavailable or has no effect; invalid data is not persisted; closing the editor leaves the original record unchanged.
+
+### UAT-CAL-05 — Move a transaction across months
+
+- **Priority:** P1
+- **Steps:** Edit a transaction date from the visible month to another month; save.
+- **Expected:** The transaction disappears from the old date and appears on the new date; both months’ summaries update; selected date follows the moved record where designed.
+
+### UAT-CAL-06 — Archive a transaction
+
+- **Priority:** P0
+- **Steps:** Record the current totals; archive one transaction from Calendar.
+- **Expected:** Transaction is removed from active history; daily, monthly, Home, and Dashboard figures recalculate without the archived value; relaunch does not restore it.
+
+---
+
+## E. Home experience — 4 cases
+
+### UAT-HOME-01 — Baseline FIRE summary is internally consistent
+
+- **Priority:** P0
+- **Precondition:** Reset Demo Data.
+- **Steps:** Open Home and compare values with Portfolio and the baseline checkpoint.
+- **Expected:** Net worth is approximately HKD 1,142,000; included FIRE assets are approximately HKD 422,000; target is approximately HKD 9,600,000; progress and countdown contain valid finite values and agree with Dashboard.
+
+### UAT-HOME-02 — Today’s cash flow updates Home
+
+- **Priority:** P0
+- **Steps:** Record a same-day income, open Home; then record a same-day expense and reopen Home.
+- **Expected:** Today’s impact changes by the correct signed amounts; countdown/progress direction is logical; updates occur without reinstalling or manually refreshing.
+
+### UAT-HOME-03 — Asset privacy toggle
+
+- **Priority:** P1
+- **Steps:** Tap Net Worth or Included FIRE to hide amounts; navigate away and back; reveal amounts.
+- **Expected:** Both sensitive values are replaced by masked text while hidden; labels remain understandable; values restore correctly when shown; no amount leaks through overlapping text.
+
+### UAT-HOME-04 — Milestone journey state
+
+- **Priority:** P1
+- **Steps:** Compare current included assets with milestone targets; modify an included asset so one milestone changes status; reopen Home.
+- **Expected:** Milestones remain ordered; achieved/current/future states update logically; hidden or archived milestones are not shown.
+
+---
+
+## F. Dashboard and projections — 6 cases
+
+### UAT-DASH-01 — Baseline deterministic FIRE calculation
+
+- **Priority:** P0
+- **Precondition:** Reset Demo Data.
+- **Steps:** Open Dashboard; inspect target, included assets, progress, selected method, projected date/age, and chart.
+- **Expected:** Target is derived from spending and withdrawal rate, not manually invented; Base method is selected; displayed values are finite and consistent with Home and Portfolio; chart and summary describe the same projection.
+
+### UAT-DASH-02 — Transaction changes propagate across Dashboard
+
+- **Priority:** P0
+- **Steps:** Record an income and expense in the current activity month; reopen Dashboard.
+- **Expected:** Saved cash flow, month net, today impact, and category leaders reflect active records; highest income/expense categories and record counts are correct; archived records are excluded.
+
+### UAT-DASH-03 — Switch projection methods
+
+- **Priority:** P0
+- **Steps:** Switch among Conservative, Base, and Aggressive methods.
+- **Expected:** Selected method is visually clear; assumptions, projected date/age, chart, and countdown update together; switching back reproduces the same deterministic result.
+
+### UAT-DASH-04 — Edit FIRE assumptions from Dashboard shortcuts
+
+- **Priority:** P0
+- **Steps:** Open assumption editors from monthly saving, withdrawal rate, inflation, and target spending; change one value at a time and save.
+- **Expected:** Edited values persist; derived target and projection update correctly; Home and Portfolio show the same goal state; no field silently reverts.
+
+### UAT-DASH-05 — No-crossover and boundary handling
+
+- **Priority:** P1
+- **Steps:** Configure a deliberately adverse method, such as very low return and low saving with high spending; view Dashboard.
+- **Expected:** App shows a controlled “not reached/no crossover” state instead of an impossible date, negative age, crash, `NaN`, or infinity.
+
+### UAT-DASH-06 — Projection chart usability
+
+- **Priority:** P2
+- **Steps:** Test chart in dark/light mode, English/Traditional Chinese, and a smaller viewport.
+- **Expected:** Chart renders without clipping or overlap; labels remain legible; changing scenarios refreshes the chart; animation does not block interaction.
+
+---
+
+## G. Portfolio and assets — 7 cases
+
+### UAT-PORT-01 — Portfolio baseline totals and allocation
+
+- **Priority:** P0
+- **Precondition:** Reset Demo Data.
+- **Steps:** Open Portfolio; compare total assets, included FIRE assets, weighted expected return, allocation, and asset rows.
+- **Expected:** Totals match the baseline checkpoint; residence is counted in total assets but excluded from FIRE; allocation reflects active assets; quote/manual source badges are understandable.
+
+### UAT-PORT-02 — Create and edit a manual asset
+
+- **Priority:** P0
+- **Steps:** Add a manual asset; edit name, class, value, currency, expected return, inclusion flag, and notes; save.
+- **Expected:** One asset is created and all edited fields persist; totals, allocation, weighted return, Home, and Dashboard update consistently.
+
+### UAT-PORT-03 — Asset validation and cancellation
+
+- **Priority:** P1
+- **Steps:** Attempt to save a blank name or negative manual value; make valid changes and close without saving.
+- **Expected:** Invalid asset cannot be saved; cancellation preserves the original asset; no partial values affect totals.
+
+### UAT-PORT-04 — Include and exclude an asset from FIRE
+
+- **Priority:** P0
+- **Steps:** Toggle a material asset from Included to Excluded and back.
+- **Expected:** Total assets remain unchanged; included FIRE assets, progress, weighted return, countdown, and projection change appropriately; state persists after relaunch.
+
+### UAT-PORT-05 — Auto-quote asset with valid cached quote
+
+- **Priority:** P1
+- **Steps:** Configure an asset for Auto quote with symbol and quantity; refresh or use available cached quote.
+- **Expected:** Resolved value uses quote price × quantity or supplied converted value; quote source/status is shown; manual value remains available as fallback data.
+
+### UAT-PORT-06 — Quote failure uses fallback instead of blanking Portfolio
+
+- **Priority:** P0
+- **Steps:** Configure an invalid/unreachable quote endpoint or go offline; trigger quote refresh; reopen Portfolio, Home, and Dashboard.
+- **Expected:** Refresh failure is communicated; asset and portfolio values remain visible using the latest usable cache or manual value; no value becomes blank, zero without explanation, `NaN`, or corrupted.
+
+### UAT-PORT-07 — Hide and reveal portfolio amounts
+
+- **Priority:** P1
+- **Steps:** Hide portfolio amounts; scroll through asset rows and summary; reveal them again.
+- **Expected:** Summary and individual asset values are masked consistently; non-sensitive names/statuses remain usable; values return unchanged.
+
+---
+
+## H. FIRE plan, methods, and milestones — 4 cases
+
+### UAT-PLAN-01 — Edit the complete FIRE plan
+
+- **Priority:** P0
+- **Steps:** Edit goal name, current age, monthly spending, monthly saving, withdrawal rate, inflation, and base currency where available; save and relaunch.
+- **Expected:** Every user-owned FIRE input is editable and persists; target and projections recalculate; the same values appear through Portfolio, Dashboard, and Settings.
+
+### UAT-PLAN-02 — Create, edit, default, and archive a projection method
+
+- **Priority:** P0
+- **Steps:** Create a method with return, inflation, withdrawal, saving, and spending adjustments; make it default; edit it; archive it.
+- **Expected:** New method appears in selectors; effective assumptions equal base values plus adjustments with valid safety bounds; only one active method is default; archiving selects a valid remaining default.
+
+### UAT-PLAN-03 — Protect the last active projection method
+
+- **Priority:** P1
+- **Steps:** Archive methods until one active method remains; attempt to archive the last one.
+- **Expected:** The last active method cannot be removed, or the app automatically preserves a valid default; Dashboard never has an empty unusable method selector.
+
+### UAT-PLAN-04 — Create, edit, hide, and archive milestones
+
+- **Priority:** P1
+- **Steps:** Create a milestone; edit name, target amount/date, expected-return override, active/hidden state; archive it.
+- **Expected:** Portfolio/Settings lists and Home journey update correctly; ordering remains stable; hidden/archived milestones disappear from the journey without affecting assets or the main FIRE target.
+
+---
+
+## I. Settings, resilience, and accessibility — 5 cases
+
+### UAT-SYS-01 — Theme, language, currency, and haptics preferences
+
+- **Priority:** P1
+- **Steps:** Toggle dark/light mode and haptics; switch English/Traditional Chinese; change display/base currency; navigate through all screens and relaunch.
+- **Expected:** Preferences apply immediately and persist; navigation labels and core copy translate consistently; no clipped text or untranslated critical action appears; currency labels update without corrupting asset records.
+
+### UAT-SYS-02 — Quote token and endpoint security
+
+- **Priority:** P0
+- **Steps:** Enter a quote endpoint and token; save; leave and reopen Settings; export data; inspect visible UI and export content.
+- **Expected:** Token entry is obscured; saved token is not displayed in plain text, logs, exported CSV/TSV, or error messages; endpoint remains editable; empty token save does not overwrite a valid token unexpectedly.
+
+### UAT-SYS-03 — Export CSV and Google Sheets-compatible data
+
+- **Priority:** P1
+- **Steps:** Export both formats after creating/editing/archiving representative records; open or inspect the shared files.
+- **Expected:** Files are generated or a supported share fallback opens; headers and delimiters are valid; active financial data is accurate; notes with commas/tabs/newlines do not corrupt structure; secrets are excluded.
+
+### UAT-SYS-04 — Local persistence, offline operation, and corrupted-storage recovery
+
+- **Priority:** P0
+- **Steps:** Create representative changes; fully terminate and relaunch; use core screens offline; where feasible inject/imitate invalid stored snapshot data and relaunch.
+- **Expected:** Valid user changes persist across restart; Log, Calendar, Home, Dashboard, and manual Portfolio remain usable offline; unreadable storage recovers to a controlled seed/default state rather than crashing indefinitely.
+
+### UAT-SYS-05 — Accessibility and destructive-action safety
+
+- **Priority:** P1
+- **Steps:** Use VoiceOver/TalkBack or platform accessibility inspection on navigation, amount input, date controls, category selection, transaction save/archive, asset inclusion, Settings controls, and modal close actions; activate Reset Demo Data deliberately.
+- **Expected:** Critical controls have meaningful names, roles, selected/disabled state, and usable touch targets; focus is not trapped behind modals; Reset is clearly intentional and restores the seed consistently. If reset occurs from an accidental single tap without adequate warning or recoverability, log a Major defect.
+
+---
+
+# 6. Mandatory end-to-end journeys
+
+These journeys reuse the test cases above; they are not additional case IDs.
+
+## Journey 1 — New daily user
+
+`UAT-NAV-01 → UAT-LOG-01 → UAT-CAL-01 → UAT-HOME-02 → UAT-DASH-02`
+
+A user records spending and sees it correctly reflected in history, today’s impact, monthly cash flow, and FIRE projection.
+
+## Journey 2 — Correct a historical mistake
+
+`UAT-LOG-03 → UAT-CAL-03 → UAT-CAL-05 → UAT-CAL-06`
+
+A user records a dated transaction, corrects all fields, moves it to another month, then archives it without leaving stale totals.
+
+## Journey 3 — Build a personal FIRE plan
+
+`UAT-PLAN-01 → UAT-PORT-02 → UAT-PORT-04 → UAT-DASH-01 → UAT-HOME-01`
+
+A user configures assumptions and assets, controls FIRE inclusion, and receives consistent outputs across the app.
+
+## Journey 4 — Compare planning methods
+
+`UAT-PLAN-02 → UAT-DASH-03 → UAT-DASH-04 → UAT-DASH-05`
+
+A user creates a projection method, compares outcomes, edits assumptions, and receives a controlled result under adverse conditions.
+
+## Journey 5 — Quote integration failure
+
+`UAT-PORT-05 → UAT-SYS-02 → UAT-PORT-06 → UAT-SYS-04`
+
+A user configures quotes, encounters a failed endpoint/offline state, retains portfolio visibility through fallback data, and keeps working after restart.
+
+## Journey 6 — Localize and export
+
+`UAT-SYS-01 → UAT-LOG-02 → UAT-SYS-03 → UAT-SYS-05`
+
+A user switches language/theme, records income, exports data, and completes the flow with accessible critical controls.
+
+---
+
+# 7. Execution and sign-off
+
+Use `UAT_EXECUTION_TRACKER.csv` for results.
+
+Allowed result values:
+
+- `Pass`
+- `Fail`
+- `Blocked`
+- `Not Run`
+
+Release sign-off must include:
+
+| Field | Value |
+|---|---|
+| Build / commit | |
+| iOS result | |
+| Android result | |
+| Web smoke result | |
+| P0 passed / total | |
+| P1 passed / total | |
+| Open Blocker/Critical defects | |
+| Product approval | |
+| QA approval | |
+| Final decision | Go / Conditional Go / No-Go |
+
+A failed case must include evidence, actual behavior, expected behavior, reproducibility, platform/build, severity, and a linked defect.
