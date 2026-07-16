@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Animated, {
+  cancelAnimation,
   Easing,
   FadeInUp,
   interpolate,
   useAnimatedStyle,
   useSharedValue,
-  withRepeat,
   withSequence,
   withTiming,
 } from "react-native-reanimated";
@@ -52,21 +52,20 @@ function statusForItem(item: JourneyItem, index: number, activeIndex: number): M
 
 function useNodePulse(active: boolean) {
   const reducedMotion = useReducedMotion();
-  const pulse = useSharedValue(active && reducedMotion ? 1 : 0);
+  const pulse = useSharedValue(0);
 
   useEffect(() => {
+    cancelAnimation(pulse);
+
     if (!active || reducedMotion) {
-      pulse.value = active ? 1 : 0;
+      pulse.value = 0;
       return;
     }
 
-    pulse.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 900, easing: Easing.out(Easing.cubic) }),
-        withTiming(0.2, { duration: 900, easing: Easing.inOut(Easing.cubic) }),
-      ),
-      -1,
-      true,
+    pulse.value = 0;
+    pulse.value = withSequence(
+      withTiming(1, { duration: 150, easing: Easing.out(Easing.cubic) }),
+      withTiming(0.12, { duration: 110, easing: Easing.inOut(Easing.cubic) }),
     );
   }, [active, pulse, reducedMotion]);
 
@@ -76,34 +75,28 @@ function useNodePulse(active: boolean) {
   }));
 }
 
-function useLoopedHeightStyle(targetHeight: number, active: boolean) {
+function useProgressFillStyle(targetHeight: number, active: boolean) {
   const reducedMotion = useReducedMotion();
-  const height = useSharedValue(Math.max(0, targetHeight));
+  const progress = useSharedValue(reducedMotion ? 1 : 0);
 
   useEffect(() => {
-    const nextHeight = Math.max(0, targetHeight);
+    cancelAnimation(progress);
 
     if (!active || reducedMotion) {
-      height.value = nextHeight;
+      progress.value = 1;
       return;
     }
 
-    height.value = 0;
-    height.value = withRepeat(
-      withSequence(
-        withTiming(nextHeight, {
-          duration: 950 + Math.min(450, Math.round(nextHeight * 2)),
-          easing: Easing.out(Easing.cubic),
-        }),
-        withTiming(nextHeight, { duration: 260 }),
-        withTiming(0, { duration: 1 }),
-      ),
-      -1,
-      false,
-    );
-  }, [active, height, reducedMotion, targetHeight]);
+    progress.value = 0;
+    progress.value = withTiming(1, {
+      duration: 240,
+      easing: Easing.bezier(0.16, 1, 0.3, 1),
+    });
+  }, [active, progress, reducedMotion, targetHeight]);
 
-  return useAnimatedStyle(() => ({ height: height.value }));
+  return useAnimatedStyle(() => ({
+    transform: [{ translateY: -(1 - progress.value) * targetHeight }],
+  }));
 }
 
 function TimelineRail({
@@ -142,7 +135,7 @@ function TimelineRail({
   const activeTargetHeight = activeSegment
     ? Math.max(0, activeSegment.height * clamp01(stageProgress))
     : 0;
-  const activeFillStyle = useLoopedHeightStyle(activeTargetHeight, activeTargetHeight > 0);
+  const activeFillStyle = useProgressFillStyle(activeTargetHeight, activeTargetHeight > 0);
 
   if (!hasCenters) {
     return null;
@@ -179,17 +172,20 @@ function TimelineRail({
         />
       ))}
       {activeSegment && activeTargetHeight > 0 ? (
-        <Animated.View
+        <View
           pointerEvents="none"
           style={[
-            styles.timelineRail,
+            styles.timelineRailClip,
             {
               top: activeSegment.top,
-              backgroundColor: primaryColor,
+              height: activeTargetHeight,
             },
-            activeFillStyle,
           ]}
-        />
+        >
+          <Animated.View
+            style={[styles.timelineRailFill, { backgroundColor: primaryColor }, activeFillStyle]}
+          />
+        </View>
       ) : null}
     </>
   );
@@ -387,7 +383,7 @@ export function MilestoneJourney({
               entering={
                 reducedMotion
                   ? undefined
-                  : FadeInUp.duration(260)
+                  : FadeInUp.duration(tokens.motion.enterMs)
                       .delay(index * tokens.motion.staggerMs)
                       .easing(Easing.out(Easing.cubic))
               }
@@ -448,18 +444,8 @@ export function MilestoneJourney({
                   styles.card,
                   {
                     opacity: state === "future" ? 0.68 : 1,
-                    backgroundColor:
-                      state === "active"
-                        ? `${colors.primary}10`
-                        : state === "reached"
-                          ? `${colors.positive}0A`
-                          : "transparent",
-                    borderColor:
-                      state === "active"
-                        ? `${colors.primary}55`
-                        : state === "reached"
-                          ? `${colors.positive}33`
-                          : colors.surfaceBorder,
+                    backgroundColor: state === "active" ? `${colors.primary}10` : "transparent",
+                    borderColor: state === "active" ? `${colors.primary}55` : "transparent",
                   },
                 ]}
               >
@@ -631,6 +617,18 @@ const styles = StyleSheet.create({
     width: 2,
     borderRadius: tokens.radius.pill,
     zIndex: 0,
+  },
+  timelineRailClip: {
+    position: "absolute",
+    left: 17,
+    width: 2,
+    overflow: "hidden",
+    zIndex: 0,
+  },
+  timelineRailFill: {
+    width: 2,
+    height: "100%",
+    borderRadius: tokens.radius.pill,
   },
   spine: {
     width: 36,

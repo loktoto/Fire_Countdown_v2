@@ -11,12 +11,14 @@ import {
   TextInput,
   View,
 } from "react-native";
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 
 import { MotionPressable } from "./MotionPressable";
+import { sheetBackdropEnter, sheetBackdropExit, sheetEnter, sheetExit } from "../design/motion";
 import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
 import type { FireGoal, Milestone, ProjectionScenario } from "../features/types";
+import { useReducedMotion } from "../hooks/useReducedMotion";
 import { useI18n } from "../i18n";
 import { money, percent } from "../utils/format";
 
@@ -110,6 +112,7 @@ function BaseSheet({
   children: React.ReactNode;
 }) {
   const colors = useThemeColors();
+  const reducedMotion = useReducedMotion();
 
   if (!visible) {
     return null;
@@ -122,15 +125,16 @@ function BaseSheet({
         style={styles.modalRoot}
       >
         <Animated.View
-          entering={FadeIn.duration(160)}
-          exiting={FadeOut.duration(120)}
+          entering={reducedMotion ? undefined : sheetBackdropEnter}
+          exiting={reducedMotion ? undefined : sheetBackdropExit}
           style={styles.scrim}
         >
           <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         </Animated.View>
         <Animated.View
-          entering={SlideInDown.duration(260)}
-          exiting={SlideOutDown.duration(180)}
+          accessibilityViewIsModal
+          entering={reducedMotion ? undefined : sheetEnter}
+          exiting={reducedMotion ? undefined : sheetExit}
           style={[
             styles.sheet,
             { backgroundColor: colors.surfaceSolid, borderColor: colors.surfaceBorder },
@@ -436,7 +440,10 @@ function FirePlanEditorContent({
     numberFromText(currentAge) <= 120 &&
     numberFromText(targetMonthlySpending) >= 0 &&
     numberFromText(monthlySaving) >= 0 &&
-    numberFromText(withdrawalRate) > 0;
+    numberFromText(withdrawalRate) > 0 &&
+    numberFromText(withdrawalRate) <= 100 &&
+    numberFromText(inflationRate, 0) > -95 &&
+    numberFromText(inflationRate, 0) <= 1000;
 
   function save() {
     if (!canSave) {
@@ -625,7 +632,7 @@ export function MilestoneListSheet({
                     adjustsFontSizeToFit
                     style={[styles.listValue, typography.title, { color: colors.text }]}
                   >
-                    {milestone.name} | {money(milestone.targetAmount, currency)}
+                    {milestone.name} · {money(milestone.targetAmount, currency)}
                   </Text>
                 </View>
                 <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textMuted} />
@@ -709,8 +716,9 @@ export function ScenarioListSheet({
                   adjustsFontSizeToFit
                   style={[styles.listValue, typography.title, { color: colors.text }]}
                 >
-                  {scenario.name} | {money(assumptions.targetMonthlySpending, currency)}
-                  {t.firePlan.monthlySuffix} | {percent(assumptions.withdrawalRate)} SWR
+                  {scenario.name} · {money(assumptions.targetMonthlySpending, currency)}
+                  {t.firePlan.monthlySuffix} · {percent(assumptions.withdrawalRate)}{" "}
+                  {t.common.withdrawalRate}
                 </Text>
                 <Text
                   numberOfLines={1}
@@ -801,7 +809,11 @@ function ScenarioEditorContent({
     numberFromText(targetMonthlySpending) >= 0 &&
     numberFromText(monthlySaving) >= 0 &&
     numberFromText(withdrawalRate) > 0 &&
-    numberFromText(expectedReturn, 0) > -95;
+    numberFromText(withdrawalRate) <= 100 &&
+    numberFromText(inflationRate, 0) > -95 &&
+    numberFromText(inflationRate, 0) <= 1000 &&
+    numberFromText(expectedReturn, 0) > -95 &&
+    numberFromText(expectedReturn, 0) <= 1000;
 
   function save() {
     if (!canSave) {
@@ -1138,9 +1150,9 @@ const styles = StyleSheet.create({
     fontSize: 26,
   },
   closeButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
   },

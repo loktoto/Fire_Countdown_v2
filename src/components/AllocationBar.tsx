@@ -1,43 +1,20 @@
-import { useEffect } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import Svg, { Circle } from "react-native-svg";
-import Animated, {
-  Easing,
-  FadeInRight,
-  interpolate,
-  useAnimatedProps,
-  useAnimatedStyle,
-  useSharedValue,
-  withDelay,
-  withSequence,
-  withSpring,
-  withTiming,
-} from "react-native-reanimated";
+import Animated, { Easing, FadeIn, FadeInRight } from "react-native-reanimated";
 
+import { allocationPresentation, type AllocationInput } from "./allocationPresentation";
 import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
 import { useReducedMotion } from "../hooks/useReducedMotion";
+import { useI18n } from "../i18n";
 
-const darkChartColors = [tokens.color.cyan, tokens.color.emerald, "#96A6BF", "#FED639", "#FF7A45"];
-const CHART_SIZE = 112;
-const CHART_STROKE = 18;
-const CHART_RADIUS = (CHART_SIZE - CHART_STROKE) / 2;
-const CHART_CENTER = CHART_SIZE / 2;
-const CHART_CIRCUMFERENCE = 2 * Math.PI * CHART_RADIUS;
-
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-
-type AllocationSegment = {
-  label: string;
-  value: number;
-};
-
-type ChartSegment = {
-  color: string;
-  length: number;
-  label: string;
-  strokeDashoffset: number;
-};
+const darkPalette = [
+  tokens.color.cyan,
+  "#93A3B8",
+  tokens.color.ochre,
+  tokens.color.indigo,
+  "#C98068",
+  tokens.color.emerald,
+];
 
 function formatAllocationLabel(label: string) {
   return label
@@ -54,63 +31,27 @@ function formatAllocationLabel(label: string) {
     .join(" ");
 }
 
-function AllocationSlice({
-  motionKey,
-  reducedMotion,
-  segment,
-  segmentIndex,
-}: {
-  motionKey: number;
-  reducedMotion: boolean;
-  segment: ChartSegment;
-  segmentIndex: number;
-}) {
-  const progress = useSharedValue(reducedMotion ? 1 : 0);
+function roundedPercentages(values: number[]) {
+  if (values.length === 0) {
+    return [];
+  }
 
-  useEffect(() => {
-    if (reducedMotion) {
-      // Reanimated shared values are intentionally mutable.
+  const raw = values.map((value) => value * 100);
+  const rounded = raw.map(Math.floor);
+  let remaining = Math.max(0, 100 - rounded.reduce((sum, value) => sum + value, 0));
+  const priority = raw
+    .map((value, index) => ({ index, fraction: value - Math.floor(value) }))
+    .sort((a, b) => b.fraction - a.fraction);
 
-      progress.value = 1;
-      return;
+  for (const item of priority) {
+    if (remaining <= 0) {
+      break;
     }
+    rounded[item.index] = (rounded[item.index] ?? 0) + 1;
+    remaining -= 1;
+  }
 
-    // Reanimated shared values are intentionally mutable.
-
-    progress.value = 0;
-    // Reanimated shared values are intentionally mutable.
-
-    progress.value = withDelay(
-      segmentIndex * 95,
-      withTiming(1, {
-        duration: 680,
-        easing: Easing.out(Easing.cubic),
-      }),
-    );
-  }, [motionKey, progress, reducedMotion, segmentIndex]);
-
-  const animatedProps = useAnimatedProps(() => {
-    const opacity = interpolate(progress.value, [0, 0.16, 1], [0, 1, 1], "clamp");
-    return {
-      opacity,
-      strokeDashoffset: segment.strokeDashoffset + (1 - progress.value) * segment.length,
-    };
-  });
-
-  return (
-    <AnimatedCircle
-      animatedProps={animatedProps}
-      cx={CHART_CENTER}
-      cy={CHART_CENTER}
-      r={CHART_RADIUS}
-      stroke={segment.color}
-      strokeWidth={CHART_STROKE}
-      fill="none"
-      strokeDasharray={`${segment.length} ${CHART_CIRCUMFERENCE - segment.length}`}
-      strokeLinecap="butt"
-      transform={`rotate(-90 ${CHART_CENTER} ${CHART_CENTER})`}
-    />
-  );
+  return rounded;
 }
 
 export function AllocationBar({
@@ -118,188 +59,139 @@ export function AllocationBar({
   segments,
 }: {
   motionKey?: number;
-  segments: AllocationSegment[];
+  segments: AllocationInput[];
 }) {
   const colors = useThemeColors();
+  const t = useI18n();
   const reducedMotion = useReducedMotion();
-  const chartPalette =
+  const palette =
     colors.mode === "dark"
-      ? darkChartColors
-      : [colors.primary, colors.positive, "#6C7C90", colors.warning, "#87573B"];
-  const chartScale = useSharedValue(1);
-  const chartRotation = useSharedValue(0);
-  const orbit = useSharedValue(reducedMotion ? 1 : 0);
-  const centerScale = useSharedValue(1);
-  const total = segments.reduce((sum, segment) => sum + segment.value, 0) || 1;
-  const visibleSegments = segments.filter((segment) => segment.value > 0);
-  const chartSegments = visibleSegments.map((segment, index) => {
-    const previousValue = visibleSegments
-      .slice(0, index)
-      .reduce((sum, previousSegment) => sum + previousSegment.value, 0);
-    const length = (segment.value / total) * CHART_CIRCUMFERENCE;
-    return {
-      color: chartPalette[index % chartPalette.length] ?? colors.primary,
-      label: segment.label,
-      length,
-      strokeDashoffset: -(previousValue / total) * CHART_CIRCUMFERENCE,
-    };
-  });
-
-  useEffect(() => {
-    if (reducedMotion) {
-      // Reanimated shared values are intentionally mutable.
-
-      chartScale.value = 1;
-      // Reanimated shared values are intentionally mutable.
-
-      chartRotation.value = 0;
-      // Reanimated shared values are intentionally mutable.
-
-      centerScale.value = 1;
-      // Reanimated shared values are intentionally mutable.
-
-      orbit.value = 1;
-      return;
+      ? darkPalette
+      : [colors.primary, "#62748A", colors.target, colors.projection, "#A75D45", colors.positive];
+  const allocation = allocationPresentation(segments);
+  const visibleSegments = allocation.rows.map((segment, index) => ({
+    ...segment,
+    color: palette[index % palette.length] ?? colors.primary,
+  }));
+  const percentages = roundedPercentages(visibleSegments.map((segment) => segment.percent));
+  const dominantIndex = visibleSegments.reduce(
+    (largest, segment, index, rows) =>
+      segment.value > (rows[largest]?.value ?? -1) ? index : largest,
+    0,
+  );
+  const dominant = visibleSegments[dominantIndex];
+  const allocationLabel = (label: string) => {
+    switch (label) {
+      case "cash":
+        return t.assets.classOptions.cash;
+      case "etf":
+        return t.assets.classOptions.etf;
+      case "stock":
+        return t.assets.classOptions.stock;
+      case "crypto":
+        return t.assets.classOptions.crypto;
+      case "bond":
+        return t.assets.classOptions.bond;
+      case "real_estate":
+        return t.assets.classOptions.realEstate;
+      case "pension":
+        return t.assets.classOptions.pension;
+      case "private_investment":
+        return t.assets.classOptions.privateInvestment;
+      case "business":
+        return t.assets.classOptions.business;
+      case "custom":
+        return t.assets.classOptions.custom;
+      default:
+        return formatAllocationLabel(label);
     }
+  };
 
-    // Reanimated shared values are intentionally mutable.
-
-    chartScale.value = 0.94;
-    // Reanimated shared values are intentionally mutable.
-
-    chartRotation.value = -8;
-    // Reanimated shared values are intentionally mutable.
-
-    centerScale.value = 0.9;
-    // Reanimated shared values are intentionally mutable.
-
-    orbit.value = 0;
-
-    // Reanimated shared values are intentionally mutable.
-
-    chartScale.value = withSequence(
-      withTiming(1.06, { duration: 180, easing: Easing.out(Easing.cubic) }),
-      withSpring(1, { damping: 12, stiffness: 150 }),
+  if (allocation.total <= 0 || !dominant) {
+    return (
+      <Text style={[styles.empty, typography.body, { color: colors.textMuted }]}>
+        {t.portfolio.noAllocation}
+      </Text>
     );
-    // Reanimated shared values are intentionally mutable.
-
-    chartRotation.value = withSequence(
-      withTiming(7, { duration: 210, easing: Easing.out(Easing.cubic) }),
-      withSpring(0, { damping: 11, stiffness: 120 }),
-    );
-    // Reanimated shared values are intentionally mutable.
-
-    centerScale.value = withDelay(
-      260,
-      withSequence(
-        withTiming(1.12, { duration: 160, easing: Easing.out(Easing.cubic) }),
-        withSpring(1, { damping: 10, stiffness: 160 }),
-      ),
-    );
-    // Reanimated shared values are intentionally mutable.
-
-    orbit.value = withTiming(1, {
-      duration: 980,
-      easing: Easing.out(Easing.cubic),
-    });
-  }, [centerScale, chartRotation, chartScale, motionKey, orbit, reducedMotion]);
-
-  const chartMotionStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${chartRotation.value}deg` }, { scale: chartScale.value }],
-  }));
-
-  const centerMotionStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(centerScale.value, [0.9, 1], [0.66, 1], "clamp"),
-    transform: [{ scale: centerScale.value }],
-  }));
-
-  const orbitStyle = useAnimatedStyle(() => {
-    const angle = orbit.value * Math.PI * 2 - Math.PI / 2;
-    const radius = CHART_RADIUS + CHART_STROKE / 2;
-    const opacity = interpolate(orbit.value, [0, 0.08, 0.84, 1], [0, 1, 1, 0], "clamp");
-    const scale = interpolate(orbit.value, [0, 0.12, 0.82, 1], [0.5, 1.15, 1, 0.7], "clamp");
-
-    return {
-      opacity: reducedMotion ? 0 : opacity,
-      transform: [
-        { translateX: Math.cos(angle) * radius },
-        { translateY: Math.sin(angle) * radius },
-        { scale },
-      ],
-    };
-  }, [reducedMotion]);
+  }
 
   return (
     <View
-      accessibilityLabel={`Allocation: ${segments
-        .map((segment) => `${segment.label} ${Math.round((segment.value / total) * 100)} percent`)
-        .join(", ")}`}
+      accessible
+      accessibilityLabel={t.portfolio.allocationSummary(
+        visibleSegments
+          .map((segment, index) =>
+            t.portfolio.allocationPercent(allocationLabel(segment.label), percentages[index] ?? 0),
+          )
+          .join(", "),
+      )}
       style={styles.root}
     >
-      <View style={styles.chartWrap}>
-        <Animated.View style={chartMotionStyle}>
-          <Svg width={CHART_SIZE} height={CHART_SIZE} viewBox={`0 0 ${CHART_SIZE} ${CHART_SIZE}`}>
-            <Circle
-              cx={CHART_CENTER}
-              cy={CHART_CENTER}
-              r={CHART_RADIUS}
-              stroke={colors.surfaceSolid}
-              strokeWidth={CHART_STROKE}
-              fill="none"
-            />
-            {chartSegments.map((segment, index) => (
-              <AllocationSlice
-                key={segment.label}
-                motionKey={motionKey}
-                reducedMotion={reducedMotion}
-                segment={segment}
-                segmentIndex={index}
-              />
-            ))}
-          </Svg>
-        </Animated.View>
-        <Animated.View style={[styles.centerLabel, centerMotionStyle]}>
-          <Text style={[styles.centerValue, typography.title, { color: colors.text }]}>100%</Text>
-          <Text style={[styles.centerText, typography.body, { color: colors.textMuted }]}>mix</Text>
-        </Animated.View>
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.orbitSpark,
-            { backgroundColor: colors.primary, shadowColor: colors.primary },
-            orbitStyle,
-          ]}
-        />
+      <View style={styles.leadMetric}>
+        <Text style={[styles.leadValue, typography.display, { color: colors.text }]}>
+          {percentages[dominantIndex] ?? 0}%
+        </Text>
+        <Text
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          style={[styles.leadLabel, typography.title, { color: dominant.color }]}
+        >
+          {allocationLabel(dominant.label)}
+        </Text>
       </View>
-      <View style={styles.legend}>
-        {segments.map((segment, index) => (
+
+      <View style={[styles.ruler, { backgroundColor: colors.surfaceElevated }]}>
+        {visibleSegments.map((segment, index) => (
           <Animated.View
             key={`${segment.label}-${motionKey}`}
             entering={
               reducedMotion
                 ? undefined
-                : FadeInRight.duration(260)
-                    .delay(180 + index * 55)
+                : FadeIn.duration(180)
+                    .delay(index * 24)
                     .easing(Easing.out(Easing.cubic))
             }
-            style={styles.legendItem}
+            style={[
+              styles.rulerSegment,
+              {
+                backgroundColor: segment.color,
+                borderRightColor: colors.surface,
+                borderRightWidth: index < visibleSegments.length - 1 ? 2 : 0,
+                width: `${segment.percent * 100}%`,
+              },
+            ]}
+          />
+        ))}
+      </View>
+
+      <View style={styles.ledger}>
+        {visibleSegments.map((segment, index) => (
+          <Animated.View
+            key={`${segment.label}-row-${motionKey}`}
+            entering={
+              reducedMotion
+                ? undefined
+                : FadeInRight.duration(210)
+                    .delay(45 + index * 28)
+                    .easing(Easing.out(Easing.cubic))
+            }
+            style={[
+              styles.ledgerRow,
+              index < visibleSegments.length - 1
+                ? { borderBottomColor: colors.surfaceBorder }
+                : undefined,
+            ]}
           >
-            <View
-              style={[styles.dot, { backgroundColor: chartPalette[index % chartPalette.length] }]}
-            />
-            <View style={styles.legendTextRow}>
-              <Text
-                numberOfLines={1}
-                style={[styles.legendName, typography.bodyMedium, { color: colors.text }]}
-              >
-                {formatAllocationLabel(segment.label)}
-              </Text>
-              <Text
-                style={[styles.legendPercent, typography.bodyMedium, { color: colors.textSubtle }]}
-              >
-                {Math.round((segment.value / total) * 100)}%
-              </Text>
-            </View>
+            <View style={[styles.colorRail, { backgroundColor: segment.color }]} />
+            <Text
+              numberOfLines={1}
+              style={[styles.ledgerLabel, typography.bodyMedium, { color: colors.text }]}
+            >
+              {allocationLabel(segment.label)}
+            </Text>
+            <Text style={[styles.ledgerValue, typography.title, { color: colors.textSubtle }]}>
+              {percentages[index] ?? 0}%
+            </Text>
           </Animated.View>
         ))}
       </View>
@@ -309,74 +201,62 @@ export function AllocationBar({
 
 const styles = StyleSheet.create({
   root: {
-    flexDirection: "row",
-    alignItems: "center",
     gap: tokens.spacing.lg,
   },
-  chartWrap: {
-    width: CHART_SIZE,
-    height: CHART_SIZE,
-    alignItems: "center",
-    justifyContent: "center",
+  empty: {
+    paddingVertical: tokens.spacing.lg,
+    textAlign: "center",
+    fontSize: 14,
+    lineHeight: 20,
   },
-  centerLabel: {
-    position: "absolute",
-    alignItems: "center",
-    justifyContent: "center",
+  leadMetric: {
+    alignItems: "flex-start",
+    gap: 2,
   },
-  orbitSpark: {
-    position: "absolute",
-    left: CHART_CENTER - 5,
-    top: CHART_CENTER - 5,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    shadowOpacity: 0.42,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 0 },
-  },
-  centerValue: {
-    fontSize: 20,
-    lineHeight: 24,
+  leadValue: {
+    fontSize: 42,
+    lineHeight: 48,
     fontVariant: ["tabular-nums"],
   },
-  centerText: {
-    fontSize: 11,
-    lineHeight: 14,
-    textTransform: "uppercase",
-  },
-  legend: {
-    flex: 1,
-    minWidth: 0,
-    gap: tokens.spacing.sm,
-  },
-  legendItem: {
-    flexDirection: "row",
-    alignItems: "center",
+  leadLabel: {
     maxWidth: "100%",
-    gap: tokens.spacing.sm,
+    fontSize: 16,
+    lineHeight: 21,
   },
-  dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+  ruler: {
+    height: 20,
+    borderRadius: 7,
+    borderCurve: "continuous",
+    flexDirection: "row",
+    overflow: "hidden",
   },
-  legendTextRow: {
-    flex: 1,
-    minWidth: 0,
+  rulerSegment: {
+    height: "100%",
+  },
+  ledger: {
+    gap: 0,
+  },
+  ledgerRow: {
+    minHeight: 48,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: tokens.spacing.md,
   },
-  legendName: {
-    flexShrink: 1,
+  colorRail: {
+    width: 4,
+    height: 26,
+    borderRadius: 2,
+  },
+  ledgerLabel: {
+    flex: 1,
     minWidth: 0,
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 15,
+    lineHeight: 20,
   },
-  legendPercent: {
-    flexShrink: 0,
-    fontSize: 13,
-    lineHeight: 18,
+  ledgerValue: {
+    fontSize: 18,
+    lineHeight: 23,
+    fontVariant: ["tabular-nums"],
   },
 });

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { transactionPreviewImpact } from "../engine/fireEngine";
 import { defaultScenario, mainGoal } from "../engine/selectors";
@@ -17,6 +17,7 @@ export function useLogViewModel() {
     (category) => category.type === type && !category.isHidden && !category.archivedAt,
   );
   const [categoryId, setCategoryId] = useState(categories[0]?.id ?? "cat-food");
+  const lastSubmissionFingerprint = useRef<string | null>(null);
   const activeCategoryId = categories.some((category) => category.id === categoryId)
     ? categoryId
     : (categories[0]?.id ?? "");
@@ -26,28 +27,45 @@ export function useLogViewModel() {
   const today = todayIso();
   const isTodaySelected = selectedDate === today;
 
-  const impact =
-    !goal || amount <= 0
-      ? { impactDays: 0, baseDays: null, simulatedDays: null }
-      : transactionPreviewImpact({
-          transactions: snapshot.transactions,
-          draft: {
-            amount,
-            type,
-            categoryId: activeCategoryId,
-            currency: snapshot.currency,
-            date: selectedDate,
-          },
-          assets: snapshot.assets,
-          quotes: snapshot.quoteCache,
-          goal,
-          scenario,
-          startDate: today,
-        });
   const selectedCategory =
     categories.find((category) => category.id === activeCategoryId) ?? categories[0] ?? null;
+  const canConfirm = amount > 0 && selectedCategory !== null;
+  const impact = useMemo(
+    () =>
+      !goal || amount <= 0
+        ? { impactDays: 0, baseDays: null, simulatedDays: null }
+        : transactionPreviewImpact({
+            transactions: snapshot.transactions,
+            draft: {
+              amount,
+              type,
+              categoryId: activeCategoryId,
+              currency: snapshot.currency,
+              date: selectedDate,
+            },
+            assets: snapshot.assets,
+            quotes: snapshot.quoteCache,
+            goal,
+            scenario,
+            startDate: today,
+          }),
+    [
+      activeCategoryId,
+      amount,
+      goal,
+      scenario,
+      selectedDate,
+      snapshot.assets,
+      snapshot.currency,
+      snapshot.quoteCache,
+      snapshot.transactions,
+      today,
+      type,
+    ],
+  );
 
   function setAmountFromInput(raw: string) {
+    lastSubmissionFingerprint.current = null;
     const decimalParts = raw
       .replace(",", ".")
       .replace(/[^\d.]/g, "")
@@ -60,14 +78,26 @@ export function useLogViewModel() {
   }
 
   function confirm() {
-    if (amount <= 0) {
+    if (!canConfirm || !selectedCategory) {
       return false;
     }
     const trimmedNote = noteText.trim();
+    const fingerprint = [
+      amount,
+      type,
+      selectedCategory.id,
+      snapshot.currency,
+      selectedDate,
+      trimmedNote,
+    ].join("|");
+    if (lastSubmissionFingerprint.current === fingerprint) {
+      return false;
+    }
+    lastSubmissionFingerprint.current = fingerprint;
     createTransaction({
       amount,
       type,
-      categoryId: activeCategoryId,
+      categoryId: selectedCategory.id,
       currency: snapshot.currency,
       date: selectedDate,
       note: trimmedNote.length > 0 ? trimmedNote : null,
@@ -123,6 +153,7 @@ export function useLogViewModel() {
     moveSelectedDate,
     resetSelectedDate,
     impact,
+    canConfirm,
     confirm,
     createCategory: createLogCategory,
     updateCategory: updateLogCategory,

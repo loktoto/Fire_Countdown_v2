@@ -1,2 +1,7 @@
-_backups
-node_modules
+node_modules/
+.expo/
+.codex/
+_backups/
+coverage/
+dist/
+web-build/

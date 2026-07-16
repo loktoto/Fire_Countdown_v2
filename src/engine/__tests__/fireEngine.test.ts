@@ -3,9 +3,11 @@ import {
   daysToFire,
   fireTarget,
   includedFireAssets,
+  isoMonthDate,
   projectionSeries,
   resolveAssetValue,
   totalAssets,
+  transactionCashflowNet,
   transactionPreviewImpact,
   weightedExpectedReturn,
 } from "../fireEngine";
@@ -16,6 +18,32 @@ const goal = seedSnapshot.goals[0]!;
 describe("fireEngine", () => {
   it("calculates daily net deterministically", () => {
     expect(dailyNet(seedSnapshot.transactions, "2026-06-29")).toBe(-120);
+  });
+
+  it("does not add unmatched currencies as if they had a one-to-one exchange rate", () => {
+    const hkdTransaction = seedSnapshot.transactions[0]!;
+    const usdTransaction = {
+      ...hkdTransaction,
+      id: "txn-usd",
+      amount: 100,
+      currency: "USD",
+      type: "income" as const,
+    };
+    const foreignManualAsset = {
+      ...seedSnapshot.assets[1]!,
+      id: "asset-usd-cash",
+      currency: "USD",
+      manualValue: 100,
+      updateMethod: "manual" as const,
+    };
+
+    expect(dailyNet([hkdTransaction, usdTransaction], hkdTransaction.date, "HKD")).toBe(-120);
+    expect(
+      transactionCashflowNet([hkdTransaction, usdTransaction], hkdTransaction.date, "HKD"),
+    ).toBe(-120);
+    expect(totalAssets([foreignManualAsset], [], "HKD")).toBe(0);
+    expect(includedFireAssets([foreignManualAsset], [], "HKD")).toBe(0);
+    expect(totalAssets([foreignManualAsset], [], "USD")).toBe(100);
   });
 
   it("resolves quote-backed assets before manual fallback", () => {
@@ -132,6 +160,57 @@ describe("fireEngine", () => {
     });
     expect(series).toHaveLength(13);
     expect(series[12]!.projectedAssets).toBeGreaterThan(series[0]!.projectedAssets);
+  });
+
+  it("keeps an end-of-month projection anchored without skipping February", () => {
+    expect(isoMonthDate("2026-01-31", 1)).toBe("2026-02-28");
+    expect(isoMonthDate("2026-01-31", 2)).toBe("2026-03-31");
+  });
+
+  it("keeps projections finite when persisted inflation assumptions are out of range", () => {
+    const series = projectionSeries({
+      assets: seedSnapshot.assets,
+      quotes: seedSnapshot.quoteCache,
+      goal: { ...goal, inflationRate: -1.5 },
+      startDate: "2026-06-29",
+      months: 24,
+    });
+
+    expect(series.every((point) => Number.isFinite(point.fireTarget))).toBe(true);
+    expect(series.every((point) => Number.isFinite(point.projectedAssets))).toBe(true);
+  });
+
+  it("does not treat future-dated cashflow as money available today", () => {
+    const futureTransaction = {
+      ...seedSnapshot.transactions[0]!,
+      id: "txn-future",
+      amount: 50000,
+      type: "income" as const,
+      date: "2026-07-01",
+    };
+
+    expect(transactionCashflowNet([futureTransaction], "2026-06-29")).toBe(0);
+    expect(transactionCashflowNet([futureTransaction], "2026-07-01")).toBe(50000);
+  });
+
+  it("does not preview a future transaction as an immediate FIRE impact", () => {
+    const preview = transactionPreviewImpact({
+      transactions: seedSnapshot.transactions,
+      draft: {
+        amount: 50000,
+        categoryId: "cat-food",
+        currency: "HKD",
+        date: "2026-07-01",
+        type: "expense",
+      },
+      assets: seedSnapshot.assets,
+      quotes: seedSnapshot.quoteCache,
+      goal,
+      startDate: "2026-06-29",
+    });
+
+    expect(preview.impactDays).toBe(0);
+    expect(preview.simulatedDays).toBe(preview.baseDays);
   });
 
   it("models retirement withdrawals instead of savings after FIRE when requested", () => {

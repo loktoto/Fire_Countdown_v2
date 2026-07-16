@@ -37,6 +37,7 @@ function categoryMonthlyLeader(
   snapshot: FireSnapshot,
   date: string,
   type: TransactionType,
+  currency?: string,
 ): CategoryCashflowLeader | null {
   const month = date.slice(0, 7);
   const categories = new Map(snapshot.categories.map((category) => [category.id, category]));
@@ -45,7 +46,10 @@ function categoryMonthlyLeader(
   snapshot.transactions
     .filter(
       (transaction) =>
-        !transaction.archivedAt && transaction.type === type && transaction.date.startsWith(month),
+        !transaction.archivedAt &&
+        transaction.type === type &&
+        transaction.date.startsWith(month) &&
+        (!currency || transaction.currency.trim().toUpperCase() === currency.trim().toUpperCase()),
     )
     .forEach((transaction) => {
       const current = totals.get(transaction.categoryId) ?? { amount: 0, transactionCount: 0 };
@@ -75,9 +79,10 @@ function categoryMonthlyLeader(
 }
 
 export function monthlyCategoryLeaders(snapshot: FireSnapshot, date = todayIso()) {
+  const currency = mainGoal(snapshot)?.baseCurrency ?? snapshot.currency;
   return {
-    expense: categoryMonthlyLeader(snapshot, date, "expense"),
-    income: categoryMonthlyLeader(snapshot, date, "income"),
+    expense: categoryMonthlyLeader(snapshot, date, "expense", currency),
+    income: categoryMonthlyLeader(snapshot, date, "income", currency),
   };
 }
 
@@ -93,7 +98,11 @@ export function deriveFireView(
     throw new Error("Missing main FIRE goal");
   }
 
-  const transactionAdjustment = transactionCashflowNet(snapshot.transactions);
+  const transactionAdjustment = transactionCashflowNet(
+    snapshot.transactions,
+    date,
+    goal.baseCurrency,
+  );
   const projection = projectionSeries({
     assets: snapshot.assets,
     quotes: snapshot.quoteCache,
@@ -133,7 +142,7 @@ export function deriveFireView(
       transactionAdjustment,
       scenario,
     ),
-    todayImpact: todayActualImpact(snapshot.transactions, date),
+    todayImpact: todayActualImpact(snapshot.transactions, date, goal.baseCurrency),
     transactionAdjustment,
     projection,
     chartProjection,
@@ -147,6 +156,7 @@ export function deriveFireView(
       snapshot.transactions,
       Number.parseInt(date.slice(0, 4), 10),
       Number.parseInt(date.slice(5, 7), 10),
+      goal.baseCurrency,
     ),
     monthLeaders: monthlyCategoryLeaders(snapshot, date),
   };

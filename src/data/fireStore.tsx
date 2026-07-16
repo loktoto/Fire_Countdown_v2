@@ -3,7 +3,9 @@ import "expo-sqlite/localStorage/install";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 import { initializeDatabase } from "./database";
+import { mergeQuoteCache } from "./quoteCache";
 import { seedSnapshot } from "./seed";
+import { readSnapshotFromStorage, writeSnapshotToStorage } from "./snapshotStorage";
 import type {
   Asset,
   AssetQuoteCache,
@@ -15,8 +17,6 @@ import type {
   QuoteBridgeSettings,
   Transaction,
 } from "../features/types";
-
-const STORAGE_KEY = "fire-countdown-v2:snapshot";
 
 type FireStoreContextValue = {
   snapshot: FireSnapshot;
@@ -33,6 +33,7 @@ type FireStoreContextValue = {
   ) => ProjectionScenario;
   archiveMilestone: (id: string) => void;
   archiveScenario: (id: string) => void;
+  archiveAsset: (id: string) => void;
   updateAsset: (id: string, patch: Partial<Asset>) => void;
   updateCategory: (id: string, patch: Partial<Category>) => void;
   updateGoal: (id: string, patch: Partial<FireGoal>) => void;
@@ -42,6 +43,8 @@ type FireStoreContextValue = {
   saveQuotes: (quotes: AssetQuoteCache[]) => void;
   setThemeMode: (mode: FireSnapshot["themeMode"]) => void;
   setHapticsEnabled: (enabled: boolean) => void;
+  setFireCompanion: (id: FireSnapshot["fireCompanionId"]) => void;
+  setFireDestination: (id: FireSnapshot["fireDestinationId"]) => void;
   setCurrency: (currency: string) => void;
   setLanguage: (language: FireSnapshot["language"]) => void;
 };
@@ -56,36 +59,21 @@ function id(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function readSnapshot(): FireSnapshot {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (!stored) {
-    return seedSnapshot;
-  }
-
-  try {
-    const parsed = JSON.parse(stored) as Partial<FireSnapshot>;
-    return {
-      ...seedSnapshot,
-      ...parsed,
-      hapticsEnabled: parsed.hapticsEnabled ?? true,
-    } as FireSnapshot;
-  } catch {
-    return seedSnapshot;
-  }
-}
-
 export function FireStoreProvider({ children }: { children: React.ReactNode }) {
-  const [snapshot, setSnapshot] = useState<FireSnapshot>(() => readSnapshot());
+  const [snapshot, setSnapshot] = useState<FireSnapshot>(() =>
+    readSnapshotFromStorage(localStorage),
+  );
 
   useEffect(() => {
-    void initializeDatabase();
+    void initializeDatabase().catch(() => {
+      // The localStorage polyfill remains the source of truth if optional schema setup fails.
+    });
   }, []);
 
   const commit = useCallback((updater: (current: FireSnapshot) => FireSnapshot) => {
     setSnapshot((current) => {
       const next = updater(current);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      return next;
+      return writeSnapshotToStorage(localStorage, next) ? next : current;
     });
   }, []);
 
@@ -93,8 +81,9 @@ export function FireStoreProvider({ children }: { children: React.ReactNode }) {
     () => ({
       snapshot,
       resetSeed: () => {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(seedSnapshot));
-        setSnapshot(seedSnapshot);
+        if (writeSnapshotToStorage(localStorage, seedSnapshot)) {
+          setSnapshot(seedSnapshot);
+        }
       },
       createTransaction: (input) =>
         commit((current) => {
@@ -243,6 +232,13 @@ export function FireStoreProvider({ children }: { children: React.ReactNode }) {
             }),
           };
         }),
+      archiveAsset: (assetId) =>
+        commit((current) => ({
+          ...current,
+          assets: current.assets.map((asset) =>
+            asset.id === assetId ? { ...asset, archivedAt: nowIso(), updatedAt: nowIso() } : asset,
+          ),
+        })),
       updateAsset: (assetId, patch) =>
         commit((current) => ({
           ...current,
@@ -323,18 +319,17 @@ export function FireStoreProvider({ children }: { children: React.ReactNode }) {
           },
         })),
       saveQuotes: (quotes) =>
-        commit((current) => ({
-          ...current,
-          quoteCache: [
-            ...quotes,
-            ...current.quoteCache.filter((quote) => quote.source !== "CACHE"),
-          ],
-          quoteSettings: {
-            ...current.quoteSettings,
-            lastRefreshAt: nowIso(),
-            updatedAt: nowIso(),
-          },
-        })),
+        commit((current) => {
+          return {
+            ...current,
+            quoteCache: mergeQuoteCache(current.quoteCache, quotes),
+            quoteSettings: {
+              ...current.quoteSettings,
+              lastRefreshAt: nowIso(),
+              updatedAt: nowIso(),
+            },
+          };
+        }),
       setThemeMode: (mode) =>
         commit((current) => ({
           ...current,
@@ -344,6 +339,16 @@ export function FireStoreProvider({ children }: { children: React.ReactNode }) {
         commit((current) => ({
           ...current,
           hapticsEnabled: enabled,
+        })),
+      setFireCompanion: (fireCompanionId) =>
+        commit((current) => ({
+          ...current,
+          fireCompanionId,
+        })),
+      setFireDestination: (fireDestinationId) =>
+        commit((current) => ({
+          ...current,
+          fireDestinationId,
         })),
       setCurrency: (currency) =>
         commit((current) => {

@@ -12,13 +12,15 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 
 import { CategoryGlyph } from "./CategoryGlyph";
 import { MotionPressable } from "./MotionPressable";
+import { sheetBackdropEnter, sheetBackdropExit, sheetEnter, sheetExit } from "../design/motion";
 import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
 import type { Category, TransactionType } from "../features/types";
+import { useReducedMotion } from "../hooks/useReducedMotion";
 import { useI18n } from "../i18n";
 
 const iconPresets = [
@@ -66,8 +68,8 @@ const iconPresets = [
   { label: "Other", value: "shape-plus-outline" },
 ];
 
-const colorPresets = ["#00F0FF", "#00FFA3", "#FF3366", "#FED639", "#9B7CFF", "#FF8A3D", "#4CC9F0"];
-const defaultCategoryColor = colorPresets[0] ?? "#00F0FF";
+const colorPresets = ["#5BD9D0", "#57D49B", "#FF6B88", "#F2C94C", "#8D7CF2", "#F28B55", "#6AA7E8"];
+const defaultCategoryColor = colorPresets[0] ?? "#5BD9D0";
 
 function defaultIcon(type: TransactionType) {
   return type === "income" ? "emoji:\\u{1F4C8}" : "emoji:\\u{1F35C}";
@@ -95,6 +97,7 @@ export function CategoryEditorSheet({
   onDelete?: (categoryId: string) => void;
 }) {
   const colors = useThemeColors();
+  const reducedMotion = useReducedMotion();
   const draftKey = `${category?.id ?? "new"}-${type}`;
 
   if (!visible) {
@@ -108,15 +111,16 @@ export function CategoryEditorSheet({
         style={styles.modalRoot}
       >
         <Animated.View
-          entering={FadeIn.duration(160)}
-          exiting={FadeOut.duration(120)}
+          entering={reducedMotion ? undefined : sheetBackdropEnter}
+          exiting={reducedMotion ? undefined : sheetBackdropExit}
           style={styles.scrim}
         >
           <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         </Animated.View>
         <Animated.View
-          entering={SlideInDown.duration(260)}
-          exiting={SlideOutDown.duration(180)}
+          accessibilityViewIsModal
+          entering={reducedMotion ? undefined : sheetEnter}
+          exiting={reducedMotion ? undefined : sheetExit}
           style={[
             styles.sheet,
             {
@@ -433,9 +437,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   swatch: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     borderWidth: 2,
     alignItems: "center",
     justifyContent: "center",

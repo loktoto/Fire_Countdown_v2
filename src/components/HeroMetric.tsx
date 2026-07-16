@@ -1,7 +1,9 @@
 import { StyleSheet, Text, View } from "react-native";
+import Animated, { Easing, FadeInUp, FadeOut } from "react-native-reanimated";
 
 import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
+import { useReducedMotion } from "../hooks/useReducedMotion";
 
 function splitMetricValue(value: string) {
   const daysMatch = value.match(/^(.+?)\s+(days?)$/i);
@@ -24,6 +26,7 @@ export function HeroMetric({
   align?: "left" | "center" | "right";
 }) {
   const colors = useThemeColors();
+  const reducedMotion = useReducedMotion();
   const alignItems = align === "left" ? "flex-start" : align === "right" ? "flex-end" : "center";
   const textAlign = align;
   const captionJustify =
@@ -40,7 +43,14 @@ export function HeroMetric({
       <Text style={[styles.label, typography.button, { color: colors.textMuted, textAlign }]}>
         {label}
       </Text>
-      <View style={[styles.valueRow, { justifyContent: captionJustify }]}>
+      <Animated.View
+        key={value}
+        entering={
+          reducedMotion ? undefined : FadeInUp.duration(220).easing(Easing.bezier(0.16, 1, 0.3, 1))
+        }
+        exiting={reducedMotion ? undefined : FadeOut.duration(90)}
+        style={[styles.valueRow, { justifyContent: captionJustify }]}
+      >
         <Text
           selectable
           adjustsFontSizeToFit
@@ -56,7 +66,7 @@ export function HeroMetric({
             </Text>
           ) : null}
         </Text>
-      </View>
+      </Animated.View>
       {captionParts.length > 0 ? (
         <View style={[styles.captionWrap, { justifyContent: captionJustify }]}>
           {captionParts.map((part, index) => (
