@@ -66,4 +66,26 @@ describe("Log workflow", () => {
     expect(result.current.confirm()).toBe(false);
     expect(store.createTransaction).not.toHaveBeenCalled();
   });
+
+  it("routes category edits and archive actions through the store", async () => {
+    const store = storeWith();
+    useFireStoreMock.mockReturnValue(store);
+    const { result } = await renderHook(() => useLogViewModel());
+
+    await act(() => {
+      result.current.updateCategory("cat-food", {
+        name: "Meals",
+        icon: "🍜",
+        color: "#5BD9D0",
+      });
+      result.current.archiveCategory("cat-food");
+    });
+
+    expect(store.updateCategory).toHaveBeenCalledWith("cat-food", {
+      name: "Meals",
+      icon: "🍜",
+      color: "#5BD9D0",
+    });
+    expect(store.archiveCategory).toHaveBeenCalledWith("cat-food");
+  });
 });

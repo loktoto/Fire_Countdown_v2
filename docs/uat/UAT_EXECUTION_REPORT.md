@@ -28,7 +28,7 @@ The iOS device matrix was not available in this environment, so iOS acceptance r
 | P2                    |      3 |     0 |       0 |      3 |
 | **All Android cases** | **48** | **0** |   **0** | **48** |
 
-Automated tests supplied evidence for validation-heavy cases (invalid input, deterministic FIRE math, persistence recovery, quote cache behavior, export sanitization, and rapid duplicate submission). Emulator evidence supplied the user-visible flows and six journeys.
+Automated tests supplied evidence for validation-heavy cases (invalid input, deterministic FIRE math, persistence recovery, quote cache behavior, export sanitization, category lifecycle routing, and rapid duplicate submission). The final suite was 18 suites / 90 tests. Emulator evidence supplied the user-visible flows and six journeys.
 
 ## Journey results
 
