@@ -1,4 +1,4 @@
-# Fire Countdown v2 UAT execution report
+﻿# Fire Countdown v2 UAT execution report
 
 ## Overall result
 
@@ -13,7 +13,7 @@ The iOS device matrix was not available in this environment, so iOS acceptance r
 - Android device: `Pixel_9a` API 37, `emulator-5556`
 - Runtime: Expo Go 56.0.1; Expo Go workflow via Metro on port 8081 and `adb reverse`
 - Execution date: 2026-07-16 (device local time)
-- App build under test: `5171b732337b5120ab7e67909f46b20f9821d34b`
+- App build under test: `e3d987a`
 - Network modes: online live quote refresh, invalid custom endpoint, and Wi-Fi/data-disabled offline navigation
 - Languages/themes: English and Traditional Chinese; light and dark mode
 - Evidence: [`docs/uat/evidence/android-pixel9a-20260716`](evidence/android-pixel9a-20260716)
@@ -32,22 +32,22 @@ Automated tests supplied evidence for validation-heavy cases (invalid input, det
 
 ## Journey results
 
-1. Log an expense → Calendar → Home → Dashboard: **Pass**. The saved Food expense propagated as the same Calendar, Home, and Dashboard cash-flow result.
-2. Edit and move a transaction → archive it: **Pass**. All owned fields were edited, the date moved across months, and the destructive action required two taps.
-3. Edit FIRE plan → add/include a manual asset → verify Portfolio/Dashboard/Home: **Pass**. UAT Bond and the edited plan were reflected consistently.
-4. Switch projection methods → adverse/no-crossover projection: **Pass**. The adverse method showed `Not reached` and no FIRE date without producing invalid chart values.
-5. Quote failure → fallback Portfolio → preferences/export: **Pass**. Cached/manual values remained visible after an invalid bridge; live Free quotes later refreshed VOO successfully; export opened the Android share sheet for CSV and Google Sheets formats.
+1. Log an expense ??Calendar ??Home ??Dashboard: **Pass**. The saved Food expense propagated as the same Calendar, Home, and Dashboard cash-flow result.
+2. Edit and move a transaction ??archive it: **Pass**. All owned fields were edited, the date moved across months, and the destructive action required two taps.
+3. Edit FIRE plan ??add/include a manual asset ??verify Portfolio/Dashboard/Home: **Pass**. UAT Bond and the edited plan were reflected consistently.
+4. Switch projection methods ??adverse/no-crossover projection: **Pass**. The adverse method showed `Not reached` and no FIRE date without producing invalid chart values.
+5. Quote failure ??fallback Portfolio ??preferences/export: **Pass**. Cached/manual values remained visible after an invalid bridge; live Free quotes later refreshed VOO successfully; export opened the Android share sheet for CSV and Google Sheets formats.
 6. Theme/language/persistence/offline/accessibility safety: **Pass** on Android. Traditional Chinese and dark mode were applied and restored, state survived full relaunch, and destructive confirmation/content descriptions were observed.
 
 ## Defects and fixes
 
-### UAT-DEF-001 — Secure quote token could not be saved on Android
+### UAT-DEF-001 ??Secure quote token could not be saved on Android
 
 Root cause: the SecureStore key was `fire-countdown-v2:quote-token`; Android SecureStore rejects keys containing `:`. The key is now `fire-countdown-v2.quote-token`. The emulator then saved the masked token and displayed `Credential saved`.
 
 Regression: `src/features/quoteBridge/__tests__/client.test.ts` asserts the valid key and trimmed credential behavior.
 
-### UAT-DEF-002 — File export failed when Android had no compatible file-share handler
+### UAT-DEF-002 ??File export failed when Android had no compatible file-share handler
 
 Root cause: `Sharing.shareAsync` can reject even when the sharing module reports available. The screen previously showed an error without attempting a text share.
 
@@ -78,3 +78,4 @@ adb devices -l
 ```
 
 Web export completed with the WASM Metro configuration and React Native Web dependency. The Android app was exercised through the repository-supported Expo Go workflow; no native/EAS rebuild was performed.
+
