@@ -78,4 +78,3 @@ adb devices -l
 ```
 
 Web export completed with the WASM Metro configuration and React Native Web dependency. The Android app was exercised through the repository-supported Expo Go workflow; no native/EAS rebuild was performed.
-
