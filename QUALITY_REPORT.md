@@ -1,7 +1,7 @@
 # Fire Countdown v2 Quality Report
 
-**Review date:** 2026-07-14  
-**Scope:** Full repository quality pass plus the modern UI system, zero-key delayed market quotes, quote-cache resilience, secure custom-bridge credentials, bilingual visual QA, automated UAT, and release readiness.  
+**Review date:** 2026-07-14
+**Scope:** Full repository quality pass plus the modern UI system, zero-key delayed market quotes, quote-cache resilience, secure custom-bridge credentials, bilingual visual QA, automated UAT, and release readiness.
 **Release decision:** **Internal release candidate GO. Public release remains conditional on a production-build/accessibility pass and acceptance of the documented dependency risk.**
 
 ## Executive summary
@@ -118,7 +118,7 @@ The current-source Expo Go visual/navigation smoke is complete. Before public di
 
 ## Production decision
 
-**Internal testing:** GO.  
+**Internal testing:** GO.
 **Public production release:** Conditional on the signed-build acceptance pass above and explicit acceptance or remediation of DEP-RES-01 / SEC-RES-01.
 
 ## Provenance and preservation
