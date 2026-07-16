@@ -11,12 +11,14 @@ import {
   TextInput,
   View,
 } from "react-native";
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 
 import { MotionPressable } from "./MotionPressable";
+import { sheetBackdropEnter, sheetBackdropExit, sheetEnter, sheetExit } from "../design/motion";
 import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
 import type { Asset, AssetClass, UpdateMethod } from "../features/types";
+import { useReducedMotion } from "../hooks/useReducedMotion";
 import { useI18n } from "../i18n";
 
 type AssetPatch = Partial<
@@ -43,6 +45,9 @@ const assetClassOptions: { label: string; value: AssetClass }[] = [
   { label: "Crypto", value: "crypto" },
   { label: "Bond", value: "bond" },
   { label: "Real estate", value: "real_estate" },
+  { label: "Pension", value: "pension" },
+  { label: "Private investment", value: "private_investment" },
+  { label: "Business", value: "business" },
   { label: "Custom", value: "custom" },
 ];
 
@@ -62,23 +67,23 @@ function normalizeNumberInput(raw: string, allowNegative = false) {
   return `${negative ? "-" : ""}${normalized}`.slice(0, 14);
 }
 
-function numberFromText(value: string, fallback = 0) {
-  const number = Number.parseFloat(value);
-  return Number.isFinite(number) ? number : fallback;
-}
-
 export function AssetEditorSheet({
   visible,
   asset,
+  isCreating = false,
   onClose,
   onSave,
+  onArchive,
 }: {
   visible: boolean;
   asset: Asset | null;
+  isCreating?: boolean;
   onClose: () => void;
   onSave: (assetId: string, patch: AssetPatch) => void;
+  onArchive?: (assetId: string) => void;
 }) {
   const colors = useThemeColors();
+  const reducedMotion = useReducedMotion();
 
   if (!visible || !asset) {
     return null;
@@ -91,21 +96,29 @@ export function AssetEditorSheet({
         style={styles.modalRoot}
       >
         <Animated.View
-          entering={FadeIn.duration(160)}
-          exiting={FadeOut.duration(120)}
+          entering={reducedMotion ? undefined : sheetBackdropEnter}
+          exiting={reducedMotion ? undefined : sheetBackdropExit}
           style={styles.scrim}
         >
           <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         </Animated.View>
         <Animated.View
-          entering={SlideInDown.duration(260)}
-          exiting={SlideOutDown.duration(180)}
+          accessibilityViewIsModal
+          entering={reducedMotion ? undefined : sheetEnter}
+          exiting={reducedMotion ? undefined : sheetExit}
           style={[
             styles.sheet,
             { backgroundColor: colors.surfaceSolid, borderColor: colors.surfaceBorder },
           ]}
         >
-          <AssetEditorContent key={asset.id} asset={asset} onClose={onClose} onSave={onSave} />
+          <AssetEditorContent
+            key={asset.id}
+            asset={asset}
+            isCreating={isCreating}
+            onClose={onClose}
+            onSave={onSave}
+            onArchive={onArchive}
+          />
         </Animated.View>
       </KeyboardAvoidingView>
     </Modal>
@@ -114,12 +127,16 @@ export function AssetEditorSheet({
 
 function AssetEditorContent({
   asset,
+  isCreating,
   onClose,
   onSave,
+  onArchive,
 }: {
   asset: Asset;
+  isCreating: boolean;
   onClose: () => void;
   onSave: (assetId: string, patch: AssetPatch) => void;
+  onArchive?: (assetId: string) => void;
 }) {
   const colors = useThemeColors();
   const t = useI18n();
@@ -138,8 +155,25 @@ function AssetEditorContent({
   const [quantity, setQuantity] = useState(asset.quantity == null ? "" : String(asset.quantity));
   const [includeInFire, setIncludeInFire] = useState(asset.includeInFire);
   const [notes, setNotes] = useState(asset.notes ?? "");
-  const canSave = name.trim().length > 0 && numberFromText(manualValue) >= 0;
+  const [confirmingArchive, setConfirmingArchive] = useState(false);
+  const manualValueNumber = Number.parseFloat(manualValue);
+  const expectedReturnNumber = Number.parseFloat(expectedReturn);
+  const quantityNumber = quantity.trim().length > 0 ? Number.parseFloat(quantity) : null;
+  const hasQuoteIdentity = googleFinanceSymbol.trim().length > 0 || ticker.trim().length > 0;
   const normalizedCurrency = currency.trim().toUpperCase().slice(0, 3);
+  const canSave =
+    name.trim().length > 0 &&
+    Number.isFinite(manualValueNumber) &&
+    manualValueNumber >= 0 &&
+    Number.isFinite(expectedReturnNumber) &&
+    expectedReturnNumber > -95 &&
+    expectedReturnNumber <= 1000 &&
+    /^[A-Z]{3}$/.test(normalizedCurrency) &&
+    (updateMethod === "manual" ||
+      (hasQuoteIdentity &&
+        quantityNumber !== null &&
+        Number.isFinite(quantityNumber) &&
+        quantityNumber > 0));
   const currencyOptions =
     normalizedCurrency && !baseCurrencyOptions.includes(normalizedCurrency)
       ? [normalizedCurrency, ...baseCurrencyOptions]
@@ -153,14 +187,14 @@ function AssetEditorContent({
     const normalizedTicker = ticker.trim();
     const normalizedQuoteSymbol = googleFinanceSymbol.trim();
     const normalizedNotes = notes.trim();
-    const quantityValue = quantity.trim().length > 0 ? numberFromText(quantity) : null;
+    const quantityValue = quantityNumber;
 
     onSave(asset.id, {
       name: name.trim(),
       assetClass,
-      manualValue: numberFromText(manualValue),
-      currency: currency.trim().length > 0 ? currency.trim().toUpperCase() : asset.currency,
-      expectedAnnualReturn: numberFromText(expectedReturn) / 100,
+      manualValue: manualValueNumber,
+      currency: normalizedCurrency,
+      expectedAnnualReturn: expectedReturnNumber / 100,
       updateMethod,
       ticker: normalizedTicker.length > 0 ? normalizedTicker : null,
       googleFinanceSymbol: normalizedQuoteSymbol.length > 0 ? normalizedQuoteSymbol : null,
@@ -184,7 +218,7 @@ function AssetEditorContent({
             adjustsFontSizeToFit
             style={[styles.title, typography.title, { color: colors.text }]}
           >
-            {t.assets.editAsset}
+            {isCreating ? t.assets.addAsset : t.assets.editAsset}
           </Text>
         </View>
         <MotionPressable
@@ -244,7 +278,13 @@ function AssetEditorContent({
                           ? t.assets.classOptions.crypto
                           : option.value === "bond"
                             ? t.assets.classOptions.bond
-                            : t.assets.classOptions.custom;
+                            : option.value === "pension"
+                              ? t.assets.classOptions.pension
+                              : option.value === "private_investment"
+                                ? t.assets.classOptions.privateInvestment
+                                : option.value === "business"
+                                  ? t.assets.classOptions.business
+                                  : t.assets.classOptions.custom;
               return (
                 <MotionPressable
                   key={option.value}
@@ -556,6 +596,34 @@ function AssetEditorContent({
             {t.assets.saveAssetCta}
           </Text>
         </MotionPressable>
+
+        {onArchive ? (
+          <MotionPressable
+            onPress={() => {
+              if (!confirmingArchive) {
+                setConfirmingArchive(true);
+                return;
+              }
+              onArchive(asset.id);
+              onClose();
+            }}
+            accessibilityLabel={
+              confirmingArchive ? t.assets.confirmDeleteAsset : t.assets.deleteAsset
+            }
+            accessibilityHint={confirmingArchive ? t.common.tapAgainToConfirm : undefined}
+            style={[
+              styles.archive,
+              {
+                borderColor: colors.negative,
+                backgroundColor: confirmingArchive ? `${colors.negative}24` : "transparent",
+              },
+            ]}
+          >
+            <Text style={[styles.archiveText, typography.button, { color: colors.negative }]}>
+              {confirmingArchive ? t.assets.confirmDeleteAsset : t.assets.deleteAsset}
+            </Text>
+          </MotionPressable>
+        ) : null}
       </ScrollView>
     </>
   );
@@ -606,9 +674,9 @@ const styles = StyleSheet.create({
     fontSize: 26,
   },
   closeButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -643,7 +711,7 @@ const styles = StyleSheet.create({
     gap: tokens.spacing.sm,
   },
   choiceChip: {
-    minHeight: 40,
+    minHeight: 44,
     borderWidth: 1,
     borderRadius: tokens.radius.pill,
     paddingHorizontal: tokens.spacing.md,
@@ -655,7 +723,7 @@ const styles = StyleSheet.create({
   },
   currencyChip: {
     minWidth: 72,
-    minHeight: 40,
+    minHeight: 44,
     borderWidth: 1,
     borderRadius: tokens.radius.pill,
     paddingHorizontal: tokens.spacing.md,
@@ -695,6 +763,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   saveText: {
+    fontSize: 14,
+  },
+  archive: {
+    minHeight: 48,
+    borderWidth: 1,
+    borderRadius: tokens.radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  archiveText: {
     fontSize: 14,
   },
 });

@@ -1,11 +1,13 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useMemo, useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 
 import { MotionPressable } from "./MotionPressable";
+import { sheetBackdropEnter, sheetBackdropExit, sheetEnter, sheetExit } from "../design/motion";
 import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
+import { useReducedMotion } from "../hooks/useReducedMotion";
 import { useI18n } from "../i18n";
 import {
   addIsoDays,
@@ -49,6 +51,7 @@ function VisibleLogDatePickerSheet({
 }: LogDatePickerSheetProps) {
   const colors = useThemeColors();
   const t = useI18n();
+  const reducedMotion = useReducedMotion();
   const [visibleMonth, setVisibleMonth] = useState(() => monthStart(selectedDate));
   const today = todayIso();
   const monthParts = isoDateParts(visibleMonth);
@@ -96,15 +99,16 @@ function VisibleLogDatePickerSheet({
     <Modal transparent visible={visible} animationType="none" onRequestClose={onClose}>
       <View style={styles.modalRoot}>
         <Animated.View
-          entering={FadeIn.duration(160)}
-          exiting={FadeOut.duration(120)}
+          entering={reducedMotion ? undefined : sheetBackdropEnter}
+          exiting={reducedMotion ? undefined : sheetBackdropExit}
           style={styles.scrim}
         >
           <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         </Animated.View>
         <Animated.View
-          entering={SlideInDown.duration(260)}
-          exiting={SlideOutDown.duration(180)}
+          accessibilityViewIsModal
+          entering={reducedMotion ? undefined : sheetEnter}
+          exiting={reducedMotion ? undefined : sheetExit}
           style={[
             styles.sheet,
             { backgroundColor: colors.surfaceSolid, borderColor: colors.surfaceBorder },
@@ -279,9 +283,9 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   closeButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -298,22 +302,22 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   monthControls: {
-    minHeight: 38,
+    minHeight: 44,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: tokens.spacing.sm,
   },
   navCluster: {
-    width: 74,
+    width: 94,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 6,
   },
   navButton: {
-    width: 34,
-    height: 34,
+    width: 44,
+    height: 44,
     borderRadius: tokens.radius.utility,
     borderWidth: 1,
     alignItems: "center",

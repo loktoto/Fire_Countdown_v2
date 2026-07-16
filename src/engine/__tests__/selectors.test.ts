@@ -44,6 +44,33 @@ describe("deriveFireView", () => {
     expect(income.progress).toBeGreaterThan(base.progress);
   });
 
+  it("keeps future-dated transactions out of today's FIRE balance", () => {
+    const base = deriveFireView(seedSnapshot, startDate);
+    const futureSnapshot = withTransaction({ type: "income", amount: 100000 });
+    futureSnapshot.transactions[0] = {
+      ...futureSnapshot.transactions[0]!,
+      date: "2026-07-01",
+    };
+
+    const future = deriveFireView(futureSnapshot, startDate);
+    expect(future.transactionAdjustment).toBe(base.transactionAdjustment);
+    expect(future.includedAssets).toBe(base.includedAssets);
+    expect(future.projectedFireDate).toBe(base.projectedFireDate);
+  });
+
+  it("keeps other-currency transactions out of base-currency FIRE totals", () => {
+    const base = deriveFireView(seedSnapshot, startDate);
+    const otherCurrency = withTransaction({ type: "income", amount: 100000 });
+    otherCurrency.transactions[0] = {
+      ...otherCurrency.transactions[0]!,
+      currency: "USD",
+    };
+
+    const view = deriveFireView(otherCurrency, startDate);
+    expect(view.transactionAdjustment).toBe(base.transactionAdjustment);
+    expect(view.monthSummary).toEqual(base.monthSummary);
+  });
+
   it("summarizes the largest income and expense categories for the selected month", () => {
     const leaders = monthlyCategoryLeaders(seedSnapshot, startDate);
 

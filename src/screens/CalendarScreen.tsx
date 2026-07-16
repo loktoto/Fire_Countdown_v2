@@ -2,6 +2,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
+import { AppHeader } from "../components/AppHeader";
 import { CategoryGlyph } from "../components/CategoryGlyph";
 import { GlassCard } from "../components/GlassCard";
 import { MotionPressable } from "../components/MotionPressable";
@@ -11,7 +12,7 @@ import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
 import { useCalendarViewModel } from "../hooks/useCalendarViewModel";
 import { useI18n } from "../i18n";
-import { money, signedMoney } from "../utils/format";
+import { formatFullDate, money, signedMoney } from "../utils/format";
 
 export function CalendarScreen() {
   const colors = useThemeColors();
@@ -27,10 +28,30 @@ export function CalendarScreen() {
       ),
     [vm.calendarCells],
   );
+  const maxAbsCurrentMonthNet = useMemo(
+    () =>
+      Math.max(
+        1,
+        ...vm.calendarCells.filter((day) => day.isCurrentMonth).map((day) => Math.abs(day.net)),
+      ),
+    [vm.calendarCells],
+  );
 
   return (
     <ScreenContainer>
-      <GlassCard>
+      <AppHeader
+        eyebrow={t.calendar.kicker}
+        title={t.calendar.title}
+        subtitle={`${vm.monthLabel}. ${t.calendar.subtitle}`}
+        accentColor={colors.projection}
+      />
+
+      <View
+        style={[
+          styles.summaryBand,
+          { backgroundColor: colors.surface, borderColor: colors.surfaceBorder },
+        ]}
+      >
         <View style={styles.summary}>
           <View style={styles.summaryItem}>
             <Text style={[styles.summaryLabel, typography.body, { color: colors.textMuted }]}>
@@ -69,11 +90,30 @@ export function CalendarScreen() {
             </Text>
           </View>
         </View>
-      </GlassCard>
+      </View>
 
       <GlassCard style={styles.calendarCard}>
         <View style={styles.calendarControls}>
-          <View style={styles.navCluster}>
+          <View style={styles.monthTitleRow}>
+            <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              style={[styles.monthControlLabel, typography.title, { color: colors.text }]}
+            >
+              {vm.monthLabel}
+            </Text>
+            <MotionPressable
+              onPress={vm.goToToday}
+              accessibilityLabel={t.calendar.jumpToday}
+              style={[styles.todayButton, { backgroundColor: colors.projectionSoft }]}
+            >
+              <MaterialCommunityIcons name="calendar-today" size={14} color={colors.projection} />
+              <Text style={[styles.todayText, typography.button, { color: colors.projection }]}>
+                {t.common.today}
+              </Text>
+            </MotionPressable>
+          </View>
+          <View style={styles.navigationRow}>
             <MotionPressable
               onPress={vm.goToPreviousYear}
               accessibilityLabel={t.calendar.previousYear}
@@ -90,35 +130,14 @@ export function CalendarScreen() {
               accessibilityLabel={t.calendar.previousMonth}
               style={[styles.navButton, { borderColor: colors.surfaceBorder }]}
             >
-              <MaterialCommunityIcons name="chevron-left" size={20} color={colors.primary} />
+              <MaterialCommunityIcons name="chevron-left" size={20} color={colors.projection} />
             </MotionPressable>
-          </View>
-          <View style={styles.monthTitle}>
-            <Text
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              style={[styles.monthControlLabel, typography.title, { color: colors.text }]}
-            >
-              {vm.monthLabel}
-            </Text>
-            <MotionPressable
-              onPress={vm.goToToday}
-              accessibilityLabel={t.calendar.jumpToday}
-              style={[styles.todayButton, { backgroundColor: `${colors.primary}16` }]}
-            >
-              <MaterialCommunityIcons name="calendar-today" size={14} color={colors.primary} />
-              <Text style={[styles.todayText, typography.button, { color: colors.primary }]}>
-                {t.common.today}
-              </Text>
-            </MotionPressable>
-          </View>
-          <View style={styles.navCluster}>
             <MotionPressable
               onPress={vm.goToNextMonth}
               accessibilityLabel={t.calendar.nextMonth}
               style={[styles.navButton, { borderColor: colors.surfaceBorder }]}
             >
-              <MaterialCommunityIcons name="chevron-right" size={20} color={colors.primary} />
+              <MaterialCommunityIcons name="chevron-right" size={20} color={colors.projection} />
             </MotionPressable>
             <MotionPressable
               onPress={vm.goToNextYear}
@@ -149,9 +168,13 @@ export function CalendarScreen() {
             <View key={week[0]?.key ?? "week"} style={styles.weekRow}>
               {week.map((day) => {
                 const selected = day.date === vm.selectedDate;
-                const textColor = day.isCurrentMonth ? colors.text : colors.textMuted;
+                const textColor = selected
+                  ? colors.projection
+                  : day.isCurrentMonth
+                    ? colors.text
+                    : colors.textMuted;
                 const netColor =
-                  day.net === 0
+                  !day.isCurrentMonth || day.net === 0
                     ? colors.textMuted
                     : day.net > 0
                       ? colors.positive
@@ -168,9 +191,8 @@ export function CalendarScreen() {
                     style={[
                       styles.day,
                       {
-                        borderColor: selected ? colors.primary : colors.surfaceBorder,
-                        backgroundColor: selected ? `${colors.primary}18` : colors.backgroundAlt,
-                        opacity: day.isCurrentMonth ? 1 : 0.46,
+                        borderColor: selected ? `${colors.projection}66` : "transparent",
+                        backgroundColor: selected ? colors.projectionSoft : "transparent",
                       },
                     ]}
                   >
@@ -179,7 +201,7 @@ export function CalendarScreen() {
                         {day.day}
                       </Text>
                       {day.isToday ? (
-                        <View style={[styles.todayDot, { backgroundColor: colors.primary }]} />
+                        <View style={[styles.todayDot, { backgroundColor: colors.projection }]} />
                       ) : null}
                     </View>
                     <Text
@@ -190,6 +212,23 @@ export function CalendarScreen() {
                         ? "-"
                         : signedMoney(day.net, vm.currency).replace(`${vm.currency} `, "")}
                     </Text>
+                    <View style={[styles.cashflowTrack, { backgroundColor: colors.surfaceBorder }]}>
+                      {day.net !== 0 ? (
+                        <View
+                          style={[
+                            styles.cashflowFill,
+                            {
+                              alignSelf: day.net > 0 ? "flex-start" : "flex-end",
+                              backgroundColor: netColor,
+                              width: `${Math.max(
+                                12,
+                                Math.sqrt(Math.abs(day.net) / maxAbsCurrentMonthNet) * 100,
+                              )}%`,
+                            },
+                          ]}
+                        />
+                      ) : null}
+                    </View>
                   </MotionPressable>
                 );
               })}
@@ -198,9 +237,9 @@ export function CalendarScreen() {
         </View>
       </GlassCard>
 
-      <GlassCard>
+      <View style={styles.transactionSection}>
         <Text style={[styles.sectionTitle, typography.title, { color: colors.text }]}>
-          {vm.selectedDate}
+          {formatFullDate(vm.selectedDate, t.locale)}
         </Text>
         {vm.selectedTransactions.length === 0 ? (
           <Text style={[styles.empty, typography.body, { color: colors.textMuted }]}>
@@ -273,7 +312,7 @@ export function CalendarScreen() {
             })}
           </View>
         )}
-      </GlassCard>
+      </View>
 
       <TransactionEditorSheet
         visible={Boolean(editingTransaction)}
@@ -281,7 +320,7 @@ export function CalendarScreen() {
         categories={vm.categories}
         onClose={() => setEditingTransactionId(null)}
         onSave={vm.saveTransactionEdit}
-        onArchive={vm.archiveTransaction}
+        onDelete={vm.deleteTransaction}
       />
     </ScreenContainer>
   );
@@ -294,6 +333,13 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     rowGap: tokens.spacing.md,
     columnGap: tokens.spacing.sm,
+  },
+  summaryBand: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: tokens.radius.card,
+    borderCurve: "continuous",
+    paddingHorizontal: tokens.spacing.lg,
+    paddingVertical: tokens.spacing.md,
   },
   summaryItem: {
     flex: 1,
@@ -313,42 +359,37 @@ const styles = StyleSheet.create({
     gap: tokens.spacing.sm,
   },
   calendarControls: {
-    minHeight: 56,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: tokens.spacing.xs,
+    gap: tokens.spacing.sm,
   },
-  navCluster: {
-    width: 78,
+  navigationRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: 6,
+    gap: tokens.spacing.sm,
   },
   navButton: {
-    width: 36,
-    height: 36,
+    flex: 1,
+    minWidth: 44,
+    height: 44,
     borderRadius: tokens.radius.utility,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     alignItems: "center",
     justifyContent: "center",
   },
-  monthTitle: {
-    flex: 1,
-    minWidth: 0,
+  monthTitleRow: {
+    minHeight: 44,
+    flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: tokens.spacing.xs,
-    gap: 5,
+    justifyContent: "space-between",
+    gap: tokens.spacing.md,
   },
   monthControlLabel: {
-    maxWidth: "100%",
-    textAlign: "center",
-    fontSize: 17,
-    lineHeight: 21,
+    flex: 1,
+    minWidth: 0,
+    fontSize: 21,
+    lineHeight: 27,
   },
   todayButton: {
-    minHeight: 24,
+    minHeight: 44,
     borderRadius: 999,
     paddingHorizontal: 10,
     flexDirection: "row",
@@ -380,9 +421,9 @@ const styles = StyleSheet.create({
   day: {
     flex: 1,
     minWidth: 0,
-    aspectRatio: 0.82,
-    borderRadius: tokens.radius.utility,
-    borderWidth: 1,
+    aspectRatio: 0.88,
+    borderRadius: 11,
+    borderWidth: StyleSheet.hairlineWidth,
     alignItems: "center",
     justifyContent: "center",
     gap: 4,
@@ -406,6 +447,16 @@ const styles = StyleSheet.create({
   dayNet: {
     fontSize: 10,
   },
+  cashflowTrack: {
+    width: "76%",
+    height: 3,
+    borderRadius: 2,
+    overflow: "hidden",
+  },
+  cashflowFill: {
+    height: "100%",
+    borderRadius: 2,
+  },
   sectionTitle: {
     fontSize: 20,
     lineHeight: 26,
@@ -416,6 +467,9 @@ const styles = StyleSheet.create({
   },
   transactionList: {
     gap: tokens.spacing.sm,
+  },
+  transactionSection: {
+    gap: tokens.spacing.md,
   },
   transactionRow: {
     minHeight: 76,

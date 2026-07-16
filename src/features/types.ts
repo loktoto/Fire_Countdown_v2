@@ -1,6 +1,9 @@
 export type TransactionType = "expense" | "income";
 export type UpdateMethod = "manual" | "google_sheet_quote" | "hybrid";
 export type QuoteStatus = "ok" | "delayed" | "stale" | "failed" | "unsupported" | "manual";
+export type QuoteProvider = "free_market" | "custom_bridge";
+export type FireCompanionId = "traveler_m" | "traveler_f";
+export type FireDestinationId = "camp" | "home" | "beach" | "mountain" | "travel" | "sunrise";
 
 export type BaseEntity = {
   id: string;
@@ -76,9 +79,12 @@ export type AssetQuoteCache = {
   fxRate?: number | null;
   asOf?: string | null;
   receivedAt: string;
-  source: "GOOGLEFINANCE" | "MANUAL" | "CACHE";
+  source: "FREE_MARKET" | "COINBASE" | "TWELVE_DATA" | "GOOGLEFINANCE" | "MANUAL" | "CACHE";
   status: QuoteStatus;
   delayMinutes?: number | null;
+  change?: number | null;
+  changePercent?: number | null;
+  marketOpen?: boolean | null;
   raw?: string | null;
 };
 
@@ -118,6 +124,7 @@ export type ProjectionScenario = BaseEntity & {
 export type QuoteBridgeSettings = {
   id: string;
   enabled: boolean;
+  provider: QuoteProvider;
   scriptUrl?: string | null;
   refreshIntervalMinutes: number;
   lastRefreshAt?: string | null;
@@ -137,6 +144,8 @@ export type FireSnapshot = {
   quoteSettings: QuoteBridgeSettings;
   themeMode: "dark" | "light";
   hapticsEnabled: boolean;
+  fireCompanionId: FireCompanionId;
+  fireDestinationId: FireDestinationId;
   currency: string;
   language: "en" | "zhHant";
 };

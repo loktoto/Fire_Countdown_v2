@@ -1,22 +1,25 @@
 import { useMutation } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
-import { getQuotes, saveQuoteToken } from "../features/quoteBridge/client";
+import { isValidQuoteBridgeUrl, saveQuoteCredential } from "../features/quoteBridge/client";
 import { useFireStore } from "../data/fireStore";
 import { deriveFireView, mainGoal } from "../engine/selectors";
+import { useQuoteRefresh } from "./useQuoteRefresh";
 import { todayIso } from "../utils/format";
 
 export function useSettingsViewModel() {
   const store = useFireStore();
+  const quoteRefresh = useQuoteRefresh();
   const {
     snapshot,
     setThemeMode,
     setHapticsEnabled,
+    setFireCompanion,
+    setFireDestination,
     setCurrency,
     setLanguage,
     updateQuoteSettings,
     updateCategory,
-    saveQuotes,
     resetSeed,
     updateGoal,
     updateMilestone,
@@ -30,22 +33,18 @@ export function useSettingsViewModel() {
   const today = todayIso();
   const fire = useMemo(() => deriveFireView(snapshot, today), [snapshot, today]);
   const [tokenDraft, setTokenDraft] = useState("");
-  const refreshQuotes = useMutation({
-    mutationFn: async () =>
-      getQuotes(snapshot.quoteSettings, goal?.baseCurrency ?? snapshot.currency),
-    onSuccess: (quotes) => saveQuotes(quotes),
+  const saveToken = useMutation({
+    mutationKey: ["save-quote-credential", snapshot.quoteSettings.provider],
+    mutationFn: async () => saveQuoteCredential(snapshot.quoteSettings.provider, tokenDraft),
+    onSuccess: () => {
+      updateQuoteSettings({ enabled: true });
+      setTokenDraft("");
+    },
   });
   const milestones = [...snapshot.milestones]
     .filter((milestone) => !milestone.archivedAt && (!goal || milestone.goalId === goal.id))
     .sort((a, b) => a.order - b.order);
   const scenarios = snapshot.scenarios.filter((scenario) => !scenario.archivedAt);
-
-  async function saveToken() {
-    if (tokenDraft.trim()) {
-      await saveQuoteToken(tokenDraft.trim());
-      setTokenDraft("");
-    }
-  }
 
   function newMilestoneDraft() {
     if (!goal) {
@@ -100,6 +99,8 @@ export function useSettingsViewModel() {
     categories: snapshot.categories.filter((category) => !category.archivedAt),
     setThemeMode,
     setHapticsEnabled,
+    setFireCompanion,
+    setFireDestination,
     setCurrency,
     setLanguage,
     updateQuoteSettings,
@@ -116,7 +117,12 @@ export function useSettingsViewModel() {
     tokenDraft,
     setTokenDraft,
     saveToken,
-    refreshQuotes,
+    quoteUrlValid:
+      snapshot.quoteSettings.provider === "free_market" ||
+      isValidQuoteBridgeUrl(snapshot.quoteSettings.scriptUrl),
+    refreshQuotes: quoteRefresh.refreshQuotes,
+    quoteAssetCount: quoteRefresh.quoteAssetCount,
+    lastRefreshAt: quoteRefresh.lastRefreshAt,
     resetSeed,
   };
 }

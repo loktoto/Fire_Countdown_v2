@@ -35,20 +35,20 @@ A release candidate is accepted only when:
 
 ### Priority
 
-| Priority | Meaning |
-|---|---|
-| P0 | Release blocker. Execute on every release candidate on iOS and Android. |
-| P1 | Core regression. Execute on every release candidate; risk-based on Web. |
-| P2 | Extended UX, compatibility, and non-blocking validation. |
+| Priority | Meaning                                                                 |
+| -------- | ----------------------------------------------------------------------- |
+| P0       | Release blocker. Execute on every release candidate on iOS and Android. |
+| P1       | Core regression. Execute on every release candidate; risk-based on Web. |
+| P2       | Extended UX, compatibility, and non-blocking validation.                |
 
 ### Defect severity
 
-| Severity | Definition |
-|---|---|
-| Blocker | App cannot launch, data is lost or corrupted, or a complete core journey cannot finish. |
+| Severity | Definition                                                                                       |
+| -------- | ------------------------------------------------------------------------------------------------ |
+| Blocker  | App cannot launch, data is lost or corrupted, or a complete core journey cannot finish.          |
 | Critical | Financial result is materially wrong, a major feature is unusable, or sensitive data is exposed. |
-| Major | Important behavior is incorrect or confusing, but a workaround exists. |
-| Minor | Cosmetic, copy, spacing, animation, or low-impact usability issue. |
+| Major    | Important behavior is incorrect or confusing, but a workaround exists.                           |
+| Minor    | Cosmetic, copy, spacing, animation, or low-impact usability issue.                               |
 
 ---
 
@@ -66,15 +66,15 @@ Record for each run:
 
 Minimum matrix:
 
-| Dimension | Required coverage |
-|---|---|
-| iOS | Current iPhone-size device plus one smaller viewport where available |
-| Android | Current Android device plus one smaller viewport where available |
-| Web | Current Chrome or Edge smoke run |
-| Theme | Dark and light |
-| Language | English and Traditional Chinese |
-| Network | Online, offline, and failed quote endpoint |
-| Persistence | Warm restart and full termination/relaunch |
+| Dimension   | Required coverage                                                    |
+| ----------- | -------------------------------------------------------------------- |
+| iOS         | Current iPhone-size device plus one smaller viewport where available |
+| Android     | Current Android device plus one smaller viewport where available     |
+| Web         | Current Chrome or Edge smoke run                                     |
+| Theme       | Dark and light                                                       |
+| Language    | English and Traditional Chinese                                      |
+| Network     | Online, offline, and failed quote endpoint                           |
+| Persistence | Warm restart and full termination/relaunch                           |
 
 ---
 
@@ -482,17 +482,17 @@ Allowed result values:
 
 Release sign-off must include:
 
-| Field | Value |
-|---|---|
-| Build / commit | |
-| iOS result | |
-| Android result | |
-| Web smoke result | |
-| P0 passed / total | |
-| P1 passed / total | |
-| Open Blocker/Critical defects | |
-| Product approval | |
-| QA approval | |
-| Final decision | Go / Conditional Go / No-Go |
+| Field                         | Value                       |
+| ----------------------------- | --------------------------- |
+| Build / commit                |                             |
+| iOS result                    |                             |
+| Android result                |                             |
+| Web smoke result              |                             |
+| P0 passed / total             |                             |
+| P1 passed / total             |                             |
+| Open Blocker/Critical defects |                             |
+| Product approval              |                             |
+| QA approval                   |                             |
+| Final decision                | Go / Conditional Go / No-Go |
 
 A failed case must include evidence, actual behavior, expected behavior, reproducibility, platform/build, severity, and a linked defect.

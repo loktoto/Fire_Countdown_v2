@@ -49,6 +49,10 @@ type ProjectionRuntime = {
 
 const dayMs = 24 * 60 * 60 * 1000;
 
+function finiteNumber(value: number | null | undefined, fallback = 0) {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
 function activeTransactions(transactions: Transaction[]) {
   return transactions.filter((transaction) => !transaction.archivedAt);
 }
@@ -112,15 +116,28 @@ function convertedQuotePrice(quote: AssetQuoteCache, baseCurrency: string) {
   return null;
 }
 
-function isoMonthDate(startDate: string, monthIndex: number) {
+export function isoMonthDate(startDate: string, monthIndex: number) {
   const date = new Date(`${startDate}T00:00:00.000Z`);
-  date.setUTCMonth(date.getUTCMonth() + monthIndex);
-  return date.toISOString().slice(0, 10);
+  if (Number.isNaN(date.getTime())) {
+    return startDate;
+  }
+
+  const anchorDay = date.getUTCDate();
+  const target = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + monthIndex, 1));
+  const lastDayOfTargetMonth = new Date(
+    Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  target.setUTCDate(Math.min(anchorDay, lastDayOfTargetMonth));
+  return target.toISOString().slice(0, 10);
 }
 
-export function dailyNet(transactions: Transaction[], date: string) {
+function matchesCurrency(transaction: Transaction, currency?: string) {
+  return !currency || normalizeCurrency(transaction.currency) === normalizeCurrency(currency);
+}
+
+export function dailyNet(transactions: Transaction[], date: string, currency?: string) {
   return activeTransactions(transactions)
-    .filter((transaction) => transaction.date === date)
+    .filter((transaction) => transaction.date === date && matchesCurrency(transaction, currency))
     .reduce(
       (total, transaction) =>
         transaction.type === "income" ? total + transaction.amount : total - transaction.amount,
@@ -128,10 +145,18 @@ export function dailyNet(transactions: Transaction[], date: string) {
     );
 }
 
-export function monthlySummary(transactions: Transaction[], year: number, month: number) {
+export function monthlySummary(
+  transactions: Transaction[],
+  year: number,
+  month: number,
+  currency?: string,
+) {
   const prefix = `${year}-${String(month).padStart(2, "0")}`;
   return activeTransactions(transactions)
-    .filter((transaction) => transaction.date.startsWith(prefix))
+    .filter(
+      (transaction) =>
+        transaction.date.startsWith(prefix) && matchesCurrency(transaction, currency),
+    )
     .reduce(
       (summary, transaction) => {
         if (transaction.type === "income") {
@@ -151,7 +176,8 @@ function resolveAssetValueFromQuote(
   quote: AssetQuoteCache | undefined,
   baseCurrency = asset.currency,
 ): AssetValueResolution {
-  const manualValue = asset.manualValue ?? 0;
+  const manualValue = Math.max(0, finiteNumber(asset.manualValue));
+  const quantity = finiteNumber(asset.quantity);
   const resolvedCurrency = normalizeCurrency(baseCurrency) || normalizeCurrency(asset.currency);
 
   if (asset.updateMethod === "manual") {
@@ -164,13 +190,13 @@ function resolveAssetValueFromQuote(
     };
   }
 
-  if (quote?.price && asset.quantity) {
+  if (quote && Number.isFinite(quote.price) && quote.price > 0 && quantity > 0) {
     const price = convertedQuotePrice(quote, resolvedCurrency);
 
     if (price) {
       return {
         assetId: asset.id,
-        value: price * asset.quantity,
+        value: price * quantity,
         currency: resolvedCurrency,
         source: "quote",
         status: quote.status,
@@ -232,7 +258,13 @@ export function totalAssets(assets: Asset[], quotes: AssetQuoteCache[], baseCurr
       return;
     }
 
-    total += resolveAssetValueFromQuote(asset, latestQuotes.get(asset.id), baseCurrency).value;
+    const resolution = resolveAssetValueFromQuote(asset, latestQuotes.get(asset.id), baseCurrency);
+    if (
+      !baseCurrency ||
+      normalizeCurrency(resolution.currency) === normalizeCurrency(baseCurrency)
+    ) {
+      total += resolution.value;
+    }
   });
 
   return total;
@@ -251,18 +283,35 @@ export function includedFireAssets(
       return;
     }
 
-    total += resolveAssetValueFromQuote(asset, latestQuotes.get(asset.id), baseCurrency).value;
+    const resolution = resolveAssetValueFromQuote(asset, latestQuotes.get(asset.id), baseCurrency);
+    if (
+      !baseCurrency ||
+      normalizeCurrency(resolution.currency) === normalizeCurrency(baseCurrency)
+    ) {
+      total += resolution.value;
+    }
   });
 
   return total;
 }
 
-export function transactionCashflowNet(transactions: Transaction[]) {
-  return activeTransactions(transactions).reduce(
-    (total, transaction) =>
-      transaction.type === "income" ? total + transaction.amount : total - transaction.amount,
-    0,
-  );
+export function transactionCashflowNet(
+  transactions: Transaction[],
+  throughDate?: string,
+  currency?: string,
+) {
+  return activeTransactions(transactions)
+    .filter(
+      (transaction) =>
+        (!throughDate || transaction.date <= throughDate) && matchesCurrency(transaction, currency),
+    )
+    .reduce(
+      (total, transaction) =>
+        transaction.type === "income"
+          ? total + finiteNumber(transaction.amount)
+          : total - finiteNumber(transaction.amount),
+      0,
+    );
 }
 
 export function weightedExpectedReturn(
@@ -279,9 +328,16 @@ export function weightedExpectedReturn(
       return;
     }
 
-    const value = resolveAssetValueFromQuote(asset, latestQuotes.get(asset.id), baseCurrency).value;
+    const resolution = resolveAssetValueFromQuote(asset, latestQuotes.get(asset.id), baseCurrency);
+    if (
+      baseCurrency &&
+      normalizeCurrency(resolution.currency) !== normalizeCurrency(baseCurrency)
+    ) {
+      return;
+    }
+    const value = resolution.value;
     denominator += value;
-    weightedTotal += value * asset.expectedAnnualReturn;
+    weightedTotal += value * finiteNumber(asset.expectedAnnualReturn);
   });
 
   if (denominator <= 0) {
@@ -292,8 +348,12 @@ export function weightedExpectedReturn(
 }
 
 export function fireTarget(goal: FireGoal, scenario?: ProjectionScenario) {
-  const spending = goal.targetMonthlySpending + (scenario?.targetSpendingAdjustment ?? 0);
-  const withdrawalRate = goal.withdrawalRate + (scenario?.withdrawalRateAdjustment ?? 0);
+  const spending = Math.max(
+    0,
+    finiteNumber(goal.targetMonthlySpending) + finiteNumber(scenario?.targetSpendingAdjustment),
+  );
+  const withdrawalRate =
+    finiteNumber(goal.withdrawalRate) + finiteNumber(scenario?.withdrawalRateAdjustment);
   return (spending * 12) / Math.max(withdrawalRate, 0.001);
 }
 
@@ -301,21 +361,31 @@ function createProjectionRuntime(input: ProjectionInput): ProjectionRuntime {
   const months = input.months ?? 600;
   const startDate = input.startDate ?? new Date().toISOString().slice(0, 10);
   const scenario = input.scenario;
-  const annualReturn = Math.max(
-    -0.95,
-    weightedExpectedReturn(input.assets, input.quotes, input.goal.baseCurrency) +
-      (scenario?.expectedReturnAdjustment ?? 0),
+  const annualReturn = Math.min(
+    10,
+    Math.max(
+      -0.95,
+      weightedExpectedReturn(input.assets, input.quotes, input.goal.baseCurrency) +
+        finiteNumber(scenario?.expectedReturnAdjustment),
+    ),
   );
   const monthlyExpectedReturn = Math.pow(1 + annualReturn, 1 / 12) - 1;
-  const monthlyInflationRate =
-    Math.pow(1 + input.goal.inflationRate + (scenario?.inflationAdjustment ?? 0), 1 / 12) - 1;
+  const annualInflation = Math.min(
+    10,
+    Math.max(
+      -0.95,
+      finiteNumber(input.goal.inflationRate) + finiteNumber(scenario?.inflationAdjustment),
+    ),
+  );
+  const monthlyInflationRate = Math.pow(1 + annualInflation, 1 / 12) - 1;
   const monthlySaving = Math.max(
     0,
-    input.goal.monthlySaving + (scenario?.monthlySavingAdjustment ?? 0),
+    finiteNumber(input.goal.monthlySaving) + finiteNumber(scenario?.monthlySavingAdjustment),
   );
   const monthlyRetirementSpending = Math.max(
     0,
-    input.goal.targetMonthlySpending + (scenario?.targetSpendingAdjustment ?? 0),
+    finiteNumber(input.goal.targetMonthlySpending) +
+      finiteNumber(scenario?.targetSpendingAdjustment),
   );
   const baseTarget = fireTarget(input.goal, scenario);
   const projectedAssets =
@@ -512,8 +582,8 @@ export function progressPercent(
   );
 }
 
-export function todayActualImpact(transactions: Transaction[], today: string) {
-  return dailyNet(transactions, today);
+export function todayActualImpact(transactions: Transaction[], today: string, currency?: string) {
+  return dailyNet(transactions, today, currency);
 }
 
 export function transactionPreviewImpact(input: {
@@ -528,8 +598,19 @@ export function transactionPreviewImpact(input: {
 }) {
   const startDate = input.startDate ?? new Date().toISOString().slice(0, 10);
   const months = input.months ?? 2400;
-  const savedTransactionDelta = transactionCashflowNet(input.transactions);
-  const draftDelta = input.draft.type === "income" ? input.draft.amount : -input.draft.amount;
+  const savedTransactionDelta = transactionCashflowNet(
+    input.transactions,
+    startDate,
+    input.goal.baseCurrency,
+  );
+  const draftAmount = finiteNumber(input.draft.amount);
+  const draftDelta =
+    input.draft.date <= startDate &&
+    normalizeCurrency(input.draft.currency) === normalizeCurrency(input.goal.baseCurrency)
+      ? input.draft.type === "income"
+        ? draftAmount
+        : -draftAmount
+      : 0;
   const baseEstimate = estimateDaysToFire({
     assets: input.assets,
     quotes: input.quotes,

@@ -1,8 +1,10 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
-import { useCallback, useRef, useState } from "react";
-import { Platform, StyleSheet, Text, TextInput, View } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AccessibilityInfo, Platform, StyleSheet, Text, TextInput, View } from "react-native";
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 
+import { AppHeader } from "../components/AppHeader";
 import { CategoryEditorSheet } from "../components/CategoryEditorSheet";
 import { CategoryGlyph } from "../components/CategoryGlyph";
 import { FireImpactCard } from "../components/FireImpactCard";
@@ -15,21 +17,23 @@ import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
 import type { Category } from "../features/types";
 import { useLogViewModel } from "../hooks/useLogViewModel";
+import { useReducedMotion } from "../hooks/useReducedMotion";
 import { useI18n } from "../i18n";
-
-function formatDateInputLabel(date: string) {
-  const [year, month, day] = date.split("-");
-  return `${day}/${month}/${year}`;
-}
+import { formatDateInputLabel } from "../utils/format";
 
 export function LogScreen() {
   const colors = useThemeColors();
   const t = useI18n();
   const vm = useLogViewModel();
+  const reducedMotion = useReducedMotion();
   const amountRef = useRef<TextInput>(null);
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [categorySheetVisible, setCategorySheetVisible] = useState(false);
   const [datePickerVisible, setDatePickerVisible] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [savedFeedback, setSavedFeedback] = useState(false);
+  const typeAccent = vm.type === "expense" ? colors.negative : colors.positive;
+  const typeAccentSoft = vm.type === "expense" ? colors.negativeSoft : colors.positiveSoft;
   const selectedCategory =
     vm.categories.find((category) => category.id === vm.categoryId) ?? vm.categories[0] ?? null;
 
@@ -39,6 +43,12 @@ export function LogScreen() {
       return () => clearTimeout(timer);
     }, []),
   );
+
+  useEffect(() => () => {
+    if (savedTimerRef.current) {
+      clearTimeout(savedTimerRef.current);
+    }
+  });
 
   function openNewCategory() {
     setEditingCategory(null);
@@ -68,8 +78,26 @@ export function LogScreen() {
     }
   }
 
+  function confirmTransaction() {
+    if (vm.confirm()) {
+      AccessibilityInfo.announceForAccessibility(t.log.transactionSaved);
+      setSavedFeedback(true);
+      if (savedTimerRef.current) {
+        clearTimeout(savedTimerRef.current);
+      }
+      savedTimerRef.current = setTimeout(() => setSavedFeedback(false), 1200);
+    }
+  }
+
   return (
     <ScreenContainer>
+      <AppHeader
+        eyebrow={t.log.kicker}
+        title={t.log.title}
+        subtitle={t.log.subtitle}
+        accentColor={typeAccent}
+      />
+
       <GlassCard compact style={styles.amountCard}>
         <Text style={[styles.amountLabel, typography.button, { color: colors.textMuted }]}>
           {t.log.amount}
@@ -81,13 +109,16 @@ export function LogScreen() {
           <TextInput
             ref={amountRef}
             value={vm.amountText}
-            onChangeText={vm.setAmountText}
+            onChangeText={(value) => {
+              setSavedFeedback(false);
+              vm.setAmountText(value);
+            }}
             keyboardType={Platform.OS === "ios" ? "decimal-pad" : "numeric"}
             inputMode="decimal"
             selectTextOnFocus
             maxLength={12}
             returnKeyType="done"
-            selectionColor={colors.primary}
+            selectionColor={typeAccent}
             placeholder="0"
             placeholderTextColor={colors.textMuted}
             style={[styles.amountInput, typography.display, { color: colors.text }]}
@@ -97,6 +128,8 @@ export function LogScreen() {
         <SegmentedControl
           value={vm.type}
           onChange={vm.setType}
+          activeColor={typeAccent}
+          activeSoftColor={typeAccentSoft}
           options={[
             { label: t.common.expense, value: "expense" },
             { label: t.common.income, value: "income" },
@@ -130,7 +163,7 @@ export function LogScreen() {
                   adjustsFontSizeToFit
                   style={[styles.dateValue, typography.title, { color: colors.text }]}
                 >
-                  {formatDateInputLabel(vm.selectedDate)}
+                  {formatDateInputLabel(vm.selectedDate, t.locale)}
                 </Text>
                 <MaterialCommunityIcons
                   name="calendar-search-outline"
@@ -199,6 +232,7 @@ export function LogScreen() {
               key={category.id}
               onPress={() => vm.setCategoryId(category.id)}
               onLongPress={() => openEditCategory(category)}
+              holdLabel={t.log.editSelectedCategory}
               accessibilityLabel={t.log.categoryA11y(category.name)}
               accessibilityState={{ selected: active }}
               haptic="selection"
@@ -241,14 +275,55 @@ export function LogScreen() {
       </View>
 
       <MotionPressable
-        onPress={vm.confirm}
-        style={[styles.confirm, { backgroundColor: colors.primary, shadowColor: colors.primary }]}
+        onPress={confirmTransaction}
+        disabled={!vm.canConfirm}
+        style={[
+          styles.confirm,
+          {
+            backgroundColor: savedFeedback
+              ? colors.positiveSoft
+              : vm.canConfirm
+                ? colors.primaryFill
+                : colors.surfaceElevated,
+            borderColor: savedFeedback
+              ? colors.positive
+              : vm.canConfirm
+                ? colors.primary
+                : colors.surfaceBorder,
+            boxShadow: vm.canConfirm && !savedFeedback ? `0 8px 18px ${colors.shadow}` : "none",
+          },
+        ]}
         accessibilityLabel={t.log.confirmTransaction}
+        accessibilityState={{ disabled: !vm.canConfirm }}
         haptic="medium"
       >
-        <Text style={[styles.confirmText, typography.button, { color: colors.onPrimary }]}>
-          {t.log.confirmTransactionCta}
-        </Text>
+        <View accessible accessibilityLiveRegion="polite" style={styles.confirmContent}>
+          <Animated.View
+            key={savedFeedback ? "saved" : "confirm"}
+            entering={reducedMotion ? undefined : FadeIn.duration(180)}
+            exiting={reducedMotion ? undefined : FadeOut.duration(100)}
+            style={styles.confirmContent}
+          >
+            {savedFeedback ? (
+              <MaterialCommunityIcons name="check" size={19} color={colors.positive} />
+            ) : null}
+            <Text
+              style={[
+                styles.confirmText,
+                typography.button,
+                {
+                  color: savedFeedback
+                    ? colors.positive
+                    : vm.canConfirm
+                      ? colors.onPrimary
+                      : colors.textMuted,
+                },
+              ]}
+            >
+              {savedFeedback ? t.log.transactionSaved : t.log.confirmTransactionCta}
+            </Text>
+          </Animated.View>
+        </View>
       </MotionPressable>
 
       <CategoryEditorSheet
@@ -272,8 +347,8 @@ export function LogScreen() {
 
 const styles = StyleSheet.create({
   amountCard: {
-    paddingTop: tokens.spacing.md,
-    paddingBottom: tokens.spacing.md,
+    padding: tokens.spacing.lg,
+    gap: tokens.spacing.md,
   },
   amountLabel: {
     fontSize: 12,
@@ -308,9 +383,9 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   editButton: {
-    minHeight: 34,
-    borderWidth: 1,
-    borderRadius: tokens.radius.pill,
+    minHeight: 44,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: tokens.radius.utility,
     paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
@@ -326,7 +401,7 @@ const styles = StyleSheet.create({
     columnGap: 6,
   },
   category: {
-    minHeight: 42,
+    minHeight: 44,
     borderWidth: 1,
     borderRadius: tokens.radius.pill,
     paddingLeft: 6,
@@ -348,7 +423,7 @@ const styles = StyleSheet.create({
   },
   dateStepper: {
     minHeight: 52,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderRadius: tokens.radius.utility,
     paddingHorizontal: tokens.spacing.sm,
     flexDirection: "row",
@@ -356,9 +431,9 @@ const styles = StyleSheet.create({
     gap: tokens.spacing.sm,
   },
   dateArrow: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -382,7 +457,7 @@ const styles = StyleSheet.create({
   },
   noteInline: {
     minHeight: 44,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderRadius: tokens.radius.utility,
     paddingHorizontal: tokens.spacing.sm,
     flexDirection: "row",
@@ -398,14 +473,18 @@ const styles = StyleSheet.create({
   },
   confirm: {
     minHeight: 52,
-    borderRadius: tokens.radius.pill,
+    borderRadius: tokens.radius.utility,
+    borderWidth: StyleSheet.hairlineWidth,
     alignItems: "center",
     justifyContent: "center",
-    shadowOpacity: 0.2,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
   },
   confirmText: {
     fontSize: 14,
+  },
+  confirmContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: tokens.spacing.sm,
   },
 });

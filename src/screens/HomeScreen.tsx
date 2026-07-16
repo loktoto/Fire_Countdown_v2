@@ -1,9 +1,9 @@
-import { useFocusEffect, useNavigation } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
+import { AppHeader } from "../components/AppHeader";
 import { FireProgressRing } from "../components/FireProgressRing";
-import { GlassCard } from "../components/GlassCard";
 import { MilestoneJourney } from "../components/MilestoneJourney";
 import { MotionPressable } from "../components/MotionPressable";
 import { ScreenContainer } from "../components/ScreenContainer";
@@ -17,9 +17,6 @@ import { money, percent, signedMoney } from "../utils/format";
 export function HomeScreen() {
   const colors = useThemeColors();
   const t = useI18n();
-  const navigation = useNavigation() as unknown as {
-    addListener: (event: "tabPress", callback: () => void) => () => void;
-  };
   const vm = useHomeViewModel();
   const [assetAmountsHidden, setAssetAmountsHidden] = useState(false);
   const [ringMotionKey, setRingMotionKey] = useState(0);
@@ -42,47 +39,41 @@ export function HomeScreen() {
     }, [replayRingMotion]),
   );
 
-  useEffect(
-    () => navigation.addListener("tabPress", replayRingMotion),
-    [navigation, replayRingMotion],
-  );
-
   function toggleAssetAmounts() {
     setAssetAmountsHidden((current) => !current);
   }
 
   return (
     <ScreenContainer>
-      <View style={styles.topBar}>
-        <View>
-          <Text style={[styles.kicker, typography.button, { color: colors.primary }]}>
-            {t.home.kicker}
-          </Text>
-          <Text style={[styles.title, typography.display, { color: colors.text }]}>
-            {t.home.title}
-          </Text>
-        </View>
+      <AppHeader eyebrow={t.home.kicker} title={t.home.title} />
+
+      <View style={[styles.countdownStage, { borderBottomColor: colors.surfaceBorder }]}>
+        <MotionPressable
+          onPress={replayRingMotion}
+          accessibilityLabel={`${t.home.daysToFire} ${daysLabel}. ${percent(vm.progress)}.`}
+          accessibilityHint={t.home.replayCountdown}
+          style={styles.ringReplay}
+        >
+          <FireProgressRing
+            accessibilityLabel={`${t.home.daysToFire} ${daysLabel}. ${percent(vm.progress)}.`}
+            motionKey={ringMotionKey}
+            progress={vm.progress}
+            centerLabel={t.home.daysToFire}
+            centerValue={daysLabel}
+          />
+        </MotionPressable>
+
+        <Text style={[styles.ringCaption, typography.body, { color: colors.textSubtle }]}>
+          {t.home.completeTarget(percent(vm.progress), money(vm.target, goalCurrency))}
+        </Text>
       </View>
 
-      <MotionPressable
-        onPress={replayRingMotion}
-        accessibilityLabel={t.home.replayCountdown}
-        style={styles.ringReplay}
+      <View
+        style={[
+          styles.statBand,
+          { backgroundColor: colors.surface, borderColor: colors.surfaceBorder },
+        ]}
       >
-        <FireProgressRing
-          accessibilityLabel={`${t.home.daysToFire} ${daysLabel}. ${percent(vm.progress)}.`}
-          motionKey={ringMotionKey}
-          progress={vm.progress}
-          centerLabel={t.home.daysToFire}
-          centerValue={daysLabel}
-        />
-      </MotionPressable>
-
-      <Text style={[styles.ringCaption, typography.body, { color: colors.textMuted }]}>
-        {t.home.completeTarget(percent(vm.progress), money(vm.target, goalCurrency))}
-      </Text>
-
-      <GlassCard>
         <View style={styles.statStrip}>
           <MotionPressable
             onPress={toggleAssetAmounts}
@@ -102,6 +93,7 @@ export function HomeScreen() {
               {totalAssetValue}
             </Text>
           </MotionPressable>
+          <View style={[styles.statDivider, { backgroundColor: colors.divider }]} />
           <MotionPressable
             onPress={toggleAssetAmounts}
             accessibilityLabel={assetVisibilityLabel}
@@ -125,9 +117,9 @@ export function HomeScreen() {
           label={t.home.todayImpact(signedMoney(vm.todayImpact, goalCurrency))}
           tone={vm.todayImpact >= 0 ? "positive" : "negative"}
         />
-      </GlassCard>
+      </View>
 
-      <GlassCard>
+      <View style={styles.journeySection}>
         <Text style={[styles.sectionTitle, typography.title, { color: colors.text }]}>
           {t.home.milestoneJourney}
         </Text>
@@ -136,46 +128,46 @@ export function HomeScreen() {
           currentAmount={vm.includedAssets}
           items={vm.milestones}
         />
-      </GlassCard>
+      </View>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  topBar: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  countdownStage: {
     alignItems: "center",
-    gap: tokens.spacing.md,
-  },
-  kicker: {
-    fontSize: 12,
-    lineHeight: 16,
-    textTransform: "uppercase",
-  },
-  title: {
-    fontSize: 30,
-    lineHeight: 36,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingBottom: tokens.spacing.xl,
   },
   ringReplay: {
     alignSelf: "center",
     borderRadius: 130,
   },
   ringCaption: {
+    maxWidth: 320,
     fontSize: 14,
     lineHeight: 20,
     textAlign: "center",
   },
   statStrip: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    rowGap: tokens.spacing.md,
+    alignItems: "stretch",
     columnGap: tokens.spacing.md,
+  },
+  statBand: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: tokens.radius.card,
+    borderCurve: "continuous",
+    padding: tokens.spacing.lg,
+    gap: tokens.spacing.md,
   },
   statItem: {
     flex: 1,
-    minWidth: 132,
+    minWidth: 0,
+    justifyContent: "center",
+  },
+  statDivider: {
+    width: StyleSheet.hairlineWidth,
   },
   statLabel: {
     fontSize: 12,
@@ -189,5 +181,8 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     lineHeight: 26,
+  },
+  journeySection: {
+    gap: tokens.spacing.md,
   },
 });

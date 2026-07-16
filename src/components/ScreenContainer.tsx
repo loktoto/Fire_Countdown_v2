@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { enter } from "../design/motion";
 import { tokens } from "../design/tokens";
 import { useThemeColors } from "../design/theme";
+import { useReducedMotion } from "../hooks/useReducedMotion";
 
 export function ScreenContainer({
   children,
@@ -17,14 +18,15 @@ export function ScreenContainer({
 }) {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
+  const reducedMotion = useReducedMotion();
   const content = (
     <Animated.View
-      entering={enter()}
+      entering={reducedMotion ? undefined : enter()}
       style={[
         styles.inner,
         {
-          paddingTop: Math.max(insets.top + tokens.spacing.lg, tokens.spacing.xl),
-          paddingBottom: Math.max(insets.bottom + 116, 132),
+          paddingTop: Math.max(insets.top + 16, tokens.spacing.xl),
+          paddingBottom: Math.max(insets.bottom + 100, 116),
         },
       ]}
     >
@@ -37,7 +39,9 @@ export function ScreenContainer({
       <StatusBar style={colors.mode === "dark" ? "light" : "dark"} />
       {scroll ? (
         <ScrollView
-          contentInsetAdjustmentBehavior="automatic"
+          contentInsetAdjustmentBehavior="never"
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
@@ -55,8 +59,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   inner: {
-    gap: 26,
-    paddingHorizontal: tokens.spacing.lg,
+    width: "100%",
+    maxWidth: 720,
+    alignSelf: "center",
+    gap: 24,
+    paddingHorizontal: 20,
   },
   scrollContent: {
     flexGrow: 1,

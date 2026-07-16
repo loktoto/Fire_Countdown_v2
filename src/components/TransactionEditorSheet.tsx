@@ -11,15 +11,19 @@ import {
   TextInput,
   View,
 } from "react-native";
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 
 import { CategoryGlyph } from "./CategoryGlyph";
+import { LogDatePickerSheet } from "./LogDatePickerSheet";
 import { MotionPressable } from "./MotionPressable";
 import { SegmentedControl } from "./SegmentedControl";
+import { sheetBackdropEnter, sheetBackdropExit, sheetEnter, sheetExit } from "../design/motion";
 import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
 import type { Category, Transaction, TransactionType } from "../features/types";
+import { useReducedMotion } from "../hooks/useReducedMotion";
 import { useI18n } from "../i18n";
+import { formatDateInputLabel, todayIso } from "../utils/format";
 
 type CalendarTransaction = Transaction & {
   category: Category | null;
@@ -53,16 +57,17 @@ export function TransactionEditorSheet({
   categories,
   onClose,
   onSave,
-  onArchive,
+  onDelete,
 }: {
   visible: boolean;
   transaction: CalendarTransaction | null;
   categories: Category[];
   onClose: () => void;
   onSave: (id: string, patch: TransactionPatch) => void;
-  onArchive: (id: string) => void;
+  onDelete: (id: string) => void;
 }) {
   const colors = useThemeColors();
+  const reducedMotion = useReducedMotion();
 
   if (!visible || !transaction) {
     return null;
@@ -75,15 +80,16 @@ export function TransactionEditorSheet({
         style={styles.modalRoot}
       >
         <Animated.View
-          entering={FadeIn.duration(160)}
-          exiting={FadeOut.duration(120)}
+          entering={reducedMotion ? undefined : sheetBackdropEnter}
+          exiting={reducedMotion ? undefined : sheetBackdropExit}
           style={styles.scrim}
         >
           <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         </Animated.View>
         <Animated.View
-          entering={SlideInDown.duration(260)}
-          exiting={SlideOutDown.duration(180)}
+          accessibilityViewIsModal
+          entering={reducedMotion ? undefined : sheetEnter}
+          exiting={reducedMotion ? undefined : sheetExit}
           style={[
             styles.sheet,
             {
@@ -98,7 +104,7 @@ export function TransactionEditorSheet({
             categories={categories}
             onClose={onClose}
             onSave={onSave}
-            onArchive={onArchive}
+            onDelete={onDelete}
           />
         </Animated.View>
       </KeyboardAvoidingView>
@@ -111,13 +117,13 @@ function TransactionEditorContent({
   categories,
   onClose,
   onSave,
-  onArchive,
+  onDelete,
 }: {
   transaction: CalendarTransaction;
   categories: Category[];
   onClose: () => void;
   onSave: (id: string, patch: TransactionPatch) => void;
-  onArchive: (id: string) => void;
+  onDelete: (id: string) => void;
 }) {
   const colors = useThemeColors();
   const t = useI18n();
@@ -126,6 +132,8 @@ function TransactionEditorContent({
   const [categoryId, setCategoryId] = useState(transaction.categoryId);
   const [date, setDate] = useState(transaction.date);
   const [note, setNote] = useState(transaction.note ?? "");
+  const [datePickerVisible, setDatePickerVisible] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const categoriesForType = categories.filter((category) => category.type === type);
   const activeCategoryId = categoriesForType.some((category) => category.id === categoryId)
     ? categoryId
@@ -148,8 +156,13 @@ function TransactionEditorContent({
     onClose();
   }
 
-  function archive() {
-    onArchive(transaction.id);
+  function deleteRecord() {
+    if (!confirmingDelete) {
+      setConfirmingDelete(true);
+      return;
+    }
+
+    onDelete(transaction.id);
     onClose();
   }
 
@@ -265,24 +278,27 @@ function TransactionEditorContent({
           <Text style={[styles.fieldLabel, typography.button, { color: colors.textMuted }]}>
             {t.common.date}
           </Text>
-          <TextInput
-            value={date}
-            onChangeText={setDate}
-            maxLength={10}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor={colors.textMuted}
-            selectionColor={colors.primary}
+          <MotionPressable
+            onPress={() => setDatePickerVisible(true)}
+            haptic="selection"
+            accessibilityLabel={t.transactions.transactionDate}
             style={[
-              styles.input,
-              typography.body,
+              styles.dateButton,
               {
-                color: colors.text,
-                borderColor: isIsoDate(date) ? colors.surfaceBorder : colors.negative,
+                borderColor: colors.surfaceBorder,
                 backgroundColor: colors.backgroundAlt,
               },
             ]}
-            accessibilityLabel={t.transactions.transactionDate}
-          />
+          >
+            <Text style={[styles.dateText, typography.button, { color: colors.text }]}>
+              {formatDateInputLabel(date, t.locale)}
+            </Text>
+            <MaterialCommunityIcons
+              name="calendar-month-outline"
+              size={20}
+              color={colors.primary}
+            />
+          </MotionPressable>
         </View>
 
         <View style={styles.fieldGroup}>
@@ -313,15 +329,26 @@ function TransactionEditorContent({
 
         <View style={styles.actions}>
           <MotionPressable
-            onPress={archive}
-            accessibilityLabel={t.transactions.archiveTransaction}
-            style={[styles.secondaryAction, { borderColor: colors.negative }]}
+            onPress={deleteRecord}
+            haptic={confirmingDelete ? "medium" : "light"}
+            accessibilityLabel={
+              confirmingDelete
+                ? t.transactions.confirmDeleteTransaction
+                : t.transactions.deleteTransaction
+            }
+            style={[
+              styles.secondaryAction,
+              {
+                borderColor: colors.negative,
+                backgroundColor: confirmingDelete ? `${colors.negative}18` : "transparent",
+              },
+            ]}
           >
-            <MaterialCommunityIcons name="archive-outline" size={18} color={colors.negative} />
+            <MaterialCommunityIcons name="delete-outline" size={18} color={colors.negative} />
             <Text
               style={[styles.secondaryActionText, typography.button, { color: colors.negative }]}
             >
-              {t.common.archive}
+              {confirmingDelete ? t.common.confirmDelete : t.common.delete}
             </Text>
           </MotionPressable>
           <MotionPressable
@@ -346,6 +373,14 @@ function TransactionEditorContent({
           </MotionPressable>
         </View>
       </ScrollView>
+
+      <LogDatePickerSheet
+        visible={datePickerVisible}
+        selectedDate={date}
+        onSelect={setDate}
+        onToday={() => setDate(todayIso())}
+        onClose={() => setDatePickerVisible(false)}
+      />
     </>
   );
 }
@@ -390,9 +425,9 @@ const styles = StyleSheet.create({
     fontSize: 26,
   },
   closeButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -433,7 +468,7 @@ const styles = StyleSheet.create({
     gap: tokens.spacing.sm,
   },
   category: {
-    minHeight: 42,
+    minHeight: 44,
     maxWidth: "48%",
     borderWidth: 1,
     borderRadius: tokens.radius.pill,
@@ -454,6 +489,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: tokens.spacing.md,
     paddingVertical: 0,
     fontSize: 15,
+  },
+  dateButton: {
+    minHeight: 50,
+    borderWidth: 1,
+    borderRadius: tokens.radius.utility,
+    paddingHorizontal: tokens.spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: tokens.spacing.sm,
+  },
+  dateText: {
+    flex: 1,
+    fontSize: 15,
+    lineHeight: 20,
+    fontVariant: ["tabular-nums"],
   },
   noteInput: {
     minHeight: 78,
