@@ -38,7 +38,7 @@ export function fireImpactPresentation(
 }
 
 export function formatImpactDayValue(days: number, locale = "en-US") {
-  const decimals = days < 0.01 ? 4 : days < 10 ? 2 : 1;
+  const decimals = days < 0.01 ? 4 : days < 1 ? 2 : days < 10 ? 1 : 0;
   return days.toLocaleString(locale, {
     maximumFractionDigits: decimals,
     minimumFractionDigits: 0,
@@ -62,4 +62,8 @@ export function formatImpactPercent(percent: number) {
     maximumFractionDigits: decimals,
     minimumFractionDigits: decimals,
   })}%`;
+}
+
+export function shouldShowImpactPercent(amount: number) {
+  return Number.isFinite(amount) && amount > 0;
 }

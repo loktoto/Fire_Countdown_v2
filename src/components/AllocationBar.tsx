@@ -7,15 +7,6 @@ import { typography, useThemeColors } from "../design/theme";
 import { useReducedMotion } from "../hooks/useReducedMotion";
 import { useI18n } from "../i18n";
 
-const darkPalette = [
-  tokens.color.cyan,
-  "#93A3B8",
-  tokens.color.ochre,
-  tokens.color.indigo,
-  "#C98068",
-  tokens.color.emerald,
-];
-
 function formatAllocationLabel(label: string) {
   return label
     .replace(/[_-]+/g, " ")
@@ -64,10 +55,14 @@ export function AllocationBar({
   const colors = useThemeColors();
   const t = useI18n();
   const reducedMotion = useReducedMotion();
-  const palette =
-    colors.mode === "dark"
-      ? darkPalette
-      : [colors.primary, "#62748A", colors.target, colors.projection, "#A75D45", colors.positive];
+  const palette = [
+    colors.chartEtf,
+    colors.chartCash,
+    colors.chartRealEstate,
+    colors.chartBlue,
+    colors.chartCoral,
+    colors.chartSage,
+  ];
   const allocation = allocationPresentation(segments);
   const visibleSegments = allocation.rows.map((segment, index) => ({
     ...segment,
@@ -128,6 +123,9 @@ export function AllocationBar({
       style={styles.root}
     >
       <View style={styles.leadMetric}>
+        <Text style={[styles.leadEyebrow, typography.button, { color: colors.textMuted }]}>
+          {t.portfolio.largestAllocation}
+        </Text>
         <Text style={[styles.leadValue, typography.display, { color: colors.text }]}>
           {percentages[dominantIndex] ?? 0}%
         </Text>
@@ -182,7 +180,7 @@ export function AllocationBar({
                 : undefined,
             ]}
           >
-            <View style={[styles.colorRail, { backgroundColor: segment.color }]} />
+            <View style={[styles.colorDot, { backgroundColor: segment.color }]} />
             <Text
               numberOfLines={1}
               style={[styles.ledgerLabel, typography.bodyMedium, { color: colors.text }]}
@@ -212,6 +210,11 @@ const styles = StyleSheet.create({
   leadMetric: {
     alignItems: "flex-start",
     gap: 2,
+  },
+  leadEyebrow: {
+    fontSize: 12,
+    lineHeight: 18,
+    textTransform: "uppercase",
   },
   leadValue: {
     fontSize: 42,
@@ -243,10 +246,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: tokens.spacing.md,
   },
-  colorRail: {
-    width: 4,
-    height: 26,
-    borderRadius: 2,
+  colorDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
   ledgerLabel: {
     flex: 1,

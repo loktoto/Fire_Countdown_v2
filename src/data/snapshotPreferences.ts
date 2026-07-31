@@ -248,7 +248,10 @@ export function hydrateSnapshotPreferences(parsed: Partial<FireSnapshot>): FireS
     milestones: validItems(raw.milestones, isMilestone, seedSnapshot.milestones),
     scenarios: requiredItems(raw.scenarios, isScenario, seedSnapshot.scenarios),
     quoteSettings: hydrateQuoteSettings(raw.quoteSettings),
-    themeMode: raw.themeMode === "light" || raw.themeMode === "dark" ? raw.themeMode : "dark",
+    themeMode:
+      raw.themeMode === "system" || raw.themeMode === "light" || raw.themeMode === "dark"
+        ? raw.themeMode
+        : "dark",
     hapticsEnabled: typeof raw.hapticsEnabled === "boolean" ? raw.hapticsEnabled : true,
     fireCompanionId: companionIds.has(raw.fireCompanionId as FireSnapshot["fireCompanionId"])
       ? (raw.fireCompanionId as FireSnapshot["fireCompanionId"])

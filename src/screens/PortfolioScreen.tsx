@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 
 import { AllocationBar } from "../components/AllocationBar";
 import { AppHeader } from "../components/AppHeader";
@@ -17,8 +17,10 @@ import {
 import { GlassCard } from "../components/GlassCard";
 import { HeroMetric } from "../components/HeroMetric";
 import { MotionPressable } from "../components/MotionPressable";
-import { ScreenContainer } from "../components/ScreenContainer";
+import { getPortfolioLayout, portfolioAssetColorRole } from "../components/portfolioPresentation";
+import { ScreenScaffold } from "../components/ScreenScaffold";
 import { StatusBadge } from "../components/StatusBadge";
+import { TimeLensValue } from "../components/TimeLens";
 import { resolveAssetValue } from "../engine/fireEngine";
 import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
@@ -45,6 +47,7 @@ export function PortfolioScreen() {
   const t = useI18n();
   const router = useRouter();
   const vm = usePortfolioViewModel();
+  const { width, fontScale } = useWindowDimensions();
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
   const [creatingAsset, setCreatingAsset] = useState(false);
   const [milestoneListOpen, setMilestoneListOpen] = useState(false);
@@ -70,12 +73,16 @@ export function PortfolioScreen() {
   const quoteStatus = vm.refreshQuotes.isPending
     ? t.portfolio.pricesRefreshing
     : quoteError
-      ? t.portfolio.pricesCached
+      ? t.portfolio.pricesCached(lastQuoteUpdate)
       : !vm.quoteEnabled
         ? t.portfolio.pricesDisabled
         : lastQuoteUpdate
           ? t.portfolio.pricesUpdated(lastQuoteUpdate)
           : t.portfolio.pricesNeverUpdated;
+  const { stackAssetRows, stackSectionHeaders, stackQuickActions } = getPortfolioLayout(
+    width,
+    fontScale,
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -109,27 +116,6 @@ export function PortfolioScreen() {
         return t.assets.classOptions.business;
       case "custom":
         return t.assets.classOptions.custom;
-    }
-  }
-
-  function assetClassColor(assetClass: Asset["assetClass"]) {
-    switch (assetClass) {
-      case "cash":
-      case "business":
-        return colors.positive;
-      case "stock":
-      case "bond":
-      case "pension":
-        return colors.projection;
-      case "crypto":
-      case "private_investment":
-        return colors.target;
-      case "real_estate":
-      case "custom":
-        return colors.textSubtle;
-      case "etf":
-      default:
-        return colors.primary;
     }
   }
 
@@ -265,7 +251,7 @@ export function PortfolioScreen() {
   }
 
   return (
-    <ScreenContainer>
+    <ScreenScaffold>
       <AppHeader
         eyebrow={t.portfolio.kicker}
         title={t.portfolio.title}
@@ -274,6 +260,7 @@ export function PortfolioScreen() {
           <MotionPressable
             onPress={() => router.push("/settings")}
             accessibilityLabel={t.portfolio.settings}
+            accessibilityRole="button"
             style={[
               styles.settingsButton,
               { backgroundColor: colors.surfaceElevated, borderColor: colors.surfaceBorder },
@@ -289,11 +276,13 @@ export function PortfolioScreen() {
           label={t.portfolio.totalAssets}
           value={totalAssetValue}
           caption={t.portfolio.includedCaption(includedAssetValue, percent(vm.weightedReturn))}
+          timeLens={{ amount: vm.totalAssets, kind: "asset", disabled: assetAmountsHidden }}
         />
         <MotionPressable
           onPress={toggleAssetAmounts}
           accessibilityLabel={assetVisibilityLabel}
-          accessibilityState={{ selected: assetAmountsHidden }}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: assetAmountsHidden }}
           hitSlop={8}
           style={[
             styles.visibilityButton,
@@ -334,6 +323,7 @@ export function PortfolioScreen() {
             {t.portfolio.marketPrices}
           </Text>
           <Text
+            accessibilityLiveRegion="polite"
             numberOfLines={2}
             style={[styles.marketStatus, typography.body, { color: colors.textMuted }]}
           >
@@ -344,6 +334,7 @@ export function PortfolioScreen() {
           onPress={() => (vm.quoteEnabled ? vm.refreshQuotes.mutate() : router.push("/settings"))}
           disabled={vm.refreshQuotes.isPending}
           accessibilityLabel={t.portfolio.refreshPrices}
+          accessibilityRole="button"
           style={[styles.marketRefresh, { borderColor: colors.surfaceBorder }]}
           haptic="selection"
         >
@@ -374,16 +365,23 @@ export function PortfolioScreen() {
       </View>
 
       <View style={styles.assetsSection}>
-        <View style={styles.sectionHeader}>
+        <View
+          style={[
+            styles.sectionHeader,
+            stackSectionHeaders ? styles.sectionHeaderStacked : undefined,
+          ]}
+        >
           <Text style={[styles.sectionTitle, typography.title, { color: colors.text }]}>
             {t.portfolio.assets}
           </Text>
           <MotionPressable
             onPress={addAsset}
             accessibilityLabel={t.assets.addAsset}
+            accessibilityRole="button"
             style={styles.headerAction}
           >
-            <Text style={[typography.button, { color: colors.primary }]}>{t.common.add}</Text>
+            <MaterialCommunityIcons name="plus" size={18} color={colors.primary} />
+            <Text style={[typography.button, { color: colors.primary }]}>{t.assets.addAsset}</Text>
           </MotionPressable>
         </View>
         <View
@@ -398,15 +396,20 @@ export function PortfolioScreen() {
               .filter((quote) => quote.assetId === asset.id)
               .sort((a, b) => Date.parse(b.receivedAt) - Date.parse(a.receivedAt))[0];
             const quoteChange = latestQuote?.changePercent;
-            const assetAccent = assetClassColor(asset.assetClass);
+            const assetAccent = colors[portfolioAssetColorRole(asset.assetClass)];
             return (
               <View
                 key={asset.id}
-                style={[styles.assetRow, { borderBottomColor: colors.surfaceBorder }]}
+                style={[
+                  styles.assetRow,
+                  stackAssetRows ? styles.assetRowStacked : undefined,
+                  { borderBottomColor: colors.surfaceBorder },
+                ]}
               >
                 <MotionPressable
                   onPress={() => openAssetEditor(asset)}
                   accessibilityLabel={t.portfolio.editAsset(asset.name)}
+                  accessibilityRole="button"
                   style={styles.assetMain}
                 >
                   <View style={[styles.assetGlyph, { backgroundColor: `${assetAccent}18` }]}>
@@ -421,8 +424,8 @@ export function PortfolioScreen() {
                       {asset.name}
                     </Text>
                     <Text style={[styles.assetMeta, typography.body, { color: colors.textMuted }]}>
-                      {assetClassLabel(asset.assetClass)} · {percent(asset.expectedAnnualReturn)}{" "}
-                      {t.portfolio.expected}
+                      {assetClassLabel(asset.assetClass)} ·{" "}
+                      {t.portfolio.expectedAnnualReturn(percent(asset.expectedAnnualReturn))}
                     </Text>
                     <View style={styles.assetStatusRow}>
                       <StatusBadge
@@ -438,44 +441,51 @@ export function PortfolioScreen() {
                               ? t.portfolio.manualFallback
                               : t.portfolio.manualValue
                         }
-                        tone={resolved.source === "quote" ? "primary" : "neutral"}
+                        tone="neutral"
                       />
                       {resolved.source === "quote" && quoteChange != null ? (
                         <Text
                           style={[
                             styles.quoteChange,
                             typography.button,
-                            { color: quoteChange >= 0 ? colors.positive : colors.negative },
+                            {
+                              color:
+                                quoteChange > 0
+                                  ? colors.positive
+                                  : quoteChange < 0
+                                    ? colors.negative
+                                    : colors.textMuted,
+                            },
                           ]}
                         >
                           {t.portfolio.priceChange(
-                            `${quoteChange >= 0 ? "+" : ""}${percent(quoteChange)}`,
+                            `${quoteChange > 0 ? "+" : ""}${percent(quoteChange)}`,
                           )}
                         </Text>
                       ) : null}
                     </View>
                   </View>
                 </MotionPressable>
-                <View style={styles.assetSide}>
-                  <MotionPressable
-                    onPress={() => openAssetEditor(asset)}
-                    accessibilityLabel={t.portfolio.editAssetValue(asset.name)}
-                    hitSlop={8}
-                    style={styles.assetValueButton}
-                  >
-                    <Text
-                      numberOfLines={1}
-                      adjustsFontSizeToFit
-                      style={[styles.assetValue, typography.title, { color: colors.text }]}
-                    >
-                      {privateMoney(resolved.value, resolved.currency)}
-                    </Text>
+                <View
+                  style={[styles.assetSide, stackAssetRows ? styles.assetSideStacked : undefined]}
+                >
+                  <View style={styles.assetValueButton}>
+                    <TimeLensValue
+                      amount={resolved.value}
+                      moneyText={privateMoney(resolved.value, resolved.currency)}
+                      kind="asset"
+                      disabled={assetAmountsHidden}
+                      onPress={() => openAssetEditor(asset)}
+                      accessibilityLabel={t.portfolio.editAssetValue(asset.name)}
+                      style={styles.assetValueLens}
+                      textStyle={[styles.assetValue, typography.title, { color: colors.text }]}
+                    />
                     <MaterialCommunityIcons
                       name="pencil-outline"
                       size={15}
                       color={colors.primary}
                     />
-                  </MotionPressable>
+                  </View>
                   <MotionPressable
                     onPress={() =>
                       vm.updateAsset(asset.id, { includeInFire: !asset.includeInFire })
@@ -511,7 +521,7 @@ export function PortfolioScreen() {
                         { color: asset.includeInFire ? colors.positive : colors.textMuted },
                       ]}
                     >
-                      {asset.includeInFire ? t.common.included : t.common.excluded}
+                      {asset.includeInFire ? t.assets.includedInFire : t.assets.excludedFromFire}
                     </Text>
                   </MotionPressable>
                 </View>
@@ -527,7 +537,12 @@ export function PortfolioScreen() {
       </View>
 
       <GlassCard>
-        <View style={styles.sectionHeader}>
+        <View
+          style={[
+            styles.sectionHeader,
+            stackSectionHeaders ? styles.sectionHeaderStacked : undefined,
+          ]}
+        >
           <Text style={[styles.sectionTitle, typography.title, { color: colors.text }]}>
             {t.portfolio.fireSettings}
           </Text>
@@ -544,16 +559,19 @@ export function PortfolioScreen() {
           value={currentAgeLabel}
           onPress={() => setFirePlanEditorOpen(true)}
         />
-        <View style={styles.quickActions}>
+        <View
+          style={[styles.quickActions, stackQuickActions ? styles.quickActionsStacked : undefined]}
+        >
           <MotionPressable
             onPress={() => setScenarioListOpen(true)}
             accessibilityLabel={t.firePlan.editFireMethods}
+            accessibilityRole="button"
             haptic="selection"
             style={[
               styles.quickAction,
               {
-                backgroundColor: `${colors.primary}14`,
-                borderColor: colors.primary,
+                backgroundColor: colors.backgroundAlt,
+                borderColor: colors.surfaceBorder,
               },
             ]}
           >
@@ -561,7 +579,7 @@ export function PortfolioScreen() {
             <Text
               numberOfLines={1}
               adjustsFontSizeToFit
-              style={[styles.quickActionText, typography.button, { color: colors.primary }]}
+              style={[styles.quickActionText, typography.button, { color: colors.text }]}
             >
               {t.firePlan.methodShortcut}
             </Text>
@@ -569,6 +587,7 @@ export function PortfolioScreen() {
           <MotionPressable
             onPress={() => setMilestoneListOpen(true)}
             accessibilityLabel={t.firePlan.editMilestones}
+            accessibilityRole="button"
             haptic="selection"
             style={[
               styles.quickAction,
@@ -624,6 +643,7 @@ export function PortfolioScreen() {
       <MilestoneEditorSheet
         visible={editingMilestone !== null}
         milestone={editingMilestone}
+        currency={goalCurrency}
         onClose={closeMilestoneEditor}
         onSave={saveMilestone}
         onArchive={creatingMilestone ? undefined : archiveMilestone}
@@ -637,7 +657,7 @@ export function PortfolioScreen() {
         onSave={saveScenario}
         onArchive={creatingScenario || vm.scenarios.length <= 1 ? undefined : archiveScenario}
       />
-    </ScreenContainer>
+    </ScreenScaffold>
   );
 }
 
@@ -649,16 +669,16 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 0,
     right: 0,
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: tokens.radius.utility,
     alignItems: "center",
     justifyContent: "center",
   },
   settingsButton: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: tokens.radius.utility,
     borderCurve: "continuous",
@@ -696,8 +716,8 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
   marketRefresh: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: tokens.radius.utility,
     alignItems: "center",
@@ -707,12 +727,18 @@ const styles = StyleSheet.create({
     minHeight: 44,
     justifyContent: "center",
     paddingHorizontal: tokens.spacing.xs,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     gap: tokens.spacing.md,
+  },
+  sectionHeaderStacked: {
+    alignItems: "flex-start",
   },
   allocationSection: {
     gap: tokens.spacing.md,
@@ -741,8 +767,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: tokens.spacing.md,
   },
+  quickActionsStacked: {
+    flexDirection: "column",
+  },
   quickAction: {
-    minHeight: 46,
+    minHeight: 48,
     flex: 1,
     minWidth: 0,
     borderWidth: StyleSheet.hairlineWidth,
@@ -767,6 +796,9 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: tokens.spacing.md,
     paddingVertical: tokens.spacing.md,
+  },
+  assetRowStacked: {
+    flexDirection: "column",
   },
   assetMain: {
     flex: 1,
@@ -813,6 +845,15 @@ const styles = StyleSheet.create({
     maxWidth: "42%",
     gap: tokens.spacing.sm,
   },
+  assetSideStacked: {
+    alignSelf: "stretch",
+    width: "100%",
+    minWidth: 0,
+    maxWidth: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   assetValueButton: {
     minHeight: 44,
     maxWidth: "100%",
@@ -821,6 +862,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     gap: 5,
   },
+  assetValueLens: { maxWidth: 160, minHeight: 44, justifyContent: "center" },
   assetValue: {
     fontSize: 18,
     lineHeight: 23,
@@ -828,7 +870,7 @@ const styles = StyleSheet.create({
     fontVariant: ["tabular-nums"],
   },
   includeButton: {
-    minHeight: 44,
+    minHeight: 48,
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: tokens.radius.pill,
     paddingHorizontal: 10,

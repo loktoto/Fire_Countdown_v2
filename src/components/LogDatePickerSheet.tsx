@@ -153,7 +153,7 @@ function VisibleLogDatePickerSheet({
                 <MaterialCommunityIcons
                   name="chevron-double-left"
                   size={18}
-                  color={colors.textMuted}
+                  color={colors.primary}
                 />
               </MotionPressable>
               <MotionPressable
@@ -187,7 +187,7 @@ function VisibleLogDatePickerSheet({
                 <MaterialCommunityIcons
                   name="chevron-double-right"
                   size={18}
-                  color={colors.textMuted}
+                  color={colors.primary}
                 />
               </MotionPressable>
             </View>
@@ -283,9 +283,9 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   closeButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -316,8 +316,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   navButton: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     borderRadius: tokens.radius.utility,
     borderWidth: 1,
     alignItems: "center",

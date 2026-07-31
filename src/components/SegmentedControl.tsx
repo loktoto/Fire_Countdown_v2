@@ -66,6 +66,9 @@ function SegmentOption({
         ]}
       />
       <Text
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.78}
         style={[
           styles.label,
           typography.button,

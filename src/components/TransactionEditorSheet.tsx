@@ -14,6 +14,7 @@ import {
 import Animated from "react-native-reanimated";
 
 import { CategoryGlyph } from "./CategoryGlyph";
+import { categoryColorPresentation } from "./categoryColorPresentation";
 import { LogDatePickerSheet } from "./LogDatePickerSheet";
 import { MotionPressable } from "./MotionPressable";
 import { SegmentedControl } from "./SegmentedControl";
@@ -243,6 +244,10 @@ function TransactionEditorContent({
             {categoriesForType.map((category) => {
               const active = category.id === activeCategoryId;
               const categoryColor = category.color ?? colors.primary;
+              const categoryPresentation = categoryColorPresentation(
+                categoryColor,
+                colors.surfaceSolid,
+              );
               return (
                 <MotionPressable
                   key={category.id}
@@ -252,8 +257,13 @@ function TransactionEditorContent({
                   style={[
                     styles.category,
                     {
-                      borderColor: active ? categoryColor : colors.surfaceBorder,
-                      backgroundColor: active ? `${categoryColor}22` : colors.backgroundAlt,
+                      borderWidth: active ? 2 : 1,
+                      borderColor: active
+                        ? categoryPresentation.foregroundColor
+                        : colors.surfaceBorder,
+                      backgroundColor: active
+                        ? categoryPresentation.backgroundColor
+                        : colors.backgroundAlt,
                     },
                   ]}
                 >
@@ -263,11 +273,21 @@ function TransactionEditorContent({
                     style={[
                       styles.categoryText,
                       typography.button,
-                      { color: active ? categoryColor : colors.text },
+                      {
+                        color: active ? categoryPresentation.foregroundColor : colors.text,
+                      },
                     ]}
                   >
                     {category.name}
                   </Text>
+                  {active ? (
+                    <MaterialCommunityIcons
+                      name="check-circle"
+                      size={16}
+                      color={categoryPresentation.foregroundColor}
+                      accessible={false}
+                    />
+                  ) : null}
                 </MotionPressable>
               );
             })}

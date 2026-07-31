@@ -3,7 +3,10 @@ export function money(value: number, currency = "HKD") {
 }
 
 export function percent(value: number, digits = 1) {
-  return `${(value * 100).toFixed(digits)}%`;
+  const scaled = value * 100;
+  const threshold = 0.5 * 10 ** -digits;
+  const normalized = Math.abs(scaled) < threshold ? 0 : scaled;
+  return `${normalized.toFixed(digits)}%`;
 }
 
 export function shortDateTime(value: string | null | undefined, locale = "en-US") {
@@ -23,7 +26,7 @@ export function shortDateTime(value: string | null | undefined, locale = "en-US"
 }
 
 export function signedMoney(value: number, currency = "HKD") {
-  const sign = value >= 0 ? "+" : "-";
+  const sign = value > 0 ? "+" : value < 0 ? "-" : "";
   return `${sign}${money(Math.abs(value), currency)}`;
 }
 
@@ -140,7 +143,8 @@ export function formatDateInputLabel(date: string, locale?: string) {
   const { year, month, day } = isoDateParts(date);
   return new Date(year, month - 1, day).toLocaleDateString(locale, {
     year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
+    month: "short",
+    day: "numeric",
+    weekday: "short",
   });
 }

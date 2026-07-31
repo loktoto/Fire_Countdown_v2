@@ -1,13 +1,19 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useMemo, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
 
 import { AppHeader } from "../components/AppHeader";
+import {
+  calendarLayout,
+  calendarNetColorRole,
+  calendarSummaryColorRole,
+} from "../components/calendarPresentation";
 import { CategoryGlyph } from "../components/CategoryGlyph";
 import { GlassCard } from "../components/GlassCard";
 import { MotionPressable } from "../components/MotionPressable";
-import { ScreenContainer } from "../components/ScreenContainer";
+import { ScreenScaffold } from "../components/ScreenScaffold";
 import { TransactionEditorSheet } from "../components/TransactionEditorSheet";
+import { TimeLensValue } from "../components/TimeLens";
 import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
 import { useCalendarViewModel } from "../hooks/useCalendarViewModel";
@@ -18,7 +24,12 @@ export function CalendarScreen() {
   const colors = useThemeColors();
   const t = useI18n();
   const vm = useCalendarViewModel();
+  const { fontScale, width } = useWindowDimensions();
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
+  const { compactDayMetrics, stackSummary, stackTransactions } = calendarLayout({
+    fontScale,
+    width,
+  });
   const editingTransaction =
     vm.selectedTransactions.find((transaction) => transaction.id === editingTransactionId) ?? null;
   const calendarRows = useMemo(
@@ -38,12 +49,12 @@ export function CalendarScreen() {
   );
 
   return (
-    <ScreenContainer>
+    <ScreenScaffold>
       <AppHeader
         eyebrow={t.calendar.kicker}
         title={t.calendar.title}
         subtitle={`${vm.monthLabel}. ${t.calendar.subtitle}`}
-        accentColor={colors.projection}
+        accentColor={colors.primary}
       />
 
       <View
@@ -52,39 +63,80 @@ export function CalendarScreen() {
           { backgroundColor: colors.surface, borderColor: colors.surfaceBorder },
         ]}
       >
-        <View style={styles.summary}>
-          <View style={styles.summaryItem}>
+        <View style={[styles.summary, stackSummary && styles.summaryStacked]}>
+          <View style={[styles.summaryItem, stackSummary && styles.summaryItemStacked]}>
             <Text style={[styles.summaryLabel, typography.body, { color: colors.textMuted }]}>
               {t.common.income}
             </Text>
-            <Text
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              style={[styles.summaryValue, typography.title, { color: colors.positive }]}
-            >
-              {money(vm.summary.income, vm.currency)}
-            </Text>
+            <TimeLensValue
+              amount={vm.summary.income}
+              moneyText={money(vm.summary.income, vm.currency)}
+              kind="income"
+              accessibilityLabel={t.calendar.summaryValue(
+                t.common.income,
+                money(vm.summary.income, vm.currency),
+              )}
+              adjustsFontSizeToFit={false}
+              numberOfLines={2}
+              style={styles.summaryLens}
+              textStyle={[
+                styles.summaryValue,
+                typography.title,
+                {
+                  color:
+                    colors[
+                      calendarSummaryColorRole({
+                        amount: vm.summary.income,
+                        kind: "income",
+                      })
+                    ],
+                },
+              ]}
+            />
           </View>
-          <View style={styles.summaryItem}>
+          <View style={[styles.summaryItem, stackSummary && styles.summaryItemStacked]}>
             <Text style={[styles.summaryLabel, typography.body, { color: colors.textMuted }]}>
               {t.common.expense}
             </Text>
-            <Text
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              style={[styles.summaryValue, typography.title, { color: colors.negative }]}
-            >
-              {money(vm.summary.expense, vm.currency)}
-            </Text>
+            <TimeLensValue
+              amount={vm.summary.expense}
+              moneyText={money(vm.summary.expense, vm.currency)}
+              kind="expense"
+              accessibilityLabel={t.calendar.summaryValue(
+                t.common.expense,
+                money(vm.summary.expense, vm.currency),
+              )}
+              adjustsFontSizeToFit={false}
+              numberOfLines={2}
+              style={styles.summaryLens}
+              textStyle={[
+                styles.summaryValue,
+                typography.title,
+                {
+                  color:
+                    colors[
+                      calendarSummaryColorRole({
+                        amount: vm.summary.expense,
+                        kind: "expense",
+                      })
+                    ],
+                },
+              ]}
+            />
           </View>
-          <View style={styles.summaryItem}>
+          <View style={[styles.summaryItem, stackSummary && styles.summaryItemStacked]}>
             <Text style={[styles.summaryLabel, typography.body, { color: colors.textMuted }]}>
-              {t.common.net}
+              {t.calendar.netCashFlow}
             </Text>
             <Text
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              style={[styles.summaryValue, typography.title, { color: colors.text }]}
+              numberOfLines={2}
+              style={[
+                styles.summaryValue,
+                typography.title,
+                {
+                  color: colors[calendarNetColorRole(vm.summary.net)],
+                },
+              ]}
             >
               {signedMoney(vm.summary.net, vm.currency)}
             </Text>
@@ -96,6 +148,7 @@ export function CalendarScreen() {
         <View style={styles.calendarControls}>
           <View style={styles.monthTitleRow}>
             <Text
+              accessibilityRole="header"
               numberOfLines={1}
               adjustsFontSizeToFit
               style={[styles.monthControlLabel, typography.title, { color: colors.text }]}
@@ -105,49 +158,57 @@ export function CalendarScreen() {
             <MotionPressable
               onPress={vm.goToToday}
               accessibilityLabel={t.calendar.jumpToday}
-              style={[styles.todayButton, { backgroundColor: colors.projectionSoft }]}
+              style={[
+                styles.todayButton,
+                { backgroundColor: colors.primarySoft, borderColor: colors.primaryBorder },
+              ]}
             >
-              <MaterialCommunityIcons name="calendar-today" size={14} color={colors.projection} />
-              <Text style={[styles.todayText, typography.button, { color: colors.projection }]}>
+              <MaterialCommunityIcons name="calendar-today" size={14} color={colors.primary} />
+              <Text style={[styles.todayText, typography.button, { color: colors.primary }]}>
                 {t.common.today}
               </Text>
             </MotionPressable>
           </View>
-          <View style={styles.navigationRow}>
+          <View
+            accessibilityRole="toolbar"
+            style={[
+              styles.navigationRow,
+              {
+                backgroundColor: colors.backgroundAlt,
+                borderColor: colors.surfaceBorder,
+              },
+            ]}
+          >
             <MotionPressable
               onPress={vm.goToPreviousYear}
               accessibilityLabel={t.calendar.previousYear}
-              style={[styles.navButton, { borderColor: colors.surfaceBorder }]}
+              style={styles.navButton}
             >
-              <MaterialCommunityIcons
-                name="chevron-double-left"
-                size={18}
-                color={colors.textMuted}
-              />
+              <MaterialCommunityIcons name="chevron-double-left" size={18} color={colors.primary} />
             </MotionPressable>
             <MotionPressable
               onPress={vm.goToPreviousMonth}
               accessibilityLabel={t.calendar.previousMonth}
-              style={[styles.navButton, { borderColor: colors.surfaceBorder }]}
+              style={styles.navButton}
             >
-              <MaterialCommunityIcons name="chevron-left" size={20} color={colors.projection} />
+              <MaterialCommunityIcons name="chevron-left" size={20} color={colors.primary} />
             </MotionPressable>
             <MotionPressable
               onPress={vm.goToNextMonth}
               accessibilityLabel={t.calendar.nextMonth}
-              style={[styles.navButton, { borderColor: colors.surfaceBorder }]}
+              style={styles.navButton}
             >
-              <MaterialCommunityIcons name="chevron-right" size={20} color={colors.projection} />
+              <MaterialCommunityIcons name="chevron-right" size={20} color={colors.primary} />
             </MotionPressable>
             <MotionPressable
               onPress={vm.goToNextYear}
               accessibilityLabel={t.calendar.nextYear}
-              style={[styles.navButton, { borderColor: colors.surfaceBorder }]}
+              style={styles.navButton}
             >
               <MaterialCommunityIcons
                 name="chevron-double-right"
                 size={18}
-                color={colors.textMuted}
+                color={colors.primary}
               />
             </MotionPressable>
           </View>
@@ -157,9 +218,10 @@ export function CalendarScreen() {
           {vm.weekdays.map((weekday) => (
             <Text
               key={weekday}
+              accessibilityLabel={weekday}
               style={[styles.weekday, typography.button, { color: colors.textMuted }]}
             >
-              {weekday}
+              {t.locale.startsWith("zh") ? weekday : weekday.slice(0, 1)}
             </Text>
           ))}
         </View>
@@ -169,13 +231,13 @@ export function CalendarScreen() {
               {week.map((day) => {
                 const selected = day.date === vm.selectedDate;
                 const textColor = selected
-                  ? colors.projection
+                  ? colors.primary
                   : day.isCurrentMonth
                     ? colors.text
-                    : colors.textMuted;
+                    : colors.textTertiary;
                 const netColor =
                   !day.isCurrentMonth || day.net === 0
-                    ? colors.textMuted
+                    ? colors.textTertiary
                     : day.net > 0
                       ? colors.positive
                       : colors.negative;
@@ -184,15 +246,16 @@ export function CalendarScreen() {
                     key={day.key}
                     onPress={() => vm.setSelectedDate(day.date)}
                     accessibilityLabel={t.calendar.dayNet(
-                      day.date,
+                      formatFullDate(day.date, t.locale),
                       signedMoney(day.net, vm.currency),
+                      day.isToday,
                     )}
                     accessibilityState={{ selected }}
                     style={[
                       styles.day,
                       {
-                        borderColor: selected ? `${colors.projection}66` : "transparent",
-                        backgroundColor: selected ? colors.projectionSoft : "transparent",
+                        borderColor: selected ? colors.primaryBorder : "transparent",
+                        backgroundColor: selected ? colors.primarySoft : "transparent",
                       },
                     ]}
                   >
@@ -201,32 +264,46 @@ export function CalendarScreen() {
                         {day.day}
                       </Text>
                       {day.isToday ? (
-                        <View style={[styles.todayDot, { backgroundColor: colors.projection }]} />
+                        <View style={[styles.todayDot, { backgroundColor: colors.primary }]} />
                       ) : null}
                     </View>
-                    <Text
-                      numberOfLines={1}
-                      style={[styles.dayNet, typography.body, { color: netColor }]}
-                    >
-                      {day.net === 0
-                        ? "-"
-                        : signedMoney(day.net, vm.currency).replace(`${vm.currency} `, "")}
-                    </Text>
-                    <View style={[styles.cashflowTrack, { backgroundColor: colors.surfaceBorder }]}>
+                    <View style={styles.dayMetricSlot}>
+                      {day.net !== 0 ? (
+                        compactDayMetrics ? (
+                          <MaterialCommunityIcons
+                            name={day.net > 0 ? "arrow-up-bold" : "arrow-down-bold"}
+                            size={12}
+                            color={netColor}
+                          />
+                        ) : (
+                          <Text
+                            numberOfLines={1}
+                            style={[styles.dayNet, typography.body, { color: netColor }]}
+                          >
+                            {signedMoney(day.net, vm.currency).replace(`${vm.currency} `, "")}
+                          </Text>
+                        )
+                      ) : null}
+                    </View>
+                    <View style={styles.cashflowSlot}>
                       {day.net !== 0 ? (
                         <View
-                          style={[
-                            styles.cashflowFill,
-                            {
-                              alignSelf: day.net > 0 ? "flex-start" : "flex-end",
-                              backgroundColor: netColor,
-                              width: `${Math.max(
-                                12,
-                                Math.sqrt(Math.abs(day.net) / maxAbsCurrentMonthNet) * 100,
-                              )}%`,
-                            },
-                          ]}
-                        />
+                          style={[styles.cashflowTrack, { backgroundColor: colors.surfaceBorder }]}
+                        >
+                          <View
+                            style={[
+                              styles.cashflowFill,
+                              {
+                                alignSelf: day.net > 0 ? "flex-start" : "flex-end",
+                                backgroundColor: netColor,
+                                width: `${Math.max(
+                                  12,
+                                  Math.sqrt(Math.abs(day.net) / maxAbsCurrentMonthNet) * 100,
+                                )}%`,
+                              },
+                            ]}
+                          />
+                        </View>
                       ) : null}
                     </View>
                   </MotionPressable>
@@ -238,13 +315,26 @@ export function CalendarScreen() {
       </GlassCard>
 
       <View style={styles.transactionSection}>
-        <Text style={[styles.sectionTitle, typography.title, { color: colors.text }]}>
+        <Text
+          accessibilityRole="header"
+          style={[styles.sectionTitle, typography.title, { color: colors.text }]}
+        >
           {formatFullDate(vm.selectedDate, t.locale)}
         </Text>
         {vm.selectedTransactions.length === 0 ? (
-          <Text style={[styles.empty, typography.body, { color: colors.textMuted }]}>
-            {t.calendar.noRecordsForDate}
-          </Text>
+          <View style={styles.emptyState}>
+            <View style={[styles.emptyIcon, { backgroundColor: colors.primarySoft }]}>
+              <MaterialCommunityIcons name="plus" size={20} color={colors.primary} />
+            </View>
+            <View style={styles.emptyCopy}>
+              <Text style={[styles.emptyTitle, typography.bodyMedium, { color: colors.text }]}>
+                {t.calendar.noRecordsForDate}
+              </Text>
+              <Text style={[styles.empty, typography.body, { color: colors.textMuted }]}>
+                {t.calendar.noRecordsHint}
+              </Text>
+            </View>
+          </View>
         ) : (
           <View style={styles.transactionList}>
             {vm.selectedTransactions.map((transaction) => {
@@ -255,59 +345,87 @@ export function CalendarScreen() {
                   ? money(transaction.amount, transaction.currency)
                   : `-${money(transaction.amount, transaction.currency)}`;
               return (
-                <MotionPressable
+                <View
                   key={transaction.id}
-                  onPress={() => setEditingTransactionId(transaction.id)}
-                  accessibilityLabel={t.calendar.editTransaction(
-                    transaction.category?.name ?? t.calendar.uncategorized,
-                    signedAmount,
-                  )}
                   style={[
                     styles.transactionRow,
                     {
                       borderColor: colors.surfaceBorder,
                       backgroundColor: colors.backgroundAlt,
                     },
+                    stackTransactions && styles.transactionRowStacked,
                   ]}
                 >
-                  <CategoryGlyph
-                    icon={transaction.category?.icon}
-                    color={categoryColor}
-                    size={40}
-                  />
-                  <View style={styles.transactionCopy}>
-                    <Text
-                      numberOfLines={1}
-                      style={[styles.transactionCategory, typography.title, { color: colors.text }]}
-                    >
-                      {transaction.category?.name ?? t.calendar.uncategorized}
-                    </Text>
-                    <Text
-                      numberOfLines={1}
-                      style={[
-                        styles.transactionNote,
-                        typography.body,
-                        { color: transaction.note ? colors.textMuted : `${colors.textMuted}99` },
+                  <MotionPressable
+                    onPress={() => setEditingTransactionId(transaction.id)}
+                    accessibilityLabel={t.calendar.editTransaction(
+                      transaction.category?.name ?? t.calendar.uncategorized,
+                      signedAmount,
+                    )}
+                    style={[
+                      styles.transactionOpen,
+                      stackTransactions && styles.transactionOpenStacked,
+                    ]}
+                  >
+                    <CategoryGlyph
+                      icon={transaction.category?.icon}
+                      color={categoryColor}
+                      size={40}
+                    />
+                    <View style={styles.transactionCopy}>
+                      <Text
+                        numberOfLines={1}
+                        style={[
+                          styles.transactionCategory,
+                          typography.title,
+                          { color: colors.text },
+                        ]}
+                      >
+                        {transaction.category?.name ?? t.calendar.uncategorized}
+                      </Text>
+                      <Text
+                        numberOfLines={1}
+                        style={[
+                          styles.transactionNote,
+                          typography.body,
+                          { color: transaction.note ? colors.textMuted : `${colors.textMuted}99` },
+                        ]}
+                      >
+                        {transaction.note ?? t.calendar.noNoteAdded}
+                      </Text>
+                    </View>
+                  </MotionPressable>
+                  <View
+                    style={[
+                      styles.transactionMeta,
+                      stackTransactions && styles.transactionMetaStacked,
+                    ]}
+                  >
+                    <TimeLensValue
+                      amount={transaction.amount}
+                      moneyText={signedAmount}
+                      kind={transaction.type}
+                      onPress={() => setEditingTransactionId(transaction.id)}
+                      accessibilityLabel={t.calendar.editTransaction(
+                        transaction.category?.name ?? t.calendar.uncategorized,
+                        signedAmount,
+                      )}
+                      adjustsFontSizeToFit={false}
+                      numberOfLines={2}
+                      style={styles.transactionAmountLens}
+                      textStyle={[
+                        styles.transactionAmount,
+                        typography.button,
+                        { color: amountColor },
                       ]}
-                    >
-                      {transaction.note ?? t.common.noNote}
-                    </Text>
-                  </View>
-                  <View style={styles.transactionMeta}>
-                    <Text
-                      numberOfLines={1}
-                      adjustsFontSizeToFit
-                      style={[styles.transactionAmount, typography.button, { color: amountColor }]}
-                    >
-                      {signedAmount}
-                    </Text>
+                    />
                     <MaterialCommunityIcons
                       name="chevron-right"
                       size={20}
                       color={colors.textMuted}
                     />
                   </View>
-                </MotionPressable>
+                </View>
               );
             })}
           </View>
@@ -322,7 +440,7 @@ export function CalendarScreen() {
         onSave={vm.saveTransactionEdit}
         onDelete={vm.deleteTransaction}
       />
-    </ScreenContainer>
+    </ScreenScaffold>
   );
 }
 
@@ -333,6 +451,10 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     rowGap: tokens.spacing.md,
     columnGap: tokens.spacing.sm,
+  },
+  summaryStacked: {
+    alignItems: "stretch",
+    flexDirection: "column",
   },
   summaryBand: {
     borderWidth: StyleSheet.hairlineWidth,
@@ -346,6 +468,9 @@ const styles = StyleSheet.create({
     minWidth: 92,
     gap: 4,
   },
+  summaryItemStacked: {
+    minWidth: "100%",
+  },
   summaryLabel: {
     fontSize: 11,
     lineHeight: 15,
@@ -355,6 +480,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 22,
   },
+  summaryLens: { maxWidth: "100%", minHeight: 44, justifyContent: "center" },
   calendarCard: {
     gap: tokens.spacing.sm,
   },
@@ -364,14 +490,17 @@ const styles = StyleSheet.create({
   navigationRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: tokens.spacing.sm,
+    gap: 2,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: tokens.radius.utility,
+    padding: 2,
+    overflow: "hidden",
   },
   navButton: {
     flex: 1,
     minWidth: 44,
     height: 44,
     borderRadius: tokens.radius.utility,
-    borderWidth: StyleSheet.hairlineWidth,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -390,6 +519,7 @@ const styles = StyleSheet.create({
   },
   todayButton: {
     minHeight: 44,
+    borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 999,
     paddingHorizontal: 10,
     flexDirection: "row",
@@ -402,7 +532,7 @@ const styles = StyleSheet.create({
   },
   weekdayRow: {
     flexDirection: "row",
-    gap: 6,
+    gap: 2,
   },
   weekday: {
     flex: 1,
@@ -416,12 +546,13 @@ const styles = StyleSheet.create({
   },
   weekRow: {
     flexDirection: "row",
-    gap: 7,
+    gap: 4,
   },
   day: {
     flex: 1,
     minWidth: 0,
-    aspectRatio: 0.88,
+    minHeight: 44,
+    aspectRatio: 1,
     borderRadius: 11,
     borderWidth: StyleSheet.hairlineWidth,
     alignItems: "center",
@@ -447,8 +578,17 @@ const styles = StyleSheet.create({
   dayNet: {
     fontSize: 10,
   },
-  cashflowTrack: {
+  dayMetricSlot: {
+    minHeight: 13,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cashflowSlot: {
     width: "76%",
+    minHeight: 3,
+  },
+  cashflowTrack: {
+    width: "100%",
     height: 3,
     borderRadius: 2,
     overflow: "hidden",
@@ -465,6 +605,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
+  emptyState: {
+    minHeight: 68,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: tokens.spacing.md,
+  },
+  emptyIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  emptyTitle: {
+    fontSize: 15,
+    lineHeight: 20,
+  },
   transactionList: {
     gap: tokens.spacing.sm,
   },
@@ -479,6 +641,20 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: tokens.spacing.md,
+  },
+  transactionRowStacked: {
+    alignItems: "stretch",
+    flexDirection: "column",
+  },
+  transactionOpen: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: tokens.spacing.md,
+  },
+  transactionOpenStacked: {
+    minHeight: 44,
   },
   transactionCopy: {
     flex: 1,
@@ -500,9 +676,15 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     gap: 2,
   },
+  transactionMetaStacked: {
+    minWidth: 0,
+    alignSelf: "stretch",
+    justifyContent: "flex-start",
+  },
   transactionAmount: {
     flexShrink: 1,
     textAlign: "right",
     fontSize: 13,
   },
+  transactionAmountLens: { maxWidth: 150, minHeight: 44, justifyContent: "center" },
 });

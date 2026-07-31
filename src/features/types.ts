@@ -142,7 +142,7 @@ export type FireSnapshot = {
   milestones: Milestone[];
   scenarios: ProjectionScenario[];
   quoteSettings: QuoteBridgeSettings;
-  themeMode: "dark" | "light";
+  themeMode: "system" | "dark" | "light";
   hapticsEnabled: boolean;
   fireCompanionId: FireCompanionId;
   fireDestinationId: FireDestinationId;

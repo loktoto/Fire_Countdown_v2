@@ -5,6 +5,10 @@ import {
   daysInIsoMonth,
   formatLogDateChipLabel,
   formatLogDateLabel,
+  formatDateInputLabel,
+  formatMonthYear,
+  percent,
+  signedMoney,
 } from "../format";
 
 describe("date formatting helpers", () => {
@@ -35,5 +39,25 @@ describe("date formatting helpers", () => {
     expect(formatLogDateLabel("2026-06-30", "2026-06-30")).toBe("Today");
     expect(formatLogDateLabel("2026-06-29", "2026-06-30")).toBe("Yesterday");
     expect(formatLogDateChipLabel("2026-06-29", "2026-06-30")).toBe("Yday");
+  });
+
+  it("keeps zero financial values neutral", () => {
+    expect(signedMoney(120, "HKD")).toBe("+HKD 120");
+    expect(signedMoney(-120, "HKD")).toBe("-HKD 120");
+    expect(signedMoney(0, "HKD")).toBe("HKD 0");
+  });
+
+  it("does not display negative zero percentages", () => {
+    expect(percent(-0.00001)).toBe("0.0%");
+    expect(percent(-0.001)).toBe("-0.1%");
+  });
+
+  it("formats projected months for people instead of storage keys", () => {
+    expect(formatMonthYear("2027-12-01", "en-US")).toBe("December 2027");
+  });
+
+  it("formats editable dates as readable, locale-aware labels", () => {
+    expect(formatDateInputLabel("2026-07-23", "en-US")).toBe("Thu, Jul 23, 2026");
+    expect(formatDateInputLabel("2026-07-23", "zh-Hant")).toContain("2026");
   });
 });

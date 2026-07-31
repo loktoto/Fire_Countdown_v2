@@ -21,6 +21,7 @@ import {
   fireImpactPresentation,
   formatImpactDayValue,
   formatImpactPercent,
+  shouldShowImpactPercent,
   type FireImpactInput,
 } from "./fireImpactPresentation";
 import { MotionPressable } from "./MotionPressable";
@@ -61,6 +62,7 @@ export function FireImpactCard({ amount, impact }: { amount: number; impact: Fir
   const breathPhase = useSharedValue(0);
   const presentation = fireImpactPresentation(amount, impact);
   const percentLabel = formatImpactPercent(presentation.rawPercent);
+  const showPercent = shouldShowImpactPercent(amount);
   const percentBubbleWidth = Math.min(108, Math.max(52, 18 + percentLabel.length * 7));
   const companionDirection: -1 | 0 | 1 =
     presentation.meterValue < 0 ? -1 : presentation.meterValue > 0 ? 1 : 0;
@@ -68,7 +70,7 @@ export function FireImpactCard({ amount, impact }: { amount: number; impact: Fir
   const tone = (() => {
     if (amount <= 0) {
       return {
-        color: colors.primary,
+        color: colors.textMuted,
         headline: t.fireImpact.noImpactYet,
       };
     }
@@ -117,7 +119,7 @@ export function FireImpactCard({ amount, impact }: { amount: number; impact: Fir
     }
 
     return {
-      color: colors.primary,
+      color: colors.textMuted,
       headline: t.fireImpact.unchanged,
     };
   })();
@@ -230,7 +232,6 @@ export function FireImpactCard({ amount, impact }: { amount: number; impact: Fir
   return (
     <>
       <View
-        accessibilityLabel={t.fireImpact.accessibility(tone.headline, percentLabel)}
         style={[
           styles.card,
           {
@@ -242,9 +243,10 @@ export function FireImpactCard({ amount, impact }: { amount: number; impact: Fir
       >
         <View style={styles.headerRow}>
           <Text
-            numberOfLines={1}
-            minimumFontScale={0.62}
-            adjustsFontSizeToFit
+            numberOfLines={2}
+            accessibilityLabel={
+              showPercent ? t.fireImpact.accessibility(tone.headline, percentLabel) : tone.headline
+            }
             style={[styles.headline, typography.display, { color: colors.text }]}
           >
             {tone.headline}
@@ -324,26 +326,29 @@ export function FireImpactCard({ amount, impact }: { amount: number; impact: Fir
               companionPositionStyle,
             ]}
           >
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                styles.percentBubble,
-                {
-                  width: percentBubbleWidth,
-                  backgroundColor: `${tone.color}16`,
-                  borderColor: `${tone.color}38`,
-                },
-              ]}
-            >
-              <Text
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.72}
-                style={[styles.percentValue, typography.button, { color: tone.color }]}
+            {showPercent ? (
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  styles.percentBubble,
+                  {
+                    width: percentBubbleWidth,
+                    backgroundColor: `${tone.color}16`,
+                    borderColor: `${tone.color}38`,
+                  },
+                ]}
               >
-                {percentLabel}
-              </Text>
-            </Animated.View>
+                <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.72}
+                  accessible={false}
+                  style={[styles.percentValue, typography.button, { color: tone.color }]}
+                >
+                  {percentLabel}
+                </Text>
+              </Animated.View>
+            ) : null}
             <Animated.View
               pointerEvents="none"
               style={[styles.arrivalRing, { borderColor: tone.color }, arrivalStyle]}
@@ -396,7 +401,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   headerRow: {
-    minHeight: 28,
+    minHeight: 44,
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
@@ -404,7 +409,6 @@ const styles = StyleSheet.create({
   },
   headline: {
     flex: 1,
-    minHeight: 24,
     fontSize: 17,
     lineHeight: 22,
   },

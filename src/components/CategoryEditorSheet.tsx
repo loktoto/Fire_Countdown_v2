@@ -14,8 +14,10 @@ import {
 } from "react-native";
 import Animated from "react-native-reanimated";
 
+import { categoryIconOptionKey } from "./categoryEditorPresentation";
 import { CategoryGlyph } from "./CategoryGlyph";
 import { MotionPressable } from "./MotionPressable";
+import { categoryColorPresentation } from "./categoryColorPresentation";
 import { sheetBackdropEnter, sheetBackdropExit, sheetEnter, sheetExit } from "../design/motion";
 import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
@@ -68,8 +70,8 @@ const iconPresets = [
   { label: "Other", value: "shape-plus-outline" },
 ];
 
-const colorPresets = ["#5BD9D0", "#57D49B", "#FF6B88", "#F2C94C", "#8D7CF2", "#F28B55", "#6AA7E8"];
-const defaultCategoryColor = colorPresets[0] ?? "#5BD9D0";
+const colorPresets = ["#198F89", "#16865C", "#C94263", "#A76518", "#4765B3", "#AE702A", "#8091A7"];
+const defaultCategoryColor = colorPresets[0] ?? "#198F89";
 
 function defaultIcon(type: TransactionType) {
   return type === "income" ? "emoji:\\u{1F4C8}" : "emoji:\\u{1F35C}";
@@ -171,6 +173,19 @@ function CategoryEditorContent({
   const iconColumns = contentWidth >= 330 ? 6 : 5;
   const iconOptionSize = Math.floor((contentWidth - optionGap * (iconColumns - 1)) / iconColumns);
   const iconGlyphSize = Math.max(32, Math.min(40, iconOptionSize - 12));
+  const selectedIconPresentation = categoryColorPresentation(color, colors.surfaceSolid);
+  const currentCategoryIcon = category?.icon ? decodeIcon(category.icon) : null;
+  const selectableIconPresets =
+    currentCategoryIcon &&
+    !iconPresets.some((item) => decodeIcon(item.value) === currentCategoryIcon)
+      ? [
+          {
+            label: category?.name ?? t.common.symbol,
+            value: category?.icon ?? currentCategoryIcon,
+          },
+          ...iconPresets,
+        ]
+      : iconPresets;
 
   function save() {
     if (!canSave) {
@@ -244,12 +259,12 @@ function CategoryEditorContent({
             {t.common.symbol}
           </Text>
           <View style={[styles.options, { columnGap: optionGap, rowGap: optionGap }]}>
-            {iconPresets.map((item) => {
+            {selectableIconPresets.map((item) => {
               const itemIcon = decodeIcon(item.value);
               const active = decodeIcon(item.value) === decodeIcon(icon);
               return (
                 <MotionPressable
-                  key={item.label}
+                  key={categoryIconOptionKey(item)}
                   onPress={() => setIcon(item.value)}
                   accessibilityLabel={t.categories.symbolA11y(item.label)}
                   accessibilityState={{ selected: active }}
@@ -260,8 +275,13 @@ function CategoryEditorContent({
                       height: iconOptionSize,
                     },
                     {
-                      borderColor: active ? color : colors.surfaceBorder,
-                      backgroundColor: active ? `${color}22` : colors.backgroundAlt,
+                      borderWidth: active ? 2 : 1,
+                      backgroundColor: active
+                        ? selectedIconPresentation.backgroundColor
+                        : colors.backgroundAlt,
+                      borderColor: active
+                        ? selectedIconPresentation.foregroundColor
+                        : colors.surfaceBorder,
                     },
                   ]}
                 >
@@ -270,6 +290,15 @@ function CategoryEditorContent({
                     color={active ? color : colors.textMuted}
                     size={iconGlyphSize}
                   />
+                  {active ? (
+                    <MaterialCommunityIcons
+                      name="check-circle"
+                      size={16}
+                      color={selectedIconPresentation.foregroundColor}
+                      style={styles.selectedIconMark}
+                      accessible={false}
+                    />
+                  ) : null}
                 </MotionPressable>
               );
             })}
@@ -431,10 +460,16 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
   iconOption: {
+    position: "relative",
     borderRadius: tokens.radius.utility,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
+  },
+  selectedIconMark: {
+    position: "absolute",
+    top: 3,
+    right: 3,
   },
   swatch: {
     width: 44,

@@ -73,15 +73,6 @@ export function FireProgressRing({
     strokeDashoffset: circumference * (1 - safeProgress * draw.value),
   }));
 
-  const animatedMarkerProps = useAnimatedProps(() => {
-    const angle = -Math.PI / 2 + safeProgress * draw.value * Math.PI * 2;
-    return {
-      cx: center + Math.cos(angle) * radius,
-      cy: center + Math.sin(angle) * radius,
-      opacity: interpolate(draw.value, [0, 0.35, 1], [0, 0, 1], "clamp"),
-    };
-  });
-
   const ticks = Array.from({ length: 36 }, (_, index) => {
     const angle = -Math.PI / 2 + (index / 36) * Math.PI * 2;
     const outerRadius = 117;
@@ -147,13 +138,6 @@ export function FireProgressRing({
             rotation="-90"
             origin={`${center}, ${center}`}
             fill="transparent"
-          />
-          <AnimatedCircle
-            animatedProps={animatedMarkerProps}
-            r={6}
-            fill={colors.primary}
-            stroke={colors.surfaceSolid}
-            strokeWidth={3}
           />
         </Svg>
       </Animated.View>

@@ -17,6 +17,7 @@ import type { ProjectionPoint } from "../engine/fireEngine";
 import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
 import { useI18n } from "../i18n";
+import { formatMonthYear } from "../utils/format";
 
 const viewBox = {
   width: 328,
@@ -214,6 +215,8 @@ export function WealthCrossoverChart({
     : null;
   const selectedTooltip = selectedScreenPoint ? tooltipLayout(selectedScreenPoint) : null;
   const selectedAge = selectedPoint ? ageAtPoint(currentAge, selectedPoint) : null;
+  const reachedMonthLabel = reached ? formatMonthYear(reached.date, t.locale) : null;
+  const selectedMonthLabel = selectedPoint ? formatMonthYear(selectedPoint.date, t.locale) : null;
 
   function onLayout(event: LayoutChangeEvent) {
     setChartWidth(event.nativeEvent.layout.width);
@@ -280,18 +283,22 @@ export function WealthCrossoverChart({
       <View
         accessible
         accessibilityRole="adjustable"
+        accessibilityLabel={t.chart.accessibilityLabel}
+        accessibilityHint={t.chart.scrubHint}
         accessibilityActions={[
-          { name: "decrement", label: t.chart.portfolio },
-          { name: "increment", label: t.chart.portfolio },
+          { name: "decrement", label: t.chart.previousPoint },
+          { name: "increment", label: t.chart.nextPoint },
         ]}
         accessibilityValue={{
           text: selectedPoint
-            ? `${selectedPoint.date.slice(0, 7)}, ${compactMoney(
-                selectedPoint.projectedAssets,
-                currency,
-              )}`
+            ? t.chart.pointAccessibility(
+                selectedMonthLabel ?? selectedPoint.date.slice(0, 7),
+                selectedAge === null ? t.chart.ageNotSet : t.chart.age(selectedAge),
+                compactMoney(selectedPoint.projectedAssets, currency),
+                compactMoney(selectedPoint.fireTarget, currency),
+              )
             : reached
-              ? t.chart.reachedAccessibility(reached.date.slice(0, 7))
+              ? t.chart.reachedAccessibility(reachedMonthLabel ?? reached.date.slice(0, 7))
               : t.chart.notReachedAccessibility,
         }}
         onAccessibilityAction={({ nativeEvent }) => {
@@ -311,7 +318,7 @@ export function WealthCrossoverChart({
         <Svg
           accessibilityLabel={
             reached
-              ? t.chart.reachedAccessibility(reached.date.slice(0, 7))
+              ? t.chart.reachedAccessibility(reachedMonthLabel ?? reached.date.slice(0, 7))
               : t.chart.notReachedAccessibility
           }
           width="100%"
@@ -459,7 +466,7 @@ export function WealthCrossoverChart({
                 fontSize="10"
                 fontWeight="700"
               >
-                {selectedPoint.date.slice(0, 7)}
+                {selectedMonthLabel}
               </SvgText>
               <SvgText
                 x={selectedTooltip.x + 12}
@@ -510,7 +517,9 @@ export function WealthCrossoverChart({
         </Svg>
       </View>
       <Text style={[styles.summary, typography.body, { color: colors.textMuted }]}>
-        {reached ? t.chart.reachedSummary(reached.date.slice(0, 7)) : t.chart.notReachedSummary}
+        {reached
+          ? t.chart.reachedSummary(reachedMonthLabel ?? reached.date.slice(0, 7))
+          : t.chart.notReachedSummary}
       </Text>
     </View>
   );

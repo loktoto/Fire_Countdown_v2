@@ -1,17 +1,19 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 
 import { AppHeader } from "../components/AppHeader";
 import { CategoryGlyph } from "../components/CategoryGlyph";
+import { fireDurationFromDays, getDashboardLayout } from "../components/dashboardPresentation";
 import {
   FirePlanEditorSheet,
   ScenarioEditorSheet,
   ScenarioListSheet,
 } from "../components/FirePlanSettingsSheets";
 import { MotionPressable } from "../components/MotionPressable";
-import { ScreenContainer } from "../components/ScreenContainer";
+import { ScreenScaffold } from "../components/ScreenScaffold";
+import { TimeLensValue, type TimeLensKind } from "../components/TimeLens";
 import { WealthCrossoverChart } from "../components/WealthCrossoverChart";
 import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
@@ -56,12 +58,20 @@ function ScenarioSwitcher({
               styles.scenarioOption,
               active
                 ? {
-                    backgroundColor: colors.projectionSoft,
-                    borderColor: `${colors.projection}48`,
+                    backgroundColor: colors.primarySoft,
+                    borderColor: colors.primaryBorder,
                   }
                 : undefined,
             ]}
           >
+            {active ? (
+              <MaterialCommunityIcons
+                accessible={false}
+                name="check"
+                size={15}
+                color={colors.primary}
+              />
+            ) : null}
             <Text
               numberOfLines={1}
               minimumFontScale={0.72}
@@ -69,7 +79,7 @@ function ScenarioSwitcher({
               style={[
                 styles.scenarioLabel,
                 typography.button,
-                { color: active ? colors.projection : colors.textMuted },
+                { color: active ? colors.primary : colors.textMuted },
               ]}
             >
               {scenario.name}
@@ -84,42 +94,61 @@ function ScenarioSwitcher({
 function ForecastStat({
   label,
   value,
+  timeLens,
   tone = "neutral",
   divider = false,
+  stacked = false,
 }: {
   label: string;
   value: string;
-  tone?: "neutral" | "primary" | "projection" | "positive" | "negative";
+  timeLens?: { amount: number; kind: TimeLensKind };
+  tone?: "neutral" | "primary" | "positive" | "negative";
   divider?: boolean;
+  stacked?: boolean;
 }) {
   const colors = useThemeColors();
   const valueColor =
-    tone === "projection"
-      ? colors.projection
-      : tone === "primary"
-        ? colors.primary
-        : tone === "positive"
-          ? colors.positive
-          : tone === "negative"
-            ? colors.negative
-            : colors.text;
+    tone === "primary"
+      ? colors.primary
+      : tone === "positive"
+        ? colors.positive
+        : tone === "negative"
+          ? colors.negative
+          : colors.text;
 
   return (
     <View
       style={[
         styles.forecastStat,
-        divider ? { borderLeftColor: colors.surfaceBorder, borderLeftWidth: 1 } : undefined,
+        stacked ? styles.forecastStatStacked : undefined,
+        divider
+          ? stacked
+            ? { borderTopColor: colors.surfaceBorder, borderTopWidth: 1 }
+            : { borderLeftColor: colors.surfaceBorder, borderLeftWidth: 1 }
+          : undefined,
       ]}
     >
       <Text style={[styles.statLabel, typography.body, { color: colors.textMuted }]}>{label}</Text>
-      <Text
-        numberOfLines={1}
-        minimumFontScale={0.72}
-        adjustsFontSizeToFit
-        style={[styles.statValue, typography.button, { color: valueColor }]}
-      >
-        {value}
-      </Text>
+      {timeLens ? (
+        <TimeLensValue
+          amount={timeLens.amount}
+          kind={timeLens.kind}
+          moneyText={value}
+          accessibilityLabel={`${label}: ${value}`}
+          style={styles.statLens}
+          textStyle={[styles.statValue, typography.button, { color: valueColor }]}
+          minimumFontScale={0.72}
+        />
+      ) : (
+        <Text
+          numberOfLines={1}
+          minimumFontScale={0.72}
+          adjustsFontSizeToFit
+          style={[styles.statValue, typography.button, { color: valueColor }]}
+        >
+          {value}
+        </Text>
+      )}
     </View>
   );
 }
@@ -168,18 +197,20 @@ function CashflowLeaderRow({
             : t.common.noRecordsThisMonth}
         </Text>
       </View>
-      <Text
-        numberOfLines={1}
-        minimumFontScale={0.7}
-        adjustsFontSizeToFit
-        style={[
+      <TimeLensValue
+        amount={leader?.amount ?? 0}
+        moneyText={money(leader?.amount ?? 0, currency)}
+        kind={tone === "positive" ? "income" : "expense"}
+        accessibilityLabel={`${title}: ${money(leader?.amount ?? 0, currency)}`}
+        style={styles.leaderAmountLens}
+        textStyle={[
           styles.leaderAmount,
           typography.title,
           { color: tone === "positive" ? colors.positive : colors.negative },
         ]}
-      >
-        {money(leader?.amount ?? 0, currency)}
-      </Text>
+        numberOfLines={2}
+        adjustsFontSizeToFit={false}
+      />
     </View>
   );
 }
@@ -188,24 +219,26 @@ function AssumptionCell({
   label,
   value,
   onPress,
+  timeLens,
   leftDivider,
   bottomDivider,
+  stacked,
 }: {
   label: string;
   value: string;
   onPress: () => void;
+  timeLens?: { amount: number; kind: TimeLensKind };
   leftDivider: boolean;
   bottomDivider: boolean;
+  stacked: boolean;
 }) {
   const colors = useThemeColors();
 
   return (
-    <MotionPressable
-      onPress={onPress}
-      haptic="selection"
-      accessibilityLabel={`${label}: ${value}`}
+    <View
       style={[
         styles.assumptionCell,
+        stacked ? styles.assumptionCellStacked : undefined,
         leftDivider ? { borderLeftColor: colors.surfaceBorder, borderLeftWidth: 1 } : undefined,
         bottomDivider
           ? { borderBottomColor: colors.surfaceBorder, borderBottomWidth: 1 }
@@ -216,17 +249,45 @@ function AssumptionCell({
         <Text style={[styles.assumptionLabel, typography.body, { color: colors.textMuted }]}>
           {label}
         </Text>
-        <Text
-          numberOfLines={1}
-          minimumFontScale={0.72}
-          adjustsFontSizeToFit
-          style={[styles.assumptionValue, typography.button, { color: colors.text }]}
-        >
-          {value}
-        </Text>
+        {timeLens ? (
+          <TimeLensValue
+            amount={timeLens.amount}
+            kind={timeLens.kind}
+            moneyText={value}
+            onPress={onPress}
+            accessibilityLabel={`${label}: ${value}`}
+            style={styles.assumptionLens}
+            textStyle={[styles.assumptionValue, typography.button, { color: colors.text }]}
+            minimumFontScale={0.72}
+          />
+        ) : (
+          <MotionPressable
+            onPress={onPress}
+            haptic="selection"
+            accessibilityLabel={`${label}: ${value}`}
+            style={styles.assumptionPlainValue}
+          >
+            <Text
+              numberOfLines={1}
+              minimumFontScale={0.72}
+              adjustsFontSizeToFit
+              style={[styles.assumptionValue, typography.button, { color: colors.text }]}
+            >
+              {value}
+            </Text>
+          </MotionPressable>
+        )}
       </View>
-      <MaterialCommunityIcons name="chevron-right" size={19} color={colors.textMuted} />
-    </MotionPressable>
+      <MotionPressable
+        onPress={onPress}
+        haptic="selection"
+        accessibilityLabel={`${label}: ${value}`}
+        hitSlop={8}
+        style={styles.assumptionChevron}
+      >
+        <MaterialCommunityIcons name="chevron-right" size={19} color={colors.textMuted} />
+      </MotionPressable>
+    </View>
   );
 }
 
@@ -235,13 +296,20 @@ export function DashboardScreen() {
   const t = useI18n();
   const router = useRouter();
   const vm = useDashboardViewModel();
+  const { width, fontScale } = useWindowDimensions();
+  const {
+    stackForecast,
+    stackForecastStats,
+    stackCashflowStats,
+    stackSectionHeader,
+    stackAssumptions,
+  } = getDashboardLayout(width, fontScale);
   const [firePlanEditorOpen, setFirePlanEditorOpen] = useState(false);
   const [scenarioListOpen, setScenarioListOpen] = useState(false);
   const [editingScenario, setEditingScenario] = useState<ProjectionScenario | null>(null);
   const [creatingScenario, setCreatingScenario] = useState(false);
   const goalCurrency = vm.goal.baseCurrency;
-  const yearsToFire =
-    vm.projectedFireDays === null ? null : Math.max(0, vm.projectedFireDays / 365.25).toFixed(1);
+  const fireDuration = fireDurationFromDays(vm.projectedFireDays);
   const projectedFireMonth = vm.projectedFireDate
     ? formatMonthYear(vm.projectedFireDate, t.locale)
     : t.dashboard.notReached;
@@ -254,10 +322,10 @@ export function DashboardScreen() {
   const fundedProgress = Math.min(1, Math.max(0, vm.progress));
   const projectedAgeLabel =
     vm.goal.currentAge == null
-      ? t.dashboard.ageNotSet
+      ? t.dashboard.fireAgeNotSet
       : vm.projectedFireDays === null || projectedFireAge === null
         ? t.dashboard.noCrossover
-        : t.dashboard.age(projectedFireAge);
+        : t.dashboard.fireAge(projectedFireAge);
 
   function openFirePlanEditor() {
     setFirePlanEditorOpen(true);
@@ -314,6 +382,7 @@ export function DashboardScreen() {
       label: t.dashboard.includedAssets,
       value: money(vm.includedAssets, goalCurrency),
       onPress: () => router.push("/portfolio"),
+      timeLens: { amount: vm.includedAssets, kind: "asset" as const },
     },
     {
       label: t.dashboard.methodReturn,
@@ -324,6 +393,10 @@ export function DashboardScreen() {
       label: t.common.monthlySaving,
       value: money(vm.effectiveAssumptions.monthlySaving, goalCurrency),
       onPress: openFirePlanEditor,
+      timeLens: {
+        amount: vm.effectiveAssumptions.monthlySaving,
+        kind: "monthlySaving" as const,
+      },
     },
     {
       label: t.common.withdrawalRate,
@@ -343,11 +416,11 @@ export function DashboardScreen() {
   ];
 
   return (
-    <ScreenContainer>
+    <ScreenScaffold>
       <AppHeader
         eyebrow={t.dashboard.kicker}
         title={t.dashboard.title}
-        accentColor={colors.projection}
+        accentColor={colors.primary}
         action={
           <MotionPressable
             onPress={openScenarioList}
@@ -358,7 +431,7 @@ export function DashboardScreen() {
               { backgroundColor: colors.surfaceElevated, borderColor: colors.surfaceBorder },
             ]}
           >
-            <MaterialCommunityIcons name="tune-variant" size={21} color={colors.projection} />
+            <MaterialCommunityIcons name="tune-variant" size={21} color={colors.primary} />
           </MotionPressable>
         }
       />
@@ -373,66 +446,81 @@ export function DashboardScreen() {
         style={[
           styles.projectionPanel,
           {
-            backgroundColor: colors.projectionSoft,
-            borderColor: `${colors.projection}38`,
+            backgroundColor: colors.surface,
+            borderColor: colors.surfaceBorder,
           },
         ]}
       >
-        <View style={styles.forecastHeader}>
+        <View style={[styles.forecastHeader, stackForecast && styles.forecastHeaderStack]}>
           <View style={styles.forecastCopy}>
             <Text style={[styles.forecastLabel, typography.body, { color: colors.textMuted }]}>
               {t.dashboard.projectedFire}
             </Text>
             <Text
-              numberOfLines={1}
-              adjustsFontSizeToFit
+              numberOfLines={2}
               style={[styles.forecastDate, typography.display, { color: colors.text }]}
             >
               {projectedFireMonth}
             </Text>
             <Text style={[styles.forecastMeta, typography.body, { color: colors.textMuted }]}>
               {vm.scenario?.name ?? t.dashboard.base}
-              {yearsToFire === null
+              {fireDuration === null
                 ? ` · ${t.dashboard.noCrossover}`
-                : ` · ${t.dashboard.years(yearsToFire)}`}
+                : ` · ${t.dashboard.fireDistance(fireDuration.years, fireDuration.months)}`}
             </Text>
           </View>
           <View
             style={[
               styles.ageBadge,
-              { backgroundColor: colors.surface, borderColor: `${colors.projection}66` },
+              { backgroundColor: colors.surfaceElevated, borderColor: colors.surfaceBorder },
             ]}
           >
-            <Text style={[styles.ageText, typography.button, { color: colors.projection }]}>
+            <Text style={[styles.ageText, typography.button, { color: colors.textMuted }]}>
               {projectedAgeLabel}
             </Text>
           </View>
         </View>
 
-        <View style={[styles.progressTrack, { backgroundColor: colors.surfaceBorder }]}>
+        <View
+          accessible
+          accessibilityRole="progressbar"
+          accessibilityLabel={t.dashboard.fireTargetFunded}
+          accessibilityValue={{
+            min: 0,
+            max: 100,
+            now: Math.round(fundedProgress * 100),
+            text: percent(vm.progress),
+          }}
+          style={[styles.progressTrack, { backgroundColor: colors.surfaceBorder }]}
+        >
           <View
             style={[
               styles.progressFill,
-              { width: `${fundedProgress * 100}%`, backgroundColor: colors.projection },
+              { width: `${fundedProgress * 100}%`, backgroundColor: colors.primary },
             ]}
           />
         </View>
 
-        <View style={styles.forecastStats}>
+        <View style={[styles.forecastStats, stackForecastStats && styles.forecastStatsStack]}>
           <ForecastStat
             label={t.dashboard.includedFire}
             value={money(vm.includedAssets, goalCurrency)}
+            timeLens={{ amount: vm.includedAssets, kind: "asset" }}
+            stacked={stackForecastStats}
           />
           <ForecastStat
-            label={t.dashboard.progress}
+            label={t.dashboard.fireTargetFunded}
             value={percent(vm.progress)}
-            tone="projection"
+            tone="neutral"
             divider
+            stacked={stackForecastStats}
           />
           <ForecastStat
             label={t.dashboard.fireTarget}
             value={money(vm.target, goalCurrency)}
+            timeLens={{ amount: vm.target, kind: "spending" }}
             divider
+            stacked={stackForecastStats}
           />
         </View>
 
@@ -446,13 +534,13 @@ export function DashboardScreen() {
           projection={vm.chartProjection}
           currency={goalCurrency}
           currentAge={vm.goal.currentAge}
-          accentColor={colors.projection}
-          targetColor={colors.target}
+          accentColor={colors.chartEtf}
+          targetColor={colors.chartRealEstate}
         />
       </View>
 
       <View style={styles.section}>
-        <View style={styles.sectionHeader}>
+        <View style={[styles.sectionHeader, stackSectionHeader && styles.sectionHeaderStack]}>
           <View>
             <Text style={[styles.sectionTitle, typography.title, { color: colors.text }]}>
               {t.dashboard.cashflowLeaders}
@@ -465,7 +553,14 @@ export function DashboardScreen() {
             style={[
               styles.todayImpact,
               typography.button,
-              { color: vm.todayImpact >= 0 ? colors.positive : colors.negative },
+              {
+                color:
+                  vm.todayImpact > 0
+                    ? colors.positive
+                    : vm.todayImpact < 0
+                      ? colors.negative
+                      : colors.textMuted,
+              },
             ]}
           >
             {t.dashboard.today(signedMoney(vm.todayImpact, goalCurrency))}
@@ -475,25 +570,37 @@ export function DashboardScreen() {
         <View
           style={[
             styles.cashflowBand,
+            stackCashflowStats && styles.cashflowBandStack,
             { backgroundColor: colors.backgroundAlt, borderColor: colors.surfaceBorder },
           ]}
         >
           <ForecastStat
             label={t.common.income}
             value={money(vm.activityMonthSummary.income, goalCurrency)}
+            timeLens={{ amount: vm.activityMonthSummary.income, kind: "income" }}
             tone="positive"
+            stacked={stackCashflowStats}
           />
           <ForecastStat
             label={t.common.expense}
             value={money(vm.activityMonthSummary.expense, goalCurrency)}
+            timeLens={{ amount: vm.activityMonthSummary.expense, kind: "expense" }}
             tone="negative"
             divider
+            stacked={stackCashflowStats}
           />
           <ForecastStat
             label={t.common.net}
             value={signedMoney(vm.activityMonthSummary.net, goalCurrency)}
-            tone={vm.activityMonthSummary.net >= 0 ? "positive" : "negative"}
+            tone={
+              vm.activityMonthSummary.net > 0
+                ? "positive"
+                : vm.activityMonthSummary.net < 0
+                  ? "negative"
+                  : "neutral"
+            }
             divider
+            stacked={stackCashflowStats}
           />
         </View>
 
@@ -517,7 +624,7 @@ export function DashboardScreen() {
       </View>
 
       <View style={styles.section}>
-        <View style={styles.sectionHeader}>
+        <View style={[styles.sectionHeader, stackSectionHeader && styles.sectionHeaderStack]}>
           <View>
             <Text style={[styles.sectionTitle, typography.title, { color: colors.text }]}>
               {t.dashboard.assumptions}
@@ -544,8 +651,12 @@ export function DashboardScreen() {
               label={assumption.label}
               value={assumption.value}
               onPress={assumption.onPress}
-              leftDivider={index % 2 === 1}
-              bottomDivider={index < assumptions.length - 2}
+              timeLens={assumption.timeLens}
+              leftDivider={!stackAssumptions && index % 2 === 1}
+              bottomDivider={
+                stackAssumptions ? index < assumptions.length - 1 : index < assumptions.length - 2
+              }
+              stacked={stackAssumptions}
             />
           ))}
         </View>
@@ -576,7 +687,7 @@ export function DashboardScreen() {
         onSave={saveScenario}
         onArchive={creatingScenario || scenarioCount <= 1 ? undefined : archiveScenario}
       />
-    </ScreenContainer>
+    </ScreenScaffold>
   );
 }
 
@@ -608,6 +719,8 @@ const styles = StyleSheet.create({
     borderRadius: tokens.radius.pill,
     alignItems: "center",
     justifyContent: "center",
+    flexDirection: "row",
+    gap: 4,
     paddingHorizontal: 6,
   },
   scenarioLabel: {
@@ -626,6 +739,9 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     justifyContent: "space-between",
     gap: tokens.spacing.md,
+  },
+  forecastHeaderStack: {
+    flexDirection: "column",
   },
   forecastCopy: {
     flex: 1,
@@ -668,11 +784,19 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "stretch",
   },
+  forecastStatsStack: {
+    flexDirection: "column",
+  },
   forecastStat: {
     flex: 1,
     minWidth: 0,
     paddingHorizontal: 10,
     gap: 3,
+  },
+  forecastStatStacked: {
+    width: "100%",
+    paddingHorizontal: 0,
+    paddingVertical: 10,
   },
   statLabel: {
     fontSize: 10,
@@ -683,6 +807,7 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     fontVariant: ["tabular-nums"],
   },
+  statLens: { maxWidth: "100%", minHeight: 23, justifyContent: "center" },
   chartHeader: {
     paddingTop: 2,
   },
@@ -694,6 +819,11 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     justifyContent: "space-between",
     gap: tokens.spacing.md,
+  },
+  sectionHeaderStack: {
+    alignItems: "flex-start",
+    flexDirection: "column",
+    gap: tokens.spacing.sm,
   },
   sectionTitle: {
     fontSize: 20,
@@ -714,6 +844,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: tokens.radius.utility,
     paddingVertical: 12,
+  },
+  cashflowBandStack: {
+    flexDirection: "column",
+    paddingHorizontal: 12,
+    paddingVertical: 0,
   },
   leaderList: {
     borderTopWidth: 1,
@@ -743,11 +878,16 @@ const styles = StyleSheet.create({
     lineHeight: 14,
   },
   leaderAmount: {
-    maxWidth: "42%",
     fontSize: 18,
     lineHeight: 23,
     fontVariant: ["tabular-nums"],
     textAlign: "right",
+  },
+  leaderAmountLens: {
+    maxWidth: "42%",
+    minHeight: 44,
+    flexShrink: 0,
+    justifyContent: "center",
   },
   assumptionGrid: {
     flexDirection: "row",
@@ -766,6 +906,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
+  assumptionCellStacked: {
+    flexBasis: "100%",
+    maxWidth: "100%",
+  },
   assumptionCopy: {
     flex: 1,
     minWidth: 0,
@@ -779,6 +923,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 19,
   },
+  assumptionLens: {
+    maxWidth: "100%",
+    minHeight: 22,
+    justifyContent: "center",
+  },
+  assumptionPlainValue: { minHeight: 22, justifyContent: "center" },
+  assumptionChevron: { width: 28, height: 40, alignItems: "center", justifyContent: "center" },
   inlineEdit: {
     paddingHorizontal: 4,
     paddingVertical: 4,

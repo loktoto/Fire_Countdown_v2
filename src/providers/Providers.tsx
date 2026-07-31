@@ -16,6 +16,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { FireStoreProvider } from "../data/fireStore";
+import { TimeLensProvider } from "../components/TimeLens";
 import { tokens } from "../design/tokens";
 
 const queryClient = new QueryClient({
@@ -52,7 +53,9 @@ export function Providers({ children }: { children: ReactNode }) {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
-          <FireStoreProvider>{children}</FireStoreProvider>
+          <FireStoreProvider>
+            <TimeLensProvider>{children}</TimeLensProvider>
+          </FireStoreProvider>
         </QueryClientProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

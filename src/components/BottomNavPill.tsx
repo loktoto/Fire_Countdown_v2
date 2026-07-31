@@ -7,6 +7,8 @@ import { MotionPressable } from "./MotionPressable";
 import { typography, useThemeColors } from "../design/theme";
 import { useI18n } from "../i18n";
 import { useReducedMotion } from "../hooks/useReducedMotion";
+import { useKeyboardInset } from "../hooks/useKeyboardInset";
+import { bottomNavigationPillHeight, minimumBottomNavigationInset } from "./screenScaffoldLayout";
 
 const tabMeta: Record<string, { icon: keyof typeof MaterialCommunityIcons.glyphMap }> = {
   home: { icon: "view-dashboard-outline" },
@@ -34,6 +36,7 @@ export function BottomNavPill({ state, navigation }: TabBarProps) {
   const insets = useSafeAreaInsets();
   const t = useI18n();
   const reducedMotion = useReducedMotion();
+  const imeInset = useKeyboardInset();
   const tabLabels: Record<string, string> = {
     home: t.tabs.home,
     calendar: t.tabs.calendar,
@@ -42,8 +45,15 @@ export function BottomNavPill({ state, navigation }: TabBarProps) {
     portfolio: t.tabs.portfolio,
   };
 
+  if (imeInset > 0) {
+    return null;
+  }
+
   return (
-    <View pointerEvents="box-none" style={[styles.wrap, { bottom: Math.max(insets.bottom, 10) }]}>
+    <View
+      pointerEvents="box-none"
+      style={[styles.wrap, { bottom: Math.max(insets.bottom, minimumBottomNavigationInset) }]}
+    >
       <View
         style={[
           styles.pill,
@@ -147,7 +157,7 @@ const styles = StyleSheet.create({
     right: 16,
   },
   pill: {
-    height: 66,
+    height: bottomNavigationPillHeight,
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 23,
     borderCurve: "continuous",

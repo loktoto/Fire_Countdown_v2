@@ -8,27 +8,35 @@ import { enter } from "../design/motion";
 import { tokens } from "../design/tokens";
 import { useThemeColors } from "../design/theme";
 import { useReducedMotion } from "../hooks/useReducedMotion";
+import { useKeyboardInset } from "../hooks/useKeyboardInset";
+import { getKeyboardAwareBottomClearance } from "./screenScaffoldLayout";
 
-export function ScreenContainer({
+export function ScreenScaffold({
   children,
   scroll = true,
+  hasBottomNavigation = true,
+  keyboardAware = false,
+  scrollRef,
 }: {
   children: ReactNode;
   scroll?: boolean;
+  hasBottomNavigation?: boolean;
+  keyboardAware?: boolean;
+  scrollRef?: React.RefObject<ScrollView | null>;
 }) {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const reducedMotion = useReducedMotion();
+  const imeInset = useKeyboardInset(keyboardAware);
+  const bottomClearance = getKeyboardAwareBottomClearance({
+    systemBottomInset: insets.bottom,
+    hasBottomNavigation,
+    imeInset,
+  });
   const content = (
     <Animated.View
       entering={reducedMotion ? undefined : enter()}
-      style={[
-        styles.inner,
-        {
-          paddingTop: Math.max(insets.top + 16, tokens.spacing.xl),
-          paddingBottom: Math.max(insets.bottom + 100, 116),
-        },
-      ]}
+      style={[styles.inner, { paddingTop: Math.max(insets.top + 16, tokens.spacing.xl) }]}
     >
       {children}
     </Animated.View>
@@ -39,16 +47,17 @@ export function ScreenContainer({
       <StatusBar style={colors.mode === "dark" ? "light" : "dark"} />
       {scroll ? (
         <ScrollView
+          ref={scrollRef}
           contentInsetAdjustmentBehavior="never"
           keyboardDismissMode="on-drag"
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomClearance }]}
         >
           {content}
         </ScrollView>
       ) : (
-        content
+        <View style={[styles.nonScrollContent, { paddingBottom: bottomClearance }]}>{content}</View>
       )}
     </View>
   );
@@ -67,5 +76,8 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
+  },
+  nonScrollContent: {
+    flex: 1,
   },
 });

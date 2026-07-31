@@ -1,4 +1,9 @@
-import { fireImpactPresentation, formatImpactPercent } from "../fireImpactPresentation";
+import {
+  fireImpactPresentation,
+  formatImpactDayValue,
+  formatImpactPercent,
+  shouldShowImpactPercent,
+} from "../fireImpactPresentation";
 
 const baseImpact = {
   baseDays: 1000,
@@ -8,6 +13,13 @@ const baseImpact = {
 describe("fireImpactPresentation", () => {
   it("keeps the companion centered without an amount", () => {
     expect(fireImpactPresentation(0, { ...baseImpact, impactDays: -50 }).meterValue).toBe(0);
+  });
+
+  it("shows a percentage only after the user enters a positive amount", () => {
+    expect(shouldShowImpactPercent(0)).toBe(false);
+    expect(shouldShowImpactPercent(-1)).toBe(false);
+    expect(shouldShowImpactPercent(Number.NaN)).toBe(false);
+    expect(shouldShowImpactPercent(1)).toBe(true);
   });
 
   it.each([
@@ -34,5 +46,10 @@ describe("fireImpactPresentation", () => {
     const result = fireImpactPresentation(100, { ...baseImpact, impactDays: -250 });
     expect(result.meterValue).toBe(1);
     expect(formatImpactPercent(result.rawPercent)).toBe("+25.00%");
+  });
+
+  it("keeps day impact readable without false precision", () => {
+    expect(formatImpactDayValue(2.84, "en-US")).toBe("2.8");
+    expect(formatImpactDayValue(0.284, "en-US")).toBe("0.28");
   });
 });

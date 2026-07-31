@@ -72,6 +72,12 @@ describe("hydrateSnapshotPreferences", () => {
     ).toMatchObject({ currency: "HKD", fireCompanionId: "traveler_m", language: "en" });
   });
 
+  it("preserves every supported appearance mode", () => {
+    expect(hydrateSnapshotPreferences({ themeMode: "system" }).themeMode).toBe("system");
+    expect(hydrateSnapshotPreferences({ themeMode: "light" }).themeMode).toBe("light");
+    expect(hydrateSnapshotPreferences({ themeMode: "dark" }).themeMode).toBe("dark");
+  });
+
   it("migrates legacy quote settings to the right provider", () => {
     const legacySettings = {
       ...seedSnapshot.quoteSettings,
