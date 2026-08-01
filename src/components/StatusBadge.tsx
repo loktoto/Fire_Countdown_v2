@@ -1,7 +1,9 @@
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text } from "react-native";
+import Animated, { Easing, FadeIn } from "react-native-reanimated";
 
 import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
+import { useReducedMotion } from "../hooks/useReducedMotion";
 
 export function StatusBadge({
   label,
@@ -11,6 +13,7 @@ export function StatusBadge({
   tone?: "neutral" | "positive" | "negative" | "primary" | "warning";
 }) {
   const colors = useThemeColors();
+  const reducedMotion = useReducedMotion();
   const toneColor =
     tone === "positive"
       ? colors.positive
@@ -21,13 +24,25 @@ export function StatusBadge({
           : tone === "primary"
             ? colors.primary
             : colors.textMuted;
+  const toneBackground =
+    tone === "positive"
+      ? colors.positiveSoft
+      : tone === "negative"
+        ? colors.negativeSoft
+        : tone === "warning"
+          ? colors.warningSoft
+          : tone === "primary"
+            ? colors.primarySoft
+            : colors.surfaceElevated;
 
   return (
-    <View
-      style={[styles.badge, { borderColor: `${toneColor}55`, backgroundColor: `${toneColor}18` }]}
+    <Animated.View
+      key={`${tone}-${label}`}
+      entering={reducedMotion ? undefined : FadeIn.duration(180).easing(Easing.out(Easing.cubic))}
+      style={[styles.badge, { borderColor: `${toneColor}44`, backgroundColor: toneBackground }]}
     >
       <Text style={[styles.text, typography.button, { color: toneColor }]}>{label}</Text>
-    </View>
+    </Animated.View>
   );
 }
 

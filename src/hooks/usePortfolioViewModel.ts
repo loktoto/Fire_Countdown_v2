@@ -3,14 +3,17 @@ import { useMemo } from "react";
 import { resolveAssetValue } from "../engine/fireEngine";
 import { deriveFireView, mainGoal } from "../engine/selectors";
 import { useFireStore } from "../data/fireStore";
+import { useQuoteRefresh } from "./useQuoteRefresh";
 import { todayIso } from "../utils/format";
 
 export function usePortfolioViewModel() {
   const store = useFireStore();
+  const quoteRefresh = useQuoteRefresh();
   const {
     snapshot,
     updateAsset,
     createAsset,
+    archiveAsset,
     updateGoal,
     updateMilestone,
     createMilestone,
@@ -22,7 +25,11 @@ export function usePortfolioViewModel() {
   const today = todayIso();
   const fire = useMemo(() => deriveFireView(snapshot, today), [snapshot, today]);
   const goal = mainGoal(snapshot);
-  const assets = snapshot.assets.filter((asset) => !asset.archivedAt);
+  const goalBaseCurrency = goal?.baseCurrency;
+  const assets = useMemo(
+    () => snapshot.assets.filter((asset) => !asset.archivedAt),
+    [snapshot.assets],
+  );
   const rawMilestones = [...snapshot.milestones]
     .filter((milestone) => !milestone.archivedAt && (!goal || milestone.goalId === goal.id))
     .sort((a, b) => a.order - b.order);
@@ -31,14 +38,22 @@ export function usePortfolioViewModel() {
   const allocation = useMemo(() => {
     const groups = new Map<string, number>();
     assets.forEach((asset) => {
-      const value = resolveAssetValue(asset, snapshot.quoteCache, goal?.baseCurrency).value;
+      const resolution = resolveAssetValue(asset, snapshot.quoteCache, goalBaseCurrency);
+      if (
+        goalBaseCurrency &&
+        resolution.currency.trim().toUpperCase() !== goalBaseCurrency.trim().toUpperCase()
+      ) {
+        return;
+      }
+      const value = resolution.value;
       groups.set(asset.assetClass, (groups.get(asset.assetClass) ?? 0) + value);
     });
     return [...groups.entries()].map(([label, value]) => ({ label, value }));
-  }, [assets, goal?.baseCurrency, snapshot.quoteCache]);
+  }, [assets, goalBaseCurrency, snapshot.quoteCache]);
 
   return {
     ...fire,
+    ...quoteRefresh,
     assets,
     allocation,
     quoteCache: snapshot.quoteCache,
@@ -46,6 +61,8 @@ export function usePortfolioViewModel() {
     rawMilestones,
     scenarios,
     updateAsset,
+    createAsset,
+    archiveAsset,
     updateGoal,
     updateMilestone,
     createMilestone,
@@ -95,17 +112,22 @@ export function usePortfolioViewModel() {
         updatedAt: timestamp,
       };
     },
-    addManualAsset: () =>
-      createAsset({
-        name: "Manual Asset",
+    newAssetDraft: () => {
+      const timestamp = new Date().toISOString();
+      return {
+        id: "draft-asset",
+        name: "",
         typeId: "type-cash",
         assetClass: "cash",
-        manualValue: 25000,
+        manualValue: 0,
         currency: snapshot.currency,
-        expectedAnnualReturn: 0.025,
+        expectedAnnualReturn: 0,
         includeInFire: true,
         updateMethod: "manual",
-        notes: "Created from Portfolio",
-      }),
+        notes: null,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      } as const;
+    },
   };
 }

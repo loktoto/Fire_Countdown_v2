@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import Animated, {
+  cancelAnimation,
   Easing,
   FadeInUp,
   interpolate,
   useAnimatedStyle,
   useSharedValue,
-  withRepeat,
   withSequence,
   withTiming,
 } from "react-native-reanimated";
@@ -15,7 +15,12 @@ import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
 import { useReducedMotion } from "../hooks/useReducedMotion";
 import { useI18n } from "../i18n";
-import { money, percent } from "../utils/format";
+import { formatMonthYear, money, percent } from "../utils/format";
+import {
+  milestoneProgressValues,
+  shouldStackMilestoneCards,
+  shouldStackMilestoneSummary,
+} from "./milestonePresentation";
 
 type JourneyItem = {
   id: string;
@@ -38,8 +43,8 @@ function clamp01(value: number) {
   return Math.min(1, Math.max(0, value));
 }
 
-function monthLabel(date: string | null, pendingLabel: string) {
-  return date ? date.slice(0, 7) : pendingLabel;
+function monthLabel(date: string | null, pendingLabel: string, locale: string) {
+  return date ? formatMonthYear(date, locale) : pendingLabel;
 }
 
 function statusForItem(item: JourneyItem, index: number, activeIndex: number): MilestoneState {
@@ -52,21 +57,20 @@ function statusForItem(item: JourneyItem, index: number, activeIndex: number): M
 
 function useNodePulse(active: boolean) {
   const reducedMotion = useReducedMotion();
-  const pulse = useSharedValue(active && reducedMotion ? 1 : 0);
+  const pulse = useSharedValue(0);
 
   useEffect(() => {
+    cancelAnimation(pulse);
+
     if (!active || reducedMotion) {
-      pulse.value = active ? 1 : 0;
+      pulse.value = 0;
       return;
     }
 
-    pulse.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 900, easing: Easing.out(Easing.cubic) }),
-        withTiming(0.2, { duration: 900, easing: Easing.inOut(Easing.cubic) }),
-      ),
-      -1,
-      true,
+    pulse.value = 0;
+    pulse.value = withSequence(
+      withTiming(1, { duration: 150, easing: Easing.out(Easing.cubic) }),
+      withTiming(0.12, { duration: 110, easing: Easing.inOut(Easing.cubic) }),
     );
   }, [active, pulse, reducedMotion]);
 
@@ -76,34 +80,28 @@ function useNodePulse(active: boolean) {
   }));
 }
 
-function useLoopedHeightStyle(targetHeight: number, active: boolean) {
+function useProgressFillStyle(targetHeight: number, active: boolean) {
   const reducedMotion = useReducedMotion();
-  const height = useSharedValue(Math.max(0, targetHeight));
+  const progress = useSharedValue(reducedMotion ? 1 : 0);
 
   useEffect(() => {
-    const nextHeight = Math.max(0, targetHeight);
+    cancelAnimation(progress);
 
     if (!active || reducedMotion) {
-      height.value = nextHeight;
+      progress.value = 1;
       return;
     }
 
-    height.value = 0;
-    height.value = withRepeat(
-      withSequence(
-        withTiming(nextHeight, {
-          duration: 950 + Math.min(450, Math.round(nextHeight * 2)),
-          easing: Easing.out(Easing.cubic),
-        }),
-        withTiming(nextHeight, { duration: 260 }),
-        withTiming(0, { duration: 1 }),
-      ),
-      -1,
-      false,
-    );
-  }, [active, height, reducedMotion, targetHeight]);
+    progress.value = 0;
+    progress.value = withTiming(1, {
+      duration: 240,
+      easing: Easing.bezier(0.16, 1, 0.3, 1),
+    });
+  }, [active, progress, reducedMotion, targetHeight]);
 
-  return useAnimatedStyle(() => ({ height: height.value }));
+  return useAnimatedStyle(() => ({
+    transform: [{ translateY: -(1 - progress.value) * targetHeight }],
+  }));
 }
 
 function TimelineRail({
@@ -142,7 +140,7 @@ function TimelineRail({
   const activeTargetHeight = activeSegment
     ? Math.max(0, activeSegment.height * clamp01(stageProgress))
     : 0;
-  const activeFillStyle = useLoopedHeightStyle(activeTargetHeight, activeTargetHeight > 0);
+  const activeFillStyle = useProgressFillStyle(activeTargetHeight, activeTargetHeight > 0);
 
   if (!hasCenters) {
     return null;
@@ -179,27 +177,32 @@ function TimelineRail({
         />
       ))}
       {activeSegment && activeTargetHeight > 0 ? (
-        <Animated.View
+        <View
           pointerEvents="none"
           style={[
-            styles.timelineRail,
+            styles.timelineRailClip,
             {
               top: activeSegment.top,
-              backgroundColor: primaryColor,
+              height: activeTargetHeight,
             },
-            activeFillStyle,
           ]}
-        />
+        >
+          <Animated.View
+            style={[styles.timelineRailFill, { backgroundColor: primaryColor }, activeFillStyle]}
+          />
+        </View>
       ) : null}
     </>
   );
 }
 
 function MilestoneProgressBar({
+  accessibilityLabel,
   color,
   progress,
   trackColor,
 }: {
+  accessibilityLabel: string;
   color: string;
   progress: number;
   trackColor: string;
@@ -208,7 +211,13 @@ function MilestoneProgressBar({
   const displayProgress = safeProgress > 0 ? Math.max(0.03, safeProgress) : 0;
 
   return (
-    <View style={[styles.progressTrack, { backgroundColor: trackColor }]}>
+    <View
+      accessible
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="progressbar"
+      accessibilityValue={{ min: 0, max: 100, now: Math.round(safeProgress * 100) }}
+      style={[styles.progressTrack, { backgroundColor: trackColor }]}
+    >
       <View
         style={[
           styles.progressFill,
@@ -234,17 +243,25 @@ export function MilestoneJourney({
   const colors = useThemeColors();
   const t = useI18n();
   const reducedMotion = useReducedMotion();
+  const { fontScale, width } = useWindowDimensions();
   const [rowLayouts, setRowLayouts] = useState<Record<string, RowLayout>>({});
+  const stackSummary = shouldStackMilestoneSummary(width, fontScale);
+  const stackCards = shouldStackMilestoneCards(width, fontScale);
   const activeIndexRaw = items.findIndex((entry) => !entry.isReached);
   const activeIndex = activeIndexRaw === -1 ? Math.max(0, items.length - 1) : activeIndexRaw;
   const activeItem = items[activeIndex];
   const maxTarget = Math.max(1, ...items.map((item) => item.targetAmount));
-  const journeyProgress = clamp01(currentAmount / maxTarget);
   const previousTarget = activeIndex > 0 ? (items[activeIndex - 1]?.targetAmount ?? 0) : 0;
   const activeTarget = Math.max(1, activeItem?.targetAmount ?? 1);
-  const stageRange = Math.max(1, activeTarget - previousTarget);
-  const stageProgress =
-    activeIndexRaw === -1 ? 1 : clamp01((currentAmount - previousTarget) / stageRange);
+  const milestoneProgress = milestoneProgressValues({
+    activeTarget,
+    currentAmount,
+    maxTarget,
+    previousTarget,
+  });
+  const activeProgress = activeIndexRaw === -1 ? 1 : milestoneProgress.active;
+  const journeyProgress = milestoneProgress.journey;
+  const stageProgress = activeIndexRaw === -1 ? 1 : milestoneProgress.stage;
   const activeGap = Math.max(0, activeTarget - currentAmount);
   const activeDone = activeIndexRaw === -1;
   const activePulseStyle = useNodePulse(items.length > 0);
@@ -275,70 +292,60 @@ export function MilestoneJourney({
         <View style={styles.summaryTop}>
           <View style={styles.summaryCopy}>
             <Text style={[styles.eyebrow, typography.button, { color: colors.primary }]}>
-              {t.milestoneJourney.nextCheckpoint}
+              {activeDone ? t.milestoneJourney.pathComplete : t.milestoneJourney.nextCheckpoint}
             </Text>
             <Text
-              numberOfLines={1}
-              adjustsFontSizeToFit
+              numberOfLines={2}
               style={[styles.activeName, typography.title, { color: colors.text }]}
             >
               {activeItem.name}
             </Text>
           </View>
-          <View
-            style={[
-              styles.statusPill,
-              {
-                backgroundColor: activeDone ? `${colors.positive}18` : `${colors.primary}18`,
-                borderColor: activeDone ? `${colors.positive}66` : `${colors.primary}66`,
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.statusText,
-                typography.button,
-                { color: activeDone ? colors.positive : colors.primary },
-              ]}
-            >
-              {activeDone ? t.milestoneJourney.complete : t.milestoneJourney.next}
-            </Text>
-          </View>
         </View>
 
-        <View style={styles.metricRow}>
-          <View style={styles.metric}>
+        <View style={[styles.metricRow, stackSummary && styles.metricRowStacked]}>
+          <View style={[styles.metric, stackSummary && styles.metricStacked]}>
             <Text style={[styles.metricLabel, typography.body, { color: colors.textMuted }]}>
               {t.milestoneJourney.toGo}
             </Text>
             <Text
-              numberOfLines={1}
-              adjustsFontSizeToFit
+              numberOfLines={2}
               style={[styles.metricValue, typography.title, { color: colors.text }]}
             >
               {activeDone ? t.milestoneJourney.done : money(activeGap, currency)}
             </Text>
           </View>
-          <View style={[styles.metricDivider, { backgroundColor: colors.surfaceBorder }]} />
-          <View style={styles.metric}>
+          <View
+            style={[
+              styles.metricDivider,
+              stackSummary && styles.metricDividerStacked,
+              { backgroundColor: colors.surfaceBorder },
+            ]}
+          />
+          <View style={[styles.metric, stackSummary && styles.metricStacked]}>
             <Text style={[styles.metricLabel, typography.body, { color: colors.textMuted }]}>
               {t.milestoneJourney.stage}
             </Text>
             <Text style={[styles.metricValue, typography.title, { color: colors.text }]}>
-              {percent(stageProgress, 0)}
+              {percent(activeProgress, 0)}
             </Text>
           </View>
-          <View style={[styles.metricDivider, { backgroundColor: colors.surfaceBorder }]} />
-          <View style={styles.metric}>
+          <View
+            style={[
+              styles.metricDivider,
+              stackSummary && styles.metricDividerStacked,
+              { backgroundColor: colors.surfaceBorder },
+            ]}
+          />
+          <View style={[styles.metric, stackSummary && styles.metricStacked]}>
             <Text style={[styles.metricLabel, typography.body, { color: colors.textMuted }]}>
               {t.milestoneJourney.eta}
             </Text>
             <Text
-              numberOfLines={1}
-              adjustsFontSizeToFit
+              numberOfLines={2}
               style={[styles.metricValue, typography.title, { color: colors.text }]}
             >
-              {monthLabel(activeItem.estimatedDate, t.milestoneJourney.pending)}
+              {monthLabel(activeItem.estimatedDate, t.milestoneJourney.pending, t.locale)}
             </Text>
           </View>
         </View>
@@ -387,7 +394,7 @@ export function MilestoneJourney({
               entering={
                 reducedMotion
                   ? undefined
-                  : FadeInUp.duration(260)
+                  : FadeInUp.duration(tokens.motion.enterMs)
                       .delay(index * tokens.motion.staggerMs)
                       .easing(Easing.out(Easing.cubic))
               }
@@ -447,39 +454,30 @@ export function MilestoneJourney({
                 style={[
                   styles.card,
                   {
-                    opacity: state === "future" ? 0.68 : 1,
-                    backgroundColor:
-                      state === "active"
-                        ? `${colors.primary}10`
-                        : state === "reached"
-                          ? `${colors.positive}0A`
-                          : "transparent",
-                    borderColor:
-                      state === "active"
-                        ? `${colors.primary}55`
-                        : state === "reached"
-                          ? `${colors.positive}33`
-                          : colors.surfaceBorder,
+                    backgroundColor: state === "active" ? `${colors.primary}10` : "transparent",
+                    borderColor: state === "active" ? `${colors.primary}55` : "transparent",
                   },
                 ]}
               >
-                <View style={styles.cardTop}>
+                <View style={[styles.cardTop, stackCards && styles.cardTopStacked]}>
                   <View style={styles.cardCopy}>
                     <Text
-                      numberOfLines={1}
-                      adjustsFontSizeToFit
-                      style={[styles.cardName, typography.title, { color: colors.text }]}
+                      numberOfLines={2}
+                      style={[
+                        styles.cardName,
+                        typography.title,
+                        { color: state === "future" ? colors.textMuted : colors.text },
+                      ]}
                     >
                       {item.name}
                     </Text>
                     <Text
-                      numberOfLines={1}
-                      adjustsFontSizeToFit
+                      numberOfLines={2}
                       style={[styles.cardMeta, typography.body, { color: colors.textMuted }]}
                     >
                       {t.milestoneJourney.targetEta(
                         money(item.targetAmount, currency),
-                        monthLabel(item.estimatedDate, t.milestoneJourney.pending),
+                        monthLabel(item.estimatedDate, t.milestoneJourney.pending, t.locale),
                       )}
                     </Text>
                   </View>
@@ -501,19 +499,27 @@ export function MilestoneJourney({
                 </View>
 
                 <MilestoneProgressBar
+                  accessibilityLabel={`${item.name}. ${t.milestoneJourney.stage}: ${percent(
+                    itemProgress,
+                    0,
+                  )}`}
                   color={markerColor}
                   progress={itemProgress}
                   trackColor={colors.surfaceBorder}
                 />
 
-                <View style={styles.cardFooter}>
+                <View style={[styles.cardFooter, stackCards && styles.cardFooterStacked]}>
                   <Text style={[styles.cardProgress, typography.button, { color: markerColor }]}>
                     {percent(itemProgress, 0)}
                   </Text>
                   <Text
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    style={[styles.cardGap, typography.body, { color: colors.textMuted }]}
+                    numberOfLines={2}
+                    style={[
+                      styles.cardGap,
+                      stackCards && styles.cardGapStacked,
+                      typography.body,
+                      { color: colors.textMuted },
+                    ]}
                   >
                     {state === "reached"
                       ? t.milestoneJourney.completed
@@ -548,7 +554,6 @@ const styles = StyleSheet.create({
     minHeight: 44,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     gap: tokens.spacing.md,
   },
   summaryCopy: {
@@ -565,17 +570,6 @@ const styles = StyleSheet.create({
     fontSize: 23,
     lineHeight: 29,
   },
-  statusPill: {
-    borderWidth: 1,
-    borderRadius: tokens.radius.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  statusText: {
-    fontSize: 12,
-    lineHeight: 15,
-    textTransform: "uppercase",
-  },
   metricRow: {
     minHeight: 56,
     flexDirection: "row",
@@ -587,9 +581,22 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 4,
   },
+  metricRowStacked: {
+    minHeight: 0,
+    flexDirection: "column",
+    gap: tokens.spacing.sm,
+  },
+  metricStacked: {
+    minHeight: 44,
+  },
   metricDivider: {
     width: 1,
     marginHorizontal: tokens.spacing.sm,
+  },
+  metricDividerStacked: {
+    width: "100%",
+    height: StyleSheet.hairlineWidth,
+    marginHorizontal: 0,
   },
   metricLabel: {
     fontSize: 12,
@@ -631,6 +638,18 @@ const styles = StyleSheet.create({
     width: 2,
     borderRadius: tokens.radius.pill,
     zIndex: 0,
+  },
+  timelineRailClip: {
+    position: "absolute",
+    left: 17,
+    width: 2,
+    overflow: "hidden",
+    zIndex: 0,
+  },
+  timelineRailFill: {
+    width: 2,
+    height: "100%",
+    borderRadius: tokens.radius.pill,
   },
   spine: {
     width: 36,
@@ -677,6 +696,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: tokens.spacing.sm,
   },
+  cardTopStacked: {
+    flexDirection: "column",
+  },
   cardCopy: {
     flex: 1,
     minWidth: 0,
@@ -691,6 +713,7 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   cardStatus: {
+    alignSelf: "flex-start",
     borderWidth: 1,
     borderRadius: tokens.radius.pill,
     paddingHorizontal: 9,
@@ -717,6 +740,10 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: tokens.spacing.sm,
   },
+  cardFooterStacked: {
+    alignItems: "flex-start",
+    flexDirection: "column",
+  },
   cardProgress: {
     fontSize: 13,
     lineHeight: 16,
@@ -727,5 +754,8 @@ const styles = StyleSheet.create({
     textAlign: "right",
     fontSize: 12,
     lineHeight: 16,
+  },
+  cardGapStacked: {
+    textAlign: "left",
   },
 });

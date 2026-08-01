@@ -11,11 +11,13 @@ import {
 } from "@expo-google-fonts/space-grotesk";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { Text, View } from "react-native";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { FireStoreProvider } from "../data/fireStore";
+import { TimeLensProvider } from "../components/TimeLens";
+import { tokens } from "../design/tokens";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -39,15 +41,10 @@ export function Providers({ children }: { children: ReactNode }) {
 
   if (!spaceLoaded || !outfitLoaded) {
     return (
-      <View
-        style={{
-          flex: 1,
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: "#090A0F",
-        }}
-      >
-        <Text style={{ color: "#00F0FF" }}>Loading Fire Countdown</Text>
+      <View style={styles.loadingScreen}>
+        <ActivityIndicator color={tokens.color.cyan} size="small" />
+        <Text style={styles.loadingTitle}>Fire Countdown</Text>
+        <Text style={styles.loadingMeta}>Loading…</Text>
       </View>
     );
   }
@@ -56,9 +53,32 @@ export function Providers({ children }: { children: ReactNode }) {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
-          <FireStoreProvider>{children}</FireStoreProvider>
+          <FireStoreProvider>
+            <TimeLensProvider>{children}</TimeLensProvider>
+          </FireStoreProvider>
         </QueryClientProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  loadingScreen: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: tokens.spacing.sm,
+    backgroundColor: tokens.color.obsidian,
+  },
+  loadingTitle: {
+    marginTop: tokens.spacing.sm,
+    color: "#F5F8F6",
+    fontSize: 18,
+    fontWeight: "700",
+    letterSpacing: -0.2,
+  },
+  loadingMeta: {
+    color: tokens.color.muted,
+    fontSize: 13,
+  },
+});

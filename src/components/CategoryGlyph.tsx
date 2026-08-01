@@ -1,7 +1,8 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { StyleSheet, Text, View } from "react-native";
 
-import { typography } from "../design/theme";
+import { categoryColorPresentation } from "./categoryColorPresentation";
+import { typography, useThemeColors } from "../design/theme";
 
 export function categoryIconLabel(icon?: string | null) {
   if (!icon) {
@@ -23,6 +24,8 @@ export function CategoryGlyph({
   color: string;
   size?: number;
 }) {
+  const colors = useThemeColors();
+  const presentation = categoryColorPresentation(color, colors.surfaceSolid);
   const glyph = categoryIconLabel(icon);
   const iconName =
     glyph && glyph in MaterialCommunityIcons.glyphMap
@@ -37,8 +40,8 @@ export function CategoryGlyph({
           width: size,
           height: size,
           borderRadius: size / 2,
-          backgroundColor: `${color}22`,
-          borderColor: `${color}66`,
+          backgroundColor: presentation.backgroundColor,
+          borderColor: presentation.foregroundColor,
         },
       ]}
     >
@@ -50,7 +53,11 @@ export function CategoryGlyph({
           {glyph}
         </Text>
       ) : (
-        <MaterialCommunityIcons name={iconName} size={size * 0.56} color={color} />
+        <MaterialCommunityIcons
+          name={iconName}
+          size={size * 0.56}
+          color={presentation.foregroundColor}
+        />
       )}
     </View>
   );

@@ -17,16 +17,17 @@ import type { ProjectionPoint } from "../engine/fireEngine";
 import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
 import { useI18n } from "../i18n";
+import { formatMonthYear } from "../utils/format";
 
 const viewBox = {
   width: 328,
-  height: 286,
+  height: 228,
 };
 const chart = {
-  left: 18,
-  right: 312,
-  top: 42,
-  bottom: 220,
+  left: 12,
+  right: 316,
+  top: 30,
+  bottom: 174,
 };
 const monthsAfterFire = 15 * 12;
 
@@ -97,25 +98,8 @@ function smoothPath(points: ScreenPoint[]) {
 
   const commands = [`M ${points[0]!.x.toFixed(1)} ${points[0]!.y.toFixed(1)}`];
 
-  for (let index = 0; index < points.length - 1; index += 1) {
-    const previous = points[Math.max(0, index - 1)]!;
-    const current = points[index]!;
-    const next = points[index + 1]!;
-    const following = points[Math.min(points.length - 1, index + 2)]!;
-    const control1 = {
-      x: current.x + (next.x - previous.x) / 6,
-      y: current.y + (next.y - previous.y) / 6,
-    };
-    const control2 = {
-      x: next.x - (following.x - current.x) / 6,
-      y: next.y - (following.y - current.y) / 6,
-    };
-
-    commands.push(
-      `C ${control1.x.toFixed(1)} ${control1.y.toFixed(1)}, ${control2.x.toFixed(
-        1,
-      )} ${control2.y.toFixed(1)}, ${next.x.toFixed(1)} ${next.y.toFixed(1)}`,
-    );
+  for (const point of points.slice(1)) {
+    commands.push(`L ${point.x.toFixed(1)} ${point.y.toFixed(1)}`);
   }
 
   return commands.join(" ");
@@ -180,8 +164,8 @@ function ageAtPoint(currentAge: number | null | undefined, point: ProjectionPoin
 function tooltipLayout(anchor: ScreenPoint) {
   const width = 138;
   const height = 82;
-  const preferredX = anchor.x > viewBox.width / 2 ? anchor.x - width - 12 : anchor.x + 12;
-  const preferredY = anchor.y < 120 ? anchor.y + 14 : anchor.y - height - 14;
+  const preferredX = anchor.x > viewBox.width / 2 ? anchor.x - width - 10 : anchor.x + 10;
+  const preferredY = anchor.y < 104 ? anchor.y + 12 : anchor.y - height - 12;
 
   return {
     x: clamp(preferredX, 10, viewBox.width - width - 10),
@@ -195,25 +179,32 @@ export function WealthCrossoverChart({
   projection,
   currency = "HKD",
   currentAge,
+  accentColor,
+  targetColor,
 }: {
   projection: ProjectionPoint[];
   currency?: string;
   currentAge?: number | null;
+  accentColor?: string;
+  targetColor?: string;
 }) {
   const colors = useThemeColors();
+  const accent = accentColor ?? colors.primary;
+  const target = targetColor ?? colors.target;
   const t = useI18n();
   const [chartWidth, setChartWidth] = useState(0);
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const reached = projection.find((point) => point.reached);
   const bounds = useMemo(() => buildChartBounds(projection), [projection]);
   const selectedPoint = useMemo(() => {
-    if (bounds.visiblePoints.length === 0) {
+    if (selectedMonth === null || bounds.visiblePoints.length === 0) {
       return null;
     }
 
-    return nearestPoint(bounds.visiblePoints, selectedMonth ?? reached?.monthIndex ?? 0);
-  }, [bounds.visiblePoints, reached?.monthIndex, selectedMonth]);
+    return nearestPoint(bounds.visiblePoints, selectedMonth);
+  }, [bounds.visiblePoints, selectedMonth]);
   const current = bounds.visiblePoints[0];
+  const end = bounds.visiblePoints[bounds.visiblePoints.length - 1];
   const currentPoint = current ? scaledPoint(bounds, current, "projectedAssets") : null;
   const reachedPoint =
     reached && reached.monthIndex <= bounds.endMonth
@@ -224,6 +215,8 @@ export function WealthCrossoverChart({
     : null;
   const selectedTooltip = selectedScreenPoint ? tooltipLayout(selectedScreenPoint) : null;
   const selectedAge = selectedPoint ? ageAtPoint(currentAge, selectedPoint) : null;
+  const reachedMonthLabel = reached ? formatMonthYear(reached.date, t.locale) : null;
+  const selectedMonthLabel = selectedPoint ? formatMonthYear(selectedPoint.date, t.locale) : null;
 
   function onLayout(event: LayoutChangeEvent) {
     setChartWidth(event.nativeEvent.layout.width);
@@ -244,6 +237,17 @@ export function WealthCrossoverChart({
     selectFromX(event.nativeEvent.locationX);
   }
 
+  function moveSelection(direction: -1 | 1) {
+    if (bounds.visiblePoints.length === 0) {
+      return;
+    }
+    const selectedIndex = selectedPoint
+      ? bounds.visiblePoints.findIndex((point) => point.monthIndex === selectedPoint.monthIndex)
+      : 0;
+    const nextIndex = clamp(selectedIndex + direction, 0, bounds.visiblePoints.length - 1);
+    setSelectedMonth(bounds.visiblePoints[nextIndex]?.monthIndex ?? 0);
+  }
+
   const webHoverProps =
     Platform.OS === "web"
       ? ({
@@ -256,6 +260,7 @@ export function WealthCrossoverChart({
                 event.nativeEvent?.layerX ??
                 0,
             ),
+          onMouseLeave: () => setSelectedMonth(null),
         } as object)
       : {};
 
@@ -263,22 +268,49 @@ export function WealthCrossoverChart({
     <View>
       <View style={styles.legendRow}>
         <View style={styles.legendItem}>
-          <View style={[styles.legendLine, { backgroundColor: colors.primary }]} />
+          <View style={[styles.legendLine, { backgroundColor: accent }]} />
           <Text style={[styles.legendText, typography.bodyMedium, { color: colors.text }]}>
             {t.chart.portfolio}
           </Text>
         </View>
         <View style={styles.legendItem}>
-          <View style={[styles.legendLine, { backgroundColor: colors.negative }]} />
+          <View style={[styles.legendLine, styles.targetLegend, { backgroundColor: target }]} />
           <Text style={[styles.legendText, typography.bodyMedium, { color: colors.text }]}>
             {t.chart.fireTarget}
           </Text>
         </View>
       </View>
       <View
+        accessible
+        accessibilityRole="adjustable"
+        accessibilityLabel={t.chart.accessibilityLabel}
+        accessibilityHint={t.chart.scrubHint}
+        accessibilityActions={[
+          { name: "decrement", label: t.chart.previousPoint },
+          { name: "increment", label: t.chart.nextPoint },
+        ]}
+        accessibilityValue={{
+          text: selectedPoint
+            ? t.chart.pointAccessibility(
+                selectedMonthLabel ?? selectedPoint.date.slice(0, 7),
+                selectedAge === null ? t.chart.ageNotSet : t.chart.age(selectedAge),
+                compactMoney(selectedPoint.projectedAssets, currency),
+                compactMoney(selectedPoint.fireTarget, currency),
+              )
+            : reached
+              ? t.chart.reachedAccessibility(reachedMonthLabel ?? reached.date.slice(0, 7))
+              : t.chart.notReachedAccessibility,
+        }}
+        onAccessibilityAction={({ nativeEvent }) => {
+          if (nativeEvent.actionName === "increment") {
+            moveSelection(1);
+          } else if (nativeEvent.actionName === "decrement") {
+            moveSelection(-1);
+          }
+        }}
         onLayout={onLayout}
         onStartShouldSetResponder={() => true}
-        onMoveShouldSetResponder={() => true}
+        onMoveShouldSetResponder={() => false}
         onResponderGrant={onResponder}
         onResponderMove={onResponder}
         {...webHoverProps}
@@ -286,7 +318,7 @@ export function WealthCrossoverChart({
         <Svg
           accessibilityLabel={
             reached
-              ? t.chart.reachedAccessibility(reached.date.slice(0, 7))
+              ? t.chart.reachedAccessibility(reachedMonthLabel ?? reached.date.slice(0, 7))
               : t.chart.notReachedAccessibility
           }
           width="100%"
@@ -295,13 +327,13 @@ export function WealthCrossoverChart({
         >
           <Defs>
             <LinearGradient id="portfolioArea" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0" stopColor={colors.primary} stopOpacity="0.24" />
-              <Stop offset="1" stopColor={colors.primary} stopOpacity="0.03" />
+              <Stop offset="0" stopColor={accent} stopOpacity="0.22" />
+              <Stop offset="1" stopColor={accent} stopOpacity="0.025" />
             </LinearGradient>
           </Defs>
-          <Line x1={chart.left} y1="54" x2={chart.right} y2="54" stroke={colors.surfaceBorder} />
-          <Line x1={chart.left} y1="116" x2={chart.right} y2="116" stroke={colors.surfaceBorder} />
-          <Line x1={chart.left} y1="178" x2={chart.right} y2="178" stroke={colors.surfaceBorder} />
+          <Line x1={chart.left} y1="42" x2={chart.right} y2="42" stroke={colors.surfaceBorder} />
+          <Line x1={chart.left} y1="86" x2={chart.right} y2="86" stroke={colors.surfaceBorder} />
+          <Line x1={chart.left} y1="130" x2={chart.right} y2="130" stroke={colors.surfaceBorder} />
           <Line
             x1={chart.left}
             y1={chart.bottom}
@@ -312,14 +344,15 @@ export function WealthCrossoverChart({
           <Path d={makeAreaPath(bounds)} fill="url(#portfolioArea)" />
           <Path
             d={makePath(bounds, "fireTarget")}
-            stroke={colors.negative}
+            stroke={target}
             strokeWidth={2.4}
             strokeLinecap="round"
+            strokeDasharray="7 6"
             fill="none"
           />
           <Path
             d={makePath(bounds, "projectedAssets")}
-            stroke={colors.primary}
+            stroke={accent}
             strokeWidth={4.5}
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -332,13 +365,13 @@ export function WealthCrossoverChart({
                 cy={currentPoint.y}
                 r={7}
                 fill={colors.surfaceSolid}
-                stroke={colors.primary}
+                stroke={accent}
                 strokeWidth={3}
               />
-              <Circle cx={currentPoint.x} cy={currentPoint.y} r={3} fill={colors.primary} />
+              <Circle cx={currentPoint.x} cy={currentPoint.y} r={3} fill={accent} />
               <SvgText
                 x={currentPoint.x + 10}
-                y={clamp(currentPoint.y - 10, 26, 210)}
+                y={clamp(currentPoint.y - 10, 22, 164)}
                 fill={colors.textSubtle}
                 fontSize="10"
                 fontWeight="600"
@@ -354,7 +387,7 @@ export function WealthCrossoverChart({
                 y1={chart.top}
                 x2={reachedPoint.x}
                 y2={chart.bottom}
-                stroke={colors.primary}
+                stroke={accent}
                 strokeDasharray="4 5"
                 opacity={0.34}
               />
@@ -363,21 +396,15 @@ export function WealthCrossoverChart({
                 cy={reachedPoint.y}
                 r={14}
                 fill="none"
-                stroke={colors.primary}
+                stroke={accent}
                 opacity={0.24}
                 strokeWidth={4}
               />
-              <Circle
-                cx={reachedPoint.x}
-                cy={reachedPoint.y}
-                r={7}
-                fill={colors.primary}
-                opacity={0.94}
-              />
+              <Circle cx={reachedPoint.x} cy={reachedPoint.y} r={7} fill={accent} opacity={0.94} />
               <SvgText
                 x={clamp(reachedPoint.x - 20, 18, 270)}
-                y={clamp(reachedPoint.y - 16, 24, 210)}
-                fill={colors.primary}
+                y={clamp(reachedPoint.y - 16, 22, 164)}
+                fill={accent}
                 fontSize="10"
                 fontWeight="800"
               >
@@ -401,7 +428,7 @@ export function WealthCrossoverChart({
                 cy={selectedScreenPoint.y}
                 r={5}
                 fill={colors.surfaceSolid}
-                stroke={colors.primary}
+                stroke={accent}
                 strokeWidth={3}
               />
               <Rect
@@ -439,12 +466,12 @@ export function WealthCrossoverChart({
                 fontSize="10"
                 fontWeight="700"
               >
-                {selectedPoint.date.slice(0, 7)}
+                {selectedMonthLabel}
               </SvgText>
               <SvgText
                 x={selectedTooltip.x + 12}
                 y={selectedTooltip.y + 72}
-                fill={colors.primary}
+                fill={accent}
                 fontSize="10"
                 fontWeight="800"
               >
@@ -452,10 +479,47 @@ export function WealthCrossoverChart({
               </SvgText>
             </G>
           ) : null}
+          {current ? (
+            <SvgText
+              x={chart.left}
+              y={chart.bottom + 20}
+              fill={colors.textMuted}
+              fontSize="9"
+              fontWeight="700"
+            >
+              {current.date.slice(0, 4)}
+            </SvgText>
+          ) : null}
+          {reachedPoint && reached ? (
+            <SvgText
+              x={reachedPoint.x}
+              y={chart.bottom + 20}
+              fill={accent}
+              fontSize="9"
+              fontWeight="800"
+              textAnchor="middle"
+            >
+              {reached.date.slice(0, 4)}
+            </SvgText>
+          ) : null}
+          {end ? (
+            <SvgText
+              x={chart.right}
+              y={chart.bottom + 20}
+              fill={colors.textMuted}
+              fontSize="9"
+              fontWeight="700"
+              textAnchor="end"
+            >
+              {end.date.slice(0, 4)}
+            </SvgText>
+          ) : null}
         </Svg>
       </View>
       <Text style={[styles.summary, typography.body, { color: colors.textMuted }]}>
-        {reached ? t.chart.reachedSummary(reached.date.slice(0, 7)) : t.chart.notReachedSummary}
+        {reached
+          ? t.chart.reachedSummary(reachedMonthLabel ?? reached.date.slice(0, 7))
+          : t.chart.notReachedSummary}
       </Text>
     </View>
   );
@@ -467,7 +531,6 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     columnGap: tokens.spacing.md,
     rowGap: tokens.spacing.sm,
-    marginTop: tokens.spacing.sm,
   },
   legendItem: {
     flexDirection: "row",
@@ -479,12 +542,15 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: tokens.radius.pill,
   },
+  targetLegend: {
+    height: 3,
+  },
   legendText: {
     fontSize: 12,
     lineHeight: 17,
   },
   summary: {
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 12,
+    lineHeight: 17,
   },
 });

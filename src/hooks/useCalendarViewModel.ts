@@ -51,12 +51,18 @@ export function useCalendarViewModel() {
         key: date,
         date,
         day: parts.day,
-        net: dailyNet(snapshot.transactions, date),
+        net: dailyNet(snapshot.transactions, date, snapshot.currency),
         isCurrentMonth: parts.year === visibleParts.year && parts.month === visibleParts.month,
         isToday: date === today,
       };
     });
-  }, [snapshot.transactions, visibleMonth, visibleParts.month, visibleParts.year]);
+  }, [
+    snapshot.currency,
+    snapshot.transactions,
+    visibleMonth,
+    visibleParts.month,
+    visibleParts.year,
+  ]);
   const selectedTransactions = snapshot.transactions.filter(
     (transaction) => transaction.date === selectedDate && !transaction.archivedAt,
   );
@@ -88,7 +94,12 @@ export function useCalendarViewModel() {
   return {
     monthLabel: formatMonthYear(visibleMonth, t.locale),
     currency: snapshot.currency,
-    summary: monthlySummary(snapshot.transactions, visibleParts.year, visibleParts.month),
+    summary: monthlySummary(
+      snapshot.transactions,
+      visibleParts.year,
+      visibleParts.month,
+      snapshot.currency,
+    ),
     weekdays: snapshot.language === "zhHant" ? t.dates.weekdays : calendarWeekdays,
     calendarCells,
     selectedDate,
@@ -104,6 +115,6 @@ export function useCalendarViewModel() {
     goToToday,
     saveTransactionEdit,
     moveTransactionToToday: (id: string) => updateTransaction(id, { date: todayIso() }),
-    archiveTransaction,
+    deleteTransaction: archiveTransaction,
   };
 }

@@ -3,11 +3,30 @@ export function money(value: number, currency = "HKD") {
 }
 
 export function percent(value: number, digits = 1) {
-  return `${(value * 100).toFixed(digits)}%`;
+  const scaled = value * 100;
+  const threshold = 0.5 * 10 ** -digits;
+  const normalized = Math.abs(scaled) < threshold ? 0 : scaled;
+  return `${normalized.toFixed(digits)}%`;
+}
+
+export function shortDateTime(value: string | null | undefined, locale = "en-US") {
+  if (!value) {
+    return "";
+  }
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) {
+    return "";
+  }
+  return new Intl.DateTimeFormat(locale, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
 }
 
 export function signedMoney(value: number, currency = "HKD") {
-  const sign = value >= 0 ? "+" : "-";
+  const sign = value > 0 ? "+" : value < 0 ? "-" : "";
   return `${sign}${money(Math.abs(value), currency)}`;
 }
 
@@ -72,6 +91,16 @@ export function formatMonthYear(date: string, locale?: string) {
   });
 }
 
+export function formatFullDate(date: string, locale?: string) {
+  const parts = isoDateParts(date);
+  return new Date(parts.year, parts.month - 1, parts.day).toLocaleDateString(locale, {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
 export function formatLogDateLabel(date: string, today = todayIso()) {
   if (date === today) {
     return "Today";
@@ -107,5 +136,15 @@ export function formatShortDate(date: string) {
   return new Date(`${date}T00:00:00`).toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
+  });
+}
+
+export function formatDateInputLabel(date: string, locale?: string) {
+  const { year, month, day } = isoDateParts(date);
+  return new Date(year, month - 1, day).toLocaleDateString(locale, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    weekday: "short",
   });
 }

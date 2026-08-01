@@ -13,7 +13,11 @@ function text(value: Primitive) {
     return "";
   }
 
-  return String(value);
+  const raw = String(value);
+  if (typeof value === "string" && /^[\t\r ]*[=+\-@]/.test(raw)) {
+    return `'${raw}`;
+  }
+  return raw;
 }
 
 function csvCell(value: Primitive) {

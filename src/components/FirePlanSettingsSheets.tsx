@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import {
   KeyboardAvoidingView,
   Modal,
@@ -9,14 +9,18 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 
+import { fieldLabelWithUnit } from "./firePlanPresentation";
 import { MotionPressable } from "./MotionPressable";
+import { sheetBackdropEnter, sheetBackdropExit, sheetEnter, sheetExit } from "../design/motion";
 import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
 import type { FireGoal, Milestone, ProjectionScenario } from "../features/types";
+import { useReducedMotion } from "../hooks/useReducedMotion";
 import { useI18n } from "../i18n";
 import { money, percent } from "../utils/format";
 
@@ -110,6 +114,7 @@ function BaseSheet({
   children: React.ReactNode;
 }) {
   const colors = useThemeColors();
+  const reducedMotion = useReducedMotion();
 
   if (!visible) {
     return null;
@@ -122,15 +127,16 @@ function BaseSheet({
         style={styles.modalRoot}
       >
         <Animated.View
-          entering={FadeIn.duration(160)}
-          exiting={FadeOut.duration(120)}
+          entering={reducedMotion ? undefined : sheetBackdropEnter}
+          exiting={reducedMotion ? undefined : sheetBackdropExit}
           style={styles.scrim}
         >
           <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         </Animated.View>
         <Animated.View
-          entering={SlideInDown.duration(260)}
-          exiting={SlideOutDown.duration(180)}
+          accessibilityViewIsModal
+          entering={reducedMotion ? undefined : sheetEnter}
+          exiting={reducedMotion ? undefined : sheetExit}
           style={[
             styles.sheet,
             { backgroundColor: colors.surfaceSolid, borderColor: colors.surfaceBorder },
@@ -251,21 +257,21 @@ function ToggleRow({
       style={[
         styles.toggleRow,
         {
-          borderColor: value ? colors.positive : colors.surfaceBorder,
-          backgroundColor: value ? `${colors.positive}16` : colors.backgroundAlt,
+          borderColor: value ? colors.primaryBorder : colors.surfaceBorder,
+          backgroundColor: value ? colors.primarySoft : colors.backgroundAlt,
         },
       ]}
     >
       <MaterialCommunityIcons
         name={value ? "check-circle-outline" : "circle-outline"}
         size={20}
-        color={value ? colors.positive : colors.textMuted}
+        color={value ? colors.primary : colors.textMuted}
       />
       <Text
         style={[
           styles.toggleText,
           typography.button,
-          { color: value ? colors.positive : colors.textMuted },
+          { color: value ? colors.primary : colors.textMuted },
         ]}
       >
         {label}
@@ -299,6 +305,33 @@ function SaveButton({
           { color: disabled ? colors.textMuted : colors.onPrimary },
         ]}
       >
+        {label}
+      </Text>
+    </MotionPressable>
+  );
+}
+
+function ResponsiveSplitFields({ children }: { children: ReactNode }) {
+  const { fontScale, width } = useWindowDimensions();
+  const shouldStack = width < 420 || fontScale >= 1.5;
+  return (
+    <View style={[styles.splitFields, shouldStack && styles.splitFieldsStack]}>{children}</View>
+  );
+}
+
+function TonalAddButton({ label, onPress }: { label: string; onPress: () => void }) {
+  const colors = useThemeColors();
+  return (
+    <MotionPressable
+      onPress={onPress}
+      accessibilityLabel={label}
+      style={[
+        styles.tonalAddButton,
+        { backgroundColor: colors.primarySoft, borderColor: `${colors.primary}52` },
+      ]}
+    >
+      <MaterialCommunityIcons name="plus" size={19} color={colors.primary} />
+      <Text style={[styles.tonalAddText, typography.button, { color: colors.primary }]}>
         {label}
       </Text>
     </MotionPressable>
@@ -436,7 +469,10 @@ function FirePlanEditorContent({
     numberFromText(currentAge) <= 120 &&
     numberFromText(targetMonthlySpending) >= 0 &&
     numberFromText(monthlySaving) >= 0 &&
-    numberFromText(withdrawalRate) > 0;
+    numberFromText(withdrawalRate) > 0 &&
+    numberFromText(withdrawalRate) <= 100 &&
+    numberFromText(inflationRate, 0) > -95 &&
+    numberFromText(inflationRate, 0) <= 1000;
 
   function save() {
     if (!canSave) {
@@ -485,47 +521,50 @@ function FirePlanEditorContent({
           accessibilityLabel={t.firePlan.currentAge}
         />
         <Field
-          label={t.firePlan.retirementMonthlyWithdrawal}
+          label={fieldLabelWithUnit(t.firePlan.retirementMonthlyWithdrawal, goal.baseCurrency)}
           value={targetMonthlySpending}
           onChangeText={(value) => setTargetMonthlySpending(normalizeNumberInput(value))}
           keyboardType={Platform.OS === "ios" ? "decimal-pad" : "numeric"}
           inputMode="decimal"
           placeholder="28000"
-          accessibilityLabel={t.firePlan.retirementMonthlyWithdrawal}
+          accessibilityLabel={fieldLabelWithUnit(
+            t.firePlan.retirementMonthlyWithdrawal,
+            goal.baseCurrency,
+          )}
         />
         <Field
-          label={t.common.monthlySaving}
+          label={fieldLabelWithUnit(t.common.monthlySaving, goal.baseCurrency)}
           value={monthlySaving}
           onChangeText={(value) => setMonthlySaving(normalizeNumberInput(value))}
           keyboardType={Platform.OS === "ios" ? "decimal-pad" : "numeric"}
           inputMode="decimal"
           placeholder="18000"
-          accessibilityLabel={t.common.monthlySaving}
+          accessibilityLabel={fieldLabelWithUnit(t.common.monthlySaving, goal.baseCurrency)}
         />
-        <View style={styles.splitFields}>
+        <ResponsiveSplitFields>
           <View style={styles.splitField}>
             <Field
-              label={`${t.common.withdrawalRate} %`}
+              label={fieldLabelWithUnit(t.common.withdrawalRate, "%")}
               value={withdrawalRate}
               onChangeText={(value) => setWithdrawalRate(normalizeNumberInput(value))}
               keyboardType={Platform.OS === "ios" ? "decimal-pad" : "numeric"}
               inputMode="decimal"
               placeholder="3.5"
-              accessibilityLabel={`${t.common.withdrawalRate} %`}
+              accessibilityLabel={fieldLabelWithUnit(t.common.withdrawalRate, "%")}
             />
           </View>
           <View style={styles.splitField}>
             <Field
-              label={`${t.common.inflation} %`}
+              label={fieldLabelWithUnit(t.common.inflation, "%")}
               value={inflationRate}
               onChangeText={(value) => setInflationRate(normalizeNumberInput(value, true))}
               keyboardType={Platform.OS === "ios" ? "numbers-and-punctuation" : "numeric"}
               inputMode="decimal"
               placeholder="2.5"
-              accessibilityLabel={`${t.common.inflation} %`}
+              accessibilityLabel={fieldLabelWithUnit(t.common.inflation, "%")}
             />
           </View>
-        </View>
+        </ResponsiveSplitFields>
         <SaveButton label={t.firePlan.saveFirePlan} disabled={!canSave} onPress={save} />
       </ScrollView>
     </>
@@ -535,12 +574,14 @@ function FirePlanEditorContent({
 export function MilestoneEditorSheet({
   visible,
   milestone,
+  currency,
   onClose,
   onSave,
   onArchive,
 }: {
   visible: boolean;
   milestone: Milestone | null;
+  currency: string;
   onClose: () => void;
   onSave: (milestoneId: string, patch: MilestonePatch) => void;
   onArchive?: (milestoneId: string) => void;
@@ -554,6 +595,7 @@ export function MilestoneEditorSheet({
       <MilestoneEditorContent
         key={milestone.id}
         milestone={milestone}
+        currency={currency}
         onClose={onClose}
         onSave={onSave}
         onArchive={onArchive}
@@ -597,7 +639,7 @@ export function MilestoneListSheet({
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
       >
-        <SaveButton label={t.firePlan.addMilestone} disabled={false} onPress={onAdd} />
+        <TonalAddButton label={t.firePlan.addMilestone} onPress={onAdd} />
         {milestones.length > 0 ? (
           milestones.map((milestone, index) => {
             const state = milestone.isHidden
@@ -625,7 +667,7 @@ export function MilestoneListSheet({
                     adjustsFontSizeToFit
                     style={[styles.listValue, typography.title, { color: colors.text }]}
                   >
-                    {milestone.name} | {money(milestone.targetAmount, currency)}
+                    {milestone.name} · {money(milestone.targetAmount, currency)}
                   </Text>
                 </View>
                 <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textMuted} />
@@ -682,11 +724,32 @@ export function ScenarioListSheet({
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
       >
-        <SaveButton
-          label={canAddScenario ? t.firePlan.addFireMethod : t.firePlan.maxFireMethods}
-          disabled={!canAddScenario}
-          onPress={onAdd}
-        />
+        {canAddScenario ? (
+          <TonalAddButton label={t.firePlan.addFireMethod} onPress={onAdd} />
+        ) : (
+          <View
+            accessible
+            accessibilityLabel={t.firePlan.maxFireMethods}
+            style={[
+              styles.maxMethodsStatus,
+              {
+                backgroundColor: colors.backgroundAlt,
+                borderColor: colors.surfaceBorder,
+              },
+            ]}
+          >
+            <MaterialCommunityIcons
+              name="check-circle-outline"
+              size={19}
+              color={colors.textMuted}
+            />
+            <Text
+              style={[styles.maxMethodsStatusText, typography.button, { color: colors.textMuted }]}
+            >
+              {t.firePlan.maxFireMethods}
+            </Text>
+          </View>
+        )}
         {scenarios.map((scenario) => {
           const assumptions = scenarioAssumptions(goal, scenario, baseExpectedReturn);
           return (
@@ -696,7 +759,63 @@ export function ScenarioListSheet({
               accessibilityLabel={`${t.firePlan.editFireMethod} ${scenario.name}`}
               style={styles.listRow}
             >
-              <View style={styles.listCopy}>
+              <View style={styles.scenarioComparison}>
+                <View style={styles.scenarioComparisonTitle}>
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.scenarioName, typography.title, { color: colors.text }]}
+                  >
+                    {scenario.name}
+                  </Text>
+                  {scenario.isDefault ? (
+                    <Text
+                      style={[
+                        styles.defaultBadge,
+                        typography.button,
+                        { backgroundColor: colors.primarySoft, color: colors.primary },
+                      ]}
+                    >
+                      {t.common.defaultLabel}
+                    </Text>
+                  ) : null}
+                </View>
+                {[
+                  [
+                    t.firePlan.retirementMonthlyWithdrawal,
+                    `${money(assumptions.targetMonthlySpending, currency)}${t.firePlan.monthlySuffix}`,
+                  ],
+                  [
+                    t.common.monthlySaving,
+                    `${money(assumptions.monthlySaving, currency)}${t.firePlan.monthlySuffix}`,
+                  ],
+                  [t.common.withdrawalRate, percent(assumptions.withdrawalRate)],
+                  [t.firePlan.expectedReturn, `${percent(assumptions.expectedReturn)} p.a.`],
+                ].map(([label, value]) => (
+                  <View key={label} style={styles.scenarioMetric}>
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.scenarioMetricLabel,
+                        typography.body,
+                        { color: colors.textMuted },
+                      ]}
+                    >
+                      {label}
+                    </Text>
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.scenarioMetricValue,
+                        typography.button,
+                        { color: colors.text },
+                      ]}
+                    >
+                      {value}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+              <View style={[styles.listCopy, styles.hidden]}>
                 <Text
                   numberOfLines={1}
                   style={[styles.listLabel, typography.body, { color: colors.textMuted }]}
@@ -709,8 +828,9 @@ export function ScenarioListSheet({
                   adjustsFontSizeToFit
                   style={[styles.listValue, typography.title, { color: colors.text }]}
                 >
-                  {scenario.name} | {money(assumptions.targetMonthlySpending, currency)}
-                  {t.firePlan.monthlySuffix} | {percent(assumptions.withdrawalRate)} SWR
+                  {scenario.name} · {money(assumptions.targetMonthlySpending, currency)}
+                  {t.firePlan.monthlySuffix} · {percent(assumptions.withdrawalRate)}{" "}
+                  {t.common.withdrawalRate}
                 </Text>
                 <Text
                   numberOfLines={1}
@@ -801,7 +921,11 @@ function ScenarioEditorContent({
     numberFromText(targetMonthlySpending) >= 0 &&
     numberFromText(monthlySaving) >= 0 &&
     numberFromText(withdrawalRate) > 0 &&
-    numberFromText(expectedReturn, 0) > -95;
+    numberFromText(withdrawalRate) <= 100 &&
+    numberFromText(inflationRate, 0) > -95 &&
+    numberFromText(inflationRate, 0) <= 1000 &&
+    numberFromText(expectedReturn, 0) > -95 &&
+    numberFromText(expectedReturn, 0) <= 1000;
 
   function save() {
     if (!canSave) {
@@ -857,24 +981,27 @@ function ScenarioEditorContent({
           accessibilityLabel={t.firePlan.methodName}
         />
         <Field
-          label={t.firePlan.retirementMonthlyWithdrawal}
+          label={fieldLabelWithUnit(t.firePlan.retirementMonthlyWithdrawal, goal?.baseCurrency)}
           value={targetMonthlySpending}
           onChangeText={(value) => setTargetMonthlySpending(normalizeNumberInput(value))}
           keyboardType={Platform.OS === "ios" ? "decimal-pad" : "numeric"}
           inputMode="decimal"
           placeholder="28000"
-          accessibilityLabel={t.firePlan.retirementMonthlyWithdrawal}
+          accessibilityLabel={fieldLabelWithUnit(
+            t.firePlan.retirementMonthlyWithdrawal,
+            goal?.baseCurrency,
+          )}
         />
         <Field
-          label={t.common.monthlySaving}
+          label={fieldLabelWithUnit(t.common.monthlySaving, goal?.baseCurrency)}
           value={monthlySaving}
           onChangeText={(value) => setMonthlySaving(normalizeNumberInput(value))}
           keyboardType={Platform.OS === "ios" ? "decimal-pad" : "numeric"}
           inputMode="decimal"
           placeholder="18000"
-          accessibilityLabel={t.common.monthlySaving}
+          accessibilityLabel={fieldLabelWithUnit(t.common.monthlySaving, goal?.baseCurrency)}
         />
-        <View style={styles.splitFields}>
+        <ResponsiveSplitFields>
           <View style={styles.splitField}>
             <Field
               label={t.firePlan.safeWithdrawalRate}
@@ -888,16 +1015,16 @@ function ScenarioEditorContent({
           </View>
           <View style={styles.splitField}>
             <Field
-              label={`${t.common.inflation} %`}
+              label={fieldLabelWithUnit(t.common.inflation, "%")}
               value={inflationRate}
               onChangeText={(value) => setInflationRate(normalizeNumberInput(value, true))}
               keyboardType={Platform.OS === "ios" ? "numbers-and-punctuation" : "numeric"}
               inputMode="decimal"
               placeholder="2.5"
-              accessibilityLabel={`${t.common.inflation} %`}
+              accessibilityLabel={fieldLabelWithUnit(t.common.inflation, "%")}
             />
           </View>
-        </View>
+        </ResponsiveSplitFields>
         <Field
           label={t.firePlan.expectedReturn}
           value={expectedReturn}
@@ -945,11 +1072,13 @@ function ScenarioEditorContent({
 
 function MilestoneEditorContent({
   milestone,
+  currency,
   onClose,
   onSave,
   onArchive,
 }: {
   milestone: Milestone;
+  currency: string;
   onClose: () => void;
   onSave: (milestoneId: string, patch: MilestonePatch) => void;
   onArchive?: (milestoneId: string) => void;
@@ -1022,15 +1151,15 @@ function MilestoneEditorContent({
           accessibilityLabel={t.firePlan.milestoneName}
         />
         <Field
-          label={t.firePlan.targetAmount}
+          label={fieldLabelWithUnit(t.firePlan.targetAmount, currency)}
           value={targetAmount}
           onChangeText={(value) => setTargetAmount(normalizeNumberInput(value))}
           keyboardType={Platform.OS === "ios" ? "decimal-pad" : "numeric"}
           inputMode="decimal"
           placeholder="450000"
-          accessibilityLabel={t.firePlan.targetAmount}
+          accessibilityLabel={fieldLabelWithUnit(t.firePlan.targetAmount, currency)}
         />
-        <View style={styles.splitFields}>
+        <ResponsiveSplitFields>
           <View style={styles.splitField}>
             <Field
               label={t.firePlan.targetDate}
@@ -1051,7 +1180,7 @@ function MilestoneEditorContent({
               accessibilityLabel={t.firePlan.returnOverride}
             />
           </View>
-        </View>
+        </ResponsiveSplitFields>
         <ToggleRow
           label={t.firePlan.activeMilestone}
           value={isActive}
@@ -1138,9 +1267,9 @@ const styles = StyleSheet.create({
     fontSize: 26,
   },
   closeButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1168,6 +1297,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: tokens.spacing.sm,
   },
+  splitFieldsStack: {
+    flexDirection: "column",
+  },
   splitField: {
     flex: 1,
     minWidth: 0,
@@ -1194,6 +1326,30 @@ const styles = StyleSheet.create({
   saveText: {
     fontSize: 14,
   },
+  tonalAddButton: {
+    minHeight: 50,
+    borderWidth: 1,
+    borderRadius: tokens.radius.utility,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: tokens.spacing.sm,
+  },
+  tonalAddText: {
+    fontSize: 14,
+  },
+  maxMethodsStatus: {
+    minHeight: 50,
+    borderWidth: 1,
+    borderRadius: tokens.radius.utility,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: tokens.spacing.sm,
+  },
+  maxMethodsStatusText: {
+    fontSize: 13,
+  },
   listRow: {
     minHeight: 68,
     flexDirection: "row",
@@ -1202,6 +1358,27 @@ const styles = StyleSheet.create({
     gap: tokens.spacing.md,
     paddingVertical: 10,
   },
+  scenarioComparison: { flex: 1, minWidth: 0, gap: 6 },
+  scenarioComparisonTitle: { flexDirection: "row", alignItems: "center", gap: tokens.spacing.sm },
+  scenarioName: { flex: 1, minWidth: 0, fontSize: 19, lineHeight: 24 },
+  defaultBadge: {
+    borderRadius: tokens.radius.pill,
+    overflow: "hidden",
+    paddingHorizontal: tokens.spacing.sm,
+    paddingVertical: 4,
+    fontSize: 10,
+    lineHeight: 14,
+  },
+  scenarioMetric: { flexDirection: "row", alignItems: "baseline", gap: tokens.spacing.md },
+  scenarioMetricLabel: { flex: 1, minWidth: 0, fontSize: 13, lineHeight: 18 },
+  scenarioMetricValue: {
+    maxWidth: "58%",
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: "right",
+    fontVariant: ["tabular-nums"],
+  },
+  hidden: { display: "none" },
   listCopy: {
     flex: 1,
     minWidth: 0,

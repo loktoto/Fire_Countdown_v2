@@ -1,9 +1,10 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useFocusEffect, useNavigation, useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useState } from "react";
+import { ActivityIndicator, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 
 import { AllocationBar } from "../components/AllocationBar";
+import { AppHeader } from "../components/AppHeader";
 import { AssetEditorSheet } from "../components/AssetEditorSheet";
 import { EditableRow } from "../components/EditableRow";
 import {
@@ -16,25 +17,39 @@ import {
 import { GlassCard } from "../components/GlassCard";
 import { HeroMetric } from "../components/HeroMetric";
 import { MotionPressable } from "../components/MotionPressable";
-import { ScreenContainer } from "../components/ScreenContainer";
+import { getPortfolioLayout, portfolioAssetColorRole } from "../components/portfolioPresentation";
+import { ScreenScaffold } from "../components/ScreenScaffold";
 import { StatusBadge } from "../components/StatusBadge";
+import { TimeLensValue } from "../components/TimeLens";
 import { resolveAssetValue } from "../engine/fireEngine";
 import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
 import type { Asset, Milestone, ProjectionScenario } from "../features/types";
 import { usePortfolioViewModel } from "../hooks/usePortfolioViewModel";
 import { useI18n } from "../i18n";
-import { money, percent } from "../utils/format";
+import { money, percent, shortDateTime } from "../utils/format";
+
+const assetClassIcons: Record<Asset["assetClass"], keyof typeof MaterialCommunityIcons.glyphMap> = {
+  cash: "cash-multiple",
+  etf: "chart-box-outline",
+  stock: "chart-line",
+  crypto: "currency-btc",
+  bond: "file-certificate-outline",
+  real_estate: "office-building-outline",
+  pension: "shield-account-outline",
+  private_investment: "briefcase-outline",
+  business: "storefront-outline",
+  custom: "shape-outline",
+};
 
 export function PortfolioScreen() {
   const colors = useThemeColors();
   const t = useI18n();
   const router = useRouter();
-  const navigation = useNavigation() as unknown as {
-    addListener: (event: "tabPress", callback: () => void) => () => void;
-  };
   const vm = usePortfolioViewModel();
+  const { width, fontScale } = useWindowDimensions();
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
+  const [creatingAsset, setCreatingAsset] = useState(false);
   const [milestoneListOpen, setMilestoneListOpen] = useState(false);
   const [scenarioListOpen, setScenarioListOpen] = useState(false);
   const [firePlanEditorOpen, setFirePlanEditorOpen] = useState(false);
@@ -43,7 +58,6 @@ export function PortfolioScreen() {
   const [editingScenario, setEditingScenario] = useState<ProjectionScenario | null>(null);
   const [creatingScenario, setCreatingScenario] = useState(false);
   const [assetAmountsHidden, setAssetAmountsHidden] = useState(false);
-  const [allocationMotionKey, setAllocationMotionKey] = useState(0);
   const assetVisibilityLabel = assetAmountsHidden
     ? t.common.showAssetAmounts
     : t.common.hideAssetAmounts;
@@ -52,24 +66,57 @@ export function PortfolioScreen() {
   const includedAssetValue = assetAmountsHidden ? "***" : money(vm.includedAssets, goalCurrency);
   const currentAgeLabel =
     vm.goal.currentAge == null ? t.common.notSet : t.common.yearsOld(vm.goal.currentAge);
-
-  const replayAllocationMotion = useCallback(() => {
-    setAllocationMotionKey((current) => current + 1);
-  }, []);
+  const lastQuoteUpdate = shortDateTime(vm.lastRefreshAt, t.locale);
+  const quoteError =
+    vm.refreshQuotes.error instanceof Error ? vm.refreshQuotes.error.message : null;
+  const refreshIfDue = vm.refreshIfDue;
+  const quoteStatus = vm.refreshQuotes.isPending
+    ? t.portfolio.pricesRefreshing
+    : quoteError
+      ? t.portfolio.pricesCached(lastQuoteUpdate)
+      : !vm.quoteEnabled
+        ? t.portfolio.pricesDisabled
+        : lastQuoteUpdate
+          ? t.portfolio.pricesUpdated(lastQuoteUpdate)
+          : t.portfolio.pricesNeverUpdated;
+  const { stackAssetRows, stackSectionHeaders, stackQuickActions } = getPortfolioLayout(
+    width,
+    fontScale,
+  );
 
   useFocusEffect(
     useCallback(() => {
-      replayAllocationMotion();
-    }, [replayAllocationMotion]),
-  );
-
-  useEffect(
-    () => navigation.addListener("tabPress", replayAllocationMotion),
-    [navigation, replayAllocationMotion],
+      refreshIfDue();
+    }, [refreshIfDue]),
   );
 
   function privateMoney(value: number, currency?: string) {
     return assetAmountsHidden ? "***" : money(value, currency);
+  }
+
+  function assetClassLabel(assetClass: Asset["assetClass"]) {
+    switch (assetClass) {
+      case "cash":
+        return t.assets.classOptions.cash;
+      case "etf":
+        return t.assets.classOptions.etf;
+      case "stock":
+        return t.assets.classOptions.stock;
+      case "crypto":
+        return t.assets.classOptions.crypto;
+      case "bond":
+        return t.assets.classOptions.bond;
+      case "real_estate":
+        return t.assets.classOptions.realEstate;
+      case "pension":
+        return t.assets.classOptions.pension;
+      case "private_investment":
+        return t.assets.classOptions.privateInvestment;
+      case "business":
+        return t.assets.classOptions.business;
+      case "custom":
+        return t.assets.classOptions.custom;
+    }
   }
 
   function toggleAssetAmounts() {
@@ -77,7 +124,43 @@ export function PortfolioScreen() {
   }
 
   function openAssetEditor(asset: Asset) {
+    setCreatingAsset(false);
     setEditingAsset(asset);
+  }
+
+  function addAsset() {
+    setCreatingAsset(true);
+    setEditingAsset(vm.newAssetDraft());
+  }
+
+  function closeAssetEditor() {
+    setEditingAsset(null);
+    setCreatingAsset(false);
+  }
+
+  function saveAsset(assetId: string, patch: Partial<Asset>) {
+    if (creatingAsset && editingAsset) {
+      const draft = { ...editingAsset, ...patch };
+      vm.createAsset({
+        archivedAt: null,
+        assetClass: draft.assetClass,
+        currency: draft.currency,
+        exchange: draft.exchange ?? null,
+        expectedAnnualReturn: draft.expectedAnnualReturn,
+        googleFinanceSymbol: draft.googleFinanceSymbol ?? null,
+        includeInFire: draft.includeInFire,
+        manualValue: draft.manualValue ?? 0,
+        name: draft.name,
+        notes: draft.notes ?? null,
+        quantity: draft.quantity ?? null,
+        ticker: draft.ticker ?? null,
+        typeId: draft.typeId,
+        updateMethod: draft.updateMethod,
+      });
+    } else {
+      vm.updateAsset(assetId, patch);
+    }
+    closeAssetEditor();
   }
 
   function addMilestone() {
@@ -168,127 +251,298 @@ export function PortfolioScreen() {
   }
 
   return (
-    <ScreenContainer>
-      <View style={styles.header}>
-        <View>
-          <Text style={[styles.kicker, typography.button, { color: colors.primary }]}>
-            {t.portfolio.kicker}
-          </Text>
-          <Text style={[styles.title, typography.display, { color: colors.text }]}>
-            {t.portfolio.title}
-          </Text>
-        </View>
-        <MotionPressable onPress={() => router.push("/settings")} style={styles.settingsButton}>
-          <Text style={[typography.button, { color: colors.primary }]}>{t.portfolio.settings}</Text>
-        </MotionPressable>
-      </View>
+    <ScreenScaffold>
+      <AppHeader
+        eyebrow={t.portfolio.kicker}
+        title={t.portfolio.title}
+        subtitle={t.portfolio.subtitle}
+        action={
+          <MotionPressable
+            onPress={() => router.push("/settings")}
+            accessibilityLabel={t.portfolio.settings}
+            accessibilityRole="button"
+            style={[
+              styles.settingsButton,
+              { backgroundColor: colors.surfaceElevated, borderColor: colors.surfaceBorder },
+            ]}
+          >
+            <MaterialCommunityIcons name="cog-outline" size={22} color={colors.primary} />
+          </MotionPressable>
+        }
+      />
 
-      <MotionPressable
-        onPress={toggleAssetAmounts}
-        accessibilityLabel={assetVisibilityLabel}
-        accessibilityState={{ selected: assetAmountsHidden }}
-        hitSlop={8}
-      >
+      <View style={styles.heroBlock}>
         <HeroMetric
           label={t.portfolio.totalAssets}
           value={totalAssetValue}
           caption={t.portfolio.includedCaption(includedAssetValue, percent(vm.weightedReturn))}
+          timeLens={{ amount: vm.totalAssets, kind: "asset", disabled: assetAmountsHidden }}
         />
-      </MotionPressable>
+        <MotionPressable
+          onPress={toggleAssetAmounts}
+          accessibilityLabel={assetVisibilityLabel}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: assetAmountsHidden }}
+          hitSlop={8}
+          style={[
+            styles.visibilityButton,
+            { backgroundColor: colors.surfaceElevated, borderColor: colors.surfaceBorder },
+          ]}
+        >
+          <MaterialCommunityIcons
+            name={assetAmountsHidden ? "eye-off-outline" : "eye-outline"}
+            size={20}
+            color={colors.primary}
+          />
+        </MotionPressable>
+      </View>
 
-      <MotionPressable
-        onPress={replayAllocationMotion}
-        accessibilityLabel={t.portfolio.replayAllocation}
-        style={styles.allocationButton}
+      <View
+        style={[
+          styles.marketStrip,
+          {
+            backgroundColor: quoteError ? colors.warningSoft : colors.surface,
+            borderColor: quoteError ? `${colors.warning}55` : colors.surfaceBorder,
+          },
+        ]}
       >
-        <GlassCard>
-          <Text style={[styles.sectionTitle, typography.title, { color: colors.text }]}>
-            {t.portfolio.allocation}
+        <View
+          style={[
+            styles.marketIcon,
+            { backgroundColor: quoteError ? `${colors.warning}22` : colors.surfaceElevated },
+          ]}
+        >
+          <MaterialCommunityIcons
+            name={quoteError ? "cloud-alert-outline" : "chart-line"}
+            size={20}
+            color={quoteError ? colors.warning : colors.primary}
+          />
+        </View>
+        <View style={styles.marketCopy}>
+          <Text style={[styles.marketTitle, typography.button, { color: colors.text }]}>
+            {t.portfolio.marketPrices}
           </Text>
-          <AllocationBar motionKey={allocationMotionKey} segments={vm.allocation} />
-        </GlassCard>
-      </MotionPressable>
+          <Text
+            accessibilityLiveRegion="polite"
+            numberOfLines={2}
+            style={[styles.marketStatus, typography.body, { color: colors.textMuted }]}
+          >
+            {quoteStatus}
+          </Text>
+        </View>
+        <MotionPressable
+          onPress={() => (vm.quoteEnabled ? vm.refreshQuotes.mutate() : router.push("/settings"))}
+          disabled={vm.refreshQuotes.isPending}
+          accessibilityLabel={t.portfolio.refreshPrices}
+          accessibilityRole="button"
+          style={[styles.marketRefresh, { borderColor: colors.surfaceBorder }]}
+          haptic="selection"
+        >
+          {vm.refreshQuotes.isPending ? (
+            <ActivityIndicator size="small" color={colors.primary} />
+          ) : (
+            <MaterialCommunityIcons
+              name={vm.quoteEnabled ? "refresh" : "arrow-right"}
+              size={20}
+              color={colors.primary}
+            />
+          )}
+        </MotionPressable>
+      </View>
 
-      <GlassCard>
-        <View style={styles.sectionHeader}>
+      <View style={styles.allocationSection}>
+        <Text style={[styles.sectionTitle, typography.title, { color: colors.text }]}>
+          {t.portfolio.allocation}
+        </Text>
+        <View
+          style={[
+            styles.allocationStage,
+            { backgroundColor: colors.surface, borderColor: colors.surfaceBorder },
+          ]}
+        >
+          <AllocationBar segments={vm.allocation} />
+        </View>
+      </View>
+
+      <View style={styles.assetsSection}>
+        <View
+          style={[
+            styles.sectionHeader,
+            stackSectionHeaders ? styles.sectionHeaderStacked : undefined,
+          ]}
+        >
           <Text style={[styles.sectionTitle, typography.title, { color: colors.text }]}>
             {t.portfolio.assets}
           </Text>
-          <MotionPressable onPress={vm.addManualAsset}>
-            <Text style={[typography.button, { color: colors.primary }]}>{t.common.add}</Text>
+          <MotionPressable
+            onPress={addAsset}
+            accessibilityLabel={t.assets.addAsset}
+            accessibilityRole="button"
+            style={styles.headerAction}
+          >
+            <MaterialCommunityIcons name="plus" size={18} color={colors.primary} />
+            <Text style={[typography.button, { color: colors.primary }]}>{t.assets.addAsset}</Text>
           </MotionPressable>
         </View>
-        {vm.assets.map((asset) => {
-          const resolved = resolveAssetValue(asset, vm.quoteCache, goalCurrency);
-          return (
-            <View
-              key={asset.id}
-              style={[styles.assetRow, { borderBottomColor: colors.surfaceBorder }]}
-            >
-              <MotionPressable
-                onPress={() => openAssetEditor(asset)}
-                accessibilityLabel={t.portfolio.editAsset(asset.name)}
-                style={styles.assetMain}
+        <View
+          style={[
+            styles.assetLedger,
+            { borderColor: colors.surfaceBorder, backgroundColor: colors.surface },
+          ]}
+        >
+          {vm.assets.map((asset) => {
+            const resolved = resolveAssetValue(asset, vm.quoteCache, goalCurrency);
+            const latestQuote = vm.quoteCache
+              .filter((quote) => quote.assetId === asset.id)
+              .sort((a, b) => Date.parse(b.receivedAt) - Date.parse(a.receivedAt))[0];
+            const quoteChange = latestQuote?.changePercent;
+            const assetAccent = colors[portfolioAssetColorRole(asset.assetClass)];
+            return (
+              <View
+                key={asset.id}
+                style={[
+                  styles.assetRow,
+                  stackAssetRows ? styles.assetRowStacked : undefined,
+                  { borderBottomColor: colors.surfaceBorder },
+                ]}
               >
-                <Text style={[styles.assetName, typography.title, { color: colors.text }]}>
-                  {asset.name}
-                </Text>
-                <Text style={[styles.assetMeta, typography.body, { color: colors.textMuted }]}>
-                  {asset.assetClass} | {percent(asset.expectedAnnualReturn)} {t.portfolio.expected}
-                </Text>
-                <StatusBadge
-                  label={
-                    resolved.source === "quote"
-                      ? t.portfolio.googleSheetQuote
-                      : resolved.source === "manual_fallback"
-                        ? t.portfolio.manualFallback
-                        : t.portfolio.manualValue
-                  }
-                  tone={resolved.source === "quote" ? "primary" : "neutral"}
-                />
-              </MotionPressable>
-              <View style={styles.assetSide}>
                 <MotionPressable
                   onPress={() => openAssetEditor(asset)}
-                  accessibilityLabel={t.portfolio.editAssetValue(asset.name)}
-                  hitSlop={8}
-                  style={styles.assetValueButton}
+                  accessibilityLabel={t.portfolio.editAsset(asset.name)}
+                  accessibilityRole="button"
+                  style={styles.assetMain}
                 >
-                  <Text
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    style={[styles.assetValue, typography.title, { color: colors.text }]}
-                  >
-                    {privateMoney(resolved.value, resolved.currency)}
-                  </Text>
-                  <MaterialCommunityIcons name="pencil-outline" size={15} color={colors.primary} />
+                  <View style={[styles.assetGlyph, { backgroundColor: `${assetAccent}18` }]}>
+                    <MaterialCommunityIcons
+                      name={assetClassIcons[asset.assetClass]}
+                      size={21}
+                      color={assetAccent}
+                    />
+                  </View>
+                  <View style={styles.assetCopy}>
+                    <Text style={[styles.assetName, typography.title, { color: colors.text }]}>
+                      {asset.name}
+                    </Text>
+                    <Text style={[styles.assetMeta, typography.body, { color: colors.textMuted }]}>
+                      {assetClassLabel(asset.assetClass)} ·{" "}
+                      {t.portfolio.expectedAnnualReturn(percent(asset.expectedAnnualReturn))}
+                    </Text>
+                    <View style={styles.assetStatusRow}>
+                      <StatusBadge
+                        label={
+                          resolved.source === "quote"
+                            ? latestQuote?.source === "FREE_MARKET" ||
+                              latestQuote?.source === "COINBASE"
+                              ? t.portfolio.freeQuote
+                              : latestQuote?.source === "GOOGLEFINANCE"
+                                ? t.portfolio.googleSheetQuote
+                                : t.portfolio.liveQuote
+                            : resolved.source === "manual_fallback"
+                              ? t.portfolio.manualFallback
+                              : t.portfolio.manualValue
+                        }
+                        tone="neutral"
+                      />
+                      {resolved.source === "quote" && quoteChange != null ? (
+                        <Text
+                          style={[
+                            styles.quoteChange,
+                            typography.button,
+                            {
+                              color:
+                                quoteChange > 0
+                                  ? colors.positive
+                                  : quoteChange < 0
+                                    ? colors.negative
+                                    : colors.textMuted,
+                            },
+                          ]}
+                        >
+                          {t.portfolio.priceChange(
+                            `${quoteChange > 0 ? "+" : ""}${percent(quoteChange)}`,
+                          )}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </View>
                 </MotionPressable>
-                <MotionPressable
-                  onPress={() => vm.updateAsset(asset.id, { includeInFire: !asset.includeInFire })}
-                  accessibilityLabel={
-                    asset.includeInFire
-                      ? t.portfolio.excludeAsset(asset.name)
-                      : t.portfolio.includeAsset(asset.name)
-                  }
-                  accessibilityState={{ selected: asset.includeInFire }}
+                <View
+                  style={[styles.assetSide, stackAssetRows ? styles.assetSideStacked : undefined]}
                 >
-                  <Text
+                  <View style={styles.assetValueButton}>
+                    <TimeLensValue
+                      amount={resolved.value}
+                      moneyText={privateMoney(resolved.value, resolved.currency)}
+                      kind="asset"
+                      disabled={assetAmountsHidden}
+                      onPress={() => openAssetEditor(asset)}
+                      accessibilityLabel={t.portfolio.editAssetValue(asset.name)}
+                      style={styles.assetValueLens}
+                      textStyle={[styles.assetValue, typography.title, { color: colors.text }]}
+                    />
+                    <MaterialCommunityIcons
+                      name="pencil-outline"
+                      size={15}
+                      color={colors.primary}
+                    />
+                  </View>
+                  <MotionPressable
+                    onPress={() =>
+                      vm.updateAsset(asset.id, { includeInFire: !asset.includeInFire })
+                    }
+                    accessibilityLabel={
+                      asset.includeInFire
+                        ? t.portfolio.excludeAsset(asset.name)
+                        : t.portfolio.includeAsset(asset.name)
+                    }
+                    accessibilityRole="switch"
+                    accessibilityState={{ checked: asset.includeInFire }}
                     style={[
-                      typography.button,
-                      { color: asset.includeInFire ? colors.positive : colors.textMuted },
+                      styles.includeButton,
+                      {
+                        backgroundColor: asset.includeInFire
+                          ? colors.positiveSoft
+                          : colors.surfaceElevated,
+                        borderColor: asset.includeInFire
+                          ? `${colors.positive}55`
+                          : colors.surfaceBorder,
+                      },
                     ]}
                   >
-                    {asset.includeInFire ? t.common.included : t.common.excluded}
-                  </Text>
-                </MotionPressable>
+                    <MaterialCommunityIcons
+                      name={asset.includeInFire ? "check-circle-outline" : "minus-circle-outline"}
+                      size={16}
+                      color={asset.includeInFire ? colors.positive : colors.textMuted}
+                    />
+                    <Text
+                      style={[
+                        styles.includeText,
+                        typography.button,
+                        { color: asset.includeInFire ? colors.positive : colors.textMuted },
+                      ]}
+                    >
+                      {asset.includeInFire ? t.assets.includedInFire : t.assets.excludedFromFire}
+                    </Text>
+                  </MotionPressable>
+                </View>
               </View>
-            </View>
-          );
-        })}
-      </GlassCard>
+            );
+          })}
+          {vm.assets.length === 0 ? (
+            <Text style={[styles.emptyAssets, typography.body, { color: colors.textMuted }]}>
+              {t.portfolio.noAssets}
+            </Text>
+          ) : null}
+        </View>
+      </View>
 
       <GlassCard>
-        <View style={styles.sectionHeader}>
+        <View
+          style={[
+            styles.sectionHeader,
+            stackSectionHeaders ? styles.sectionHeaderStacked : undefined,
+          ]}
+        >
           <Text style={[styles.sectionTitle, typography.title, { color: colors.text }]}>
             {t.portfolio.fireSettings}
           </Text>
@@ -305,16 +559,19 @@ export function PortfolioScreen() {
           value={currentAgeLabel}
           onPress={() => setFirePlanEditorOpen(true)}
         />
-        <View style={styles.quickActions}>
+        <View
+          style={[styles.quickActions, stackQuickActions ? styles.quickActionsStacked : undefined]}
+        >
           <MotionPressable
             onPress={() => setScenarioListOpen(true)}
             accessibilityLabel={t.firePlan.editFireMethods}
+            accessibilityRole="button"
             haptic="selection"
             style={[
               styles.quickAction,
               {
-                backgroundColor: `${colors.primary}14`,
-                borderColor: colors.primary,
+                backgroundColor: colors.backgroundAlt,
+                borderColor: colors.surfaceBorder,
               },
             ]}
           >
@@ -322,7 +579,7 @@ export function PortfolioScreen() {
             <Text
               numberOfLines={1}
               adjustsFontSizeToFit
-              style={[styles.quickActionText, typography.button, { color: colors.primary }]}
+              style={[styles.quickActionText, typography.button, { color: colors.text }]}
             >
               {t.firePlan.methodShortcut}
             </Text>
@@ -330,6 +587,7 @@ export function PortfolioScreen() {
           <MotionPressable
             onPress={() => setMilestoneListOpen(true)}
             accessibilityLabel={t.firePlan.editMilestones}
+            accessibilityRole="button"
             haptic="selection"
             style={[
               styles.quickAction,
@@ -377,12 +635,15 @@ export function PortfolioScreen() {
       <AssetEditorSheet
         visible={editingAsset !== null}
         asset={editingAsset}
-        onClose={() => setEditingAsset(null)}
-        onSave={vm.updateAsset}
+        isCreating={creatingAsset}
+        onClose={closeAssetEditor}
+        onSave={saveAsset}
+        onArchive={creatingAsset ? undefined : vm.archiveAsset}
       />
       <MilestoneEditorSheet
         visible={editingMilestone !== null}
         milestone={editingMilestone}
+        currency={goalCurrency}
         onClose={closeMilestoneEditor}
         onSave={saveMilestone}
         onArchive={creatingMilestone ? undefined : archiveMilestone}
@@ -396,34 +657,79 @@ export function PortfolioScreen() {
         onSave={saveScenario}
         onArchive={creatingScenario || vm.scenarios.length <= 1 ? undefined : archiveScenario}
       />
-    </ScreenContainer>
+    </ScreenScaffold>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
+  heroBlock: {
+    position: "relative",
+  },
+  visibilityButton: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    width: 48,
+    height: 48,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: tokens.radius.utility,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  settingsButton: {
+    width: 48,
+    height: 48,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: tokens.radius.utility,
+    borderCurve: "continuous",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  marketStrip: {
+    minHeight: 72,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: tokens.radius.card,
+    borderCurve: "continuous",
+    padding: tokens.spacing.md,
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
     gap: tokens.spacing.md,
   },
-  kicker: {
+  marketIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  marketCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  marketTitle: {
+    fontSize: 14,
+    lineHeight: 18,
+  },
+  marketStatus: {
     fontSize: 12,
-    lineHeight: 16,
-    textTransform: "uppercase",
+    lineHeight: 17,
   },
-  title: {
-    fontSize: 38,
-    lineHeight: 44,
-  },
-  settingsButton: {
-    minHeight: 42,
+  marketRefresh: {
+    width: 48,
+    height: 48,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: tokens.radius.utility,
+    alignItems: "center",
     justifyContent: "center",
   },
   headerAction: {
-    minHeight: 36,
+    minHeight: 44,
     justifyContent: "center",
     paddingHorizontal: tokens.spacing.xs,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   sectionHeader: {
     flexDirection: "row",
@@ -431,8 +737,27 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: tokens.spacing.md,
   },
-  allocationButton: {
+  sectionHeaderStacked: {
+    alignItems: "flex-start",
+  },
+  allocationSection: {
+    gap: tokens.spacing.md,
+  },
+  allocationStage: {
+    borderWidth: StyleSheet.hairlineWidth,
     borderRadius: tokens.radius.card,
+    borderCurve: "continuous",
+    padding: tokens.spacing.md,
+  },
+  assetsSection: {
+    gap: tokens.spacing.md,
+  },
+  assetLedger: {
+    overflow: "hidden",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: tokens.radius.card,
+    borderCurve: "continuous",
+    paddingHorizontal: tokens.spacing.md,
   },
   sectionTitle: {
     fontSize: 20,
@@ -442,12 +767,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: tokens.spacing.md,
   },
+  quickActionsStacked: {
+    flexDirection: "column",
+  },
   quickAction: {
-    minHeight: 46,
+    minHeight: 48,
     flex: 1,
     minWidth: 0,
-    borderWidth: 1,
-    borderRadius: tokens.radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: tokens.radius.utility,
     paddingHorizontal: tokens.spacing.md,
     flexDirection: "row",
     alignItems: "center",
@@ -461,7 +789,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   assetRow: {
-    minHeight: 96,
+    minHeight: 112,
     borderBottomWidth: 1,
     flexDirection: "row",
     justifyContent: "space-between",
@@ -469,10 +797,34 @@ const styles = StyleSheet.create({
     gap: tokens.spacing.md,
     paddingVertical: tokens.spacing.md,
   },
+  assetRowStacked: {
+    flexDirection: "column",
+  },
   assetMain: {
     flex: 1,
     minWidth: 0,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: tokens.spacing.md,
+  },
+  assetGlyph: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    borderCurve: "continuous",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  assetCopy: {
+    flex: 1,
+    minWidth: 0,
     gap: 6,
+  },
+  assetStatusRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: tokens.spacing.sm,
   },
   assetName: {
     fontSize: 18,
@@ -482,24 +834,57 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
+  quoteChange: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
   assetSide: {
     alignItems: "flex-end",
     justifyContent: "space-between",
-    minWidth: 118,
-    maxWidth: "45%",
+    minWidth: 112,
+    maxWidth: "42%",
     gap: tokens.spacing.sm,
   },
+  assetSideStacked: {
+    alignSelf: "stretch",
+    width: "100%",
+    minWidth: 0,
+    maxWidth: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   assetValueButton: {
-    minHeight: 32,
+    minHeight: 44,
     maxWidth: "100%",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-end",
     gap: 5,
   },
+  assetValueLens: { maxWidth: 160, minHeight: 44, justifyContent: "center" },
   assetValue: {
     fontSize: 18,
     lineHeight: 23,
     flexShrink: 1,
+    fontVariant: ["tabular-nums"],
+  },
+  includeButton: {
+    minHeight: 48,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: tokens.radius.pill,
+    paddingHorizontal: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+  },
+  includeText: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  emptyAssets: {
+    paddingVertical: tokens.spacing.lg,
+    textAlign: "center",
   },
 });

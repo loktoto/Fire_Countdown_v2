@@ -29,8 +29,9 @@ export function useDashboardViewModel() {
         snapshot.transactions,
         Number.parseInt(activityDate.slice(0, 4), 10),
         Number.parseInt(activityDate.slice(5, 7), 10),
+        goal?.baseCurrency ?? snapshot.currency,
       ),
-    [activityDate, snapshot.transactions],
+    [activityDate, goal?.baseCurrency, snapshot.currency, snapshot.transactions],
   );
   const activityMonthLeaders = useMemo(
     () => monthlyCategoryLeaders(snapshot, activityDate),

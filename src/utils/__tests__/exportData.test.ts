@@ -20,4 +20,22 @@ describe("exportData", () => {
     expect(sheetText).toContain("id\ttype\tdate\tamount\tcurrency");
     expect(sheetText).toContain("txn-1\texpense\t2026-06-29\t120\tHKD\tFood\tLunch");
   });
+
+  it("neutralizes user-entered spreadsheet formulas without changing numeric cells", () => {
+    const snapshot = {
+      ...seedSnapshot,
+      transactions: [
+        {
+          ...seedSnapshot.transactions[0]!,
+          note: '=HYPERLINK("https://example.com")',
+          amount: -25,
+        },
+      ],
+      assets: [{ ...seedSnapshot.assets[0]!, name: " @SUM(A1:A2)" }],
+    };
+
+    expect(buildCsvExport(snapshot)).toContain("'=HYPERLINK");
+    expect(buildGoogleSheetsExport(snapshot)).toContain("' @SUM(A1:A2)");
+    expect(buildCsvExport(snapshot)).toContain(",-25,");
+  });
 });

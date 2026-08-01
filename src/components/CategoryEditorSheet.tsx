@@ -12,13 +12,17 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 
+import { categoryIconOptionKey } from "./categoryEditorPresentation";
 import { CategoryGlyph } from "./CategoryGlyph";
 import { MotionPressable } from "./MotionPressable";
+import { categoryColorPresentation } from "./categoryColorPresentation";
+import { sheetBackdropEnter, sheetBackdropExit, sheetEnter, sheetExit } from "../design/motion";
 import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
 import type { Category, TransactionType } from "../features/types";
+import { useReducedMotion } from "../hooks/useReducedMotion";
 import { useI18n } from "../i18n";
 
 const iconPresets = [
@@ -66,8 +70,8 @@ const iconPresets = [
   { label: "Other", value: "shape-plus-outline" },
 ];
 
-const colorPresets = ["#00F0FF", "#00FFA3", "#FF3366", "#FED639", "#9B7CFF", "#FF8A3D", "#4CC9F0"];
-const defaultCategoryColor = colorPresets[0] ?? "#00F0FF";
+const colorPresets = ["#198F89", "#16865C", "#C94263", "#A76518", "#4765B3", "#AE702A", "#8091A7"];
+const defaultCategoryColor = colorPresets[0] ?? "#198F89";
 
 function defaultIcon(type: TransactionType) {
   return type === "income" ? "emoji:\\u{1F4C8}" : "emoji:\\u{1F35C}";
@@ -95,6 +99,7 @@ export function CategoryEditorSheet({
   onDelete?: (categoryId: string) => void;
 }) {
   const colors = useThemeColors();
+  const reducedMotion = useReducedMotion();
   const draftKey = `${category?.id ?? "new"}-${type}`;
 
   if (!visible) {
@@ -108,15 +113,16 @@ export function CategoryEditorSheet({
         style={styles.modalRoot}
       >
         <Animated.View
-          entering={FadeIn.duration(160)}
-          exiting={FadeOut.duration(120)}
+          entering={reducedMotion ? undefined : sheetBackdropEnter}
+          exiting={reducedMotion ? undefined : sheetBackdropExit}
           style={styles.scrim}
         >
           <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         </Animated.View>
         <Animated.View
-          entering={SlideInDown.duration(260)}
-          exiting={SlideOutDown.duration(180)}
+          accessibilityViewIsModal
+          entering={reducedMotion ? undefined : sheetEnter}
+          exiting={reducedMotion ? undefined : sheetExit}
           style={[
             styles.sheet,
             {
@@ -167,6 +173,19 @@ function CategoryEditorContent({
   const iconColumns = contentWidth >= 330 ? 6 : 5;
   const iconOptionSize = Math.floor((contentWidth - optionGap * (iconColumns - 1)) / iconColumns);
   const iconGlyphSize = Math.max(32, Math.min(40, iconOptionSize - 12));
+  const selectedIconPresentation = categoryColorPresentation(color, colors.surfaceSolid);
+  const currentCategoryIcon = category?.icon ? decodeIcon(category.icon) : null;
+  const selectableIconPresets =
+    currentCategoryIcon &&
+    !iconPresets.some((item) => decodeIcon(item.value) === currentCategoryIcon)
+      ? [
+          {
+            label: category?.name ?? t.common.symbol,
+            value: category?.icon ?? currentCategoryIcon,
+          },
+          ...iconPresets,
+        ]
+      : iconPresets;
 
   function save() {
     if (!canSave) {
@@ -240,12 +259,12 @@ function CategoryEditorContent({
             {t.common.symbol}
           </Text>
           <View style={[styles.options, { columnGap: optionGap, rowGap: optionGap }]}>
-            {iconPresets.map((item) => {
+            {selectableIconPresets.map((item) => {
               const itemIcon = decodeIcon(item.value);
               const active = decodeIcon(item.value) === decodeIcon(icon);
               return (
                 <MotionPressable
-                  key={item.label}
+                  key={categoryIconOptionKey(item)}
                   onPress={() => setIcon(item.value)}
                   accessibilityLabel={t.categories.symbolA11y(item.label)}
                   accessibilityState={{ selected: active }}
@@ -256,8 +275,13 @@ function CategoryEditorContent({
                       height: iconOptionSize,
                     },
                     {
-                      borderColor: active ? color : colors.surfaceBorder,
-                      backgroundColor: active ? `${color}22` : colors.backgroundAlt,
+                      borderWidth: active ? 2 : 1,
+                      backgroundColor: active
+                        ? selectedIconPresentation.backgroundColor
+                        : colors.backgroundAlt,
+                      borderColor: active
+                        ? selectedIconPresentation.foregroundColor
+                        : colors.surfaceBorder,
                     },
                   ]}
                 >
@@ -266,6 +290,15 @@ function CategoryEditorContent({
                     color={active ? color : colors.textMuted}
                     size={iconGlyphSize}
                   />
+                  {active ? (
+                    <MaterialCommunityIcons
+                      name="check-circle"
+                      size={16}
+                      color={selectedIconPresentation.foregroundColor}
+                      style={styles.selectedIconMark}
+                      accessible={false}
+                    />
+                  ) : null}
                 </MotionPressable>
               );
             })}
@@ -427,15 +460,21 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
   iconOption: {
+    position: "relative",
     borderRadius: tokens.radius.utility,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
   },
+  selectedIconMark: {
+    position: "absolute",
+    top: 3,
+    right: 3,
+  },
   swatch: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     borderWidth: 2,
     alignItems: "center",
     justifyContent: "center",

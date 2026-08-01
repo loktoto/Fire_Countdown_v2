@@ -3,6 +3,7 @@ import { useColorScheme } from "react-native";
 
 import { tokens } from "./tokens";
 import { useFireStore } from "../data/fireStore";
+import type { FireSnapshot } from "../features/types";
 
 export type ThemeColors = ReturnType<typeof getThemeColors>;
 
@@ -13,27 +14,60 @@ export function getThemeColors(mode: "dark" | "light") {
     mode,
     background: isDark ? tokens.color.obsidian : tokens.color.offWhite,
     backgroundAlt: isDark ? tokens.color.obsidianSurface : tokens.color.offWhitePanel,
-    surface: isDark ? "rgba(255,255,255,0.035)" : "rgba(238,242,239,0.98)",
+    surface: isDark ? tokens.color.obsidianSurface : tokens.color.offWhiteRaised,
     surfaceSolid: isDark ? tokens.color.obsidianRaised : tokens.color.offWhiteRaised,
-    surfaceBorder: isDark ? "rgba(255,255,255,0.08)" : "rgba(31,48,54,0.22)",
-    text: isDark ? "#FFFFFF" : "#15191C",
-    textMuted: isDark ? tokens.color.muted : "#5A6670",
-    textSubtle: isDark ? "#B9CACB" : "#2F3E46",
+    surfaceElevated: isDark ? tokens.color.obsidianRaised : tokens.color.offWhitePanel,
+    surfacePressed: isDark ? tokens.color.obsidianPressed : tokens.color.lightPressed,
+    surfaceBorder: isDark ? tokens.color.darkBorder : tokens.color.lightBorder,
+    divider: isDark ? "#223039" : "#E3E8E4",
+    text: isDark ? "#F4F7F6" : tokens.color.ink,
+    textMuted: isDark ? "#A8B3B0" : "#687773",
+    textSubtle: isDark ? "#C7D0CE" : "#455752",
+    textTertiary: isDark ? "#788580" : "#8D9995",
+    disabled: isDark ? "#4E5A60" : "#B8C0BD",
     primary: isDark ? tokens.color.cyan : tokens.color.lightCyan,
     primaryFill: isDark ? tokens.color.cyan : tokens.color.lightCyanFill,
-    onPrimary: isDark ? tokens.color.obsidian : "#FFFFFF",
+    primaryPressed: isDark ? "#39BDB6" : tokens.color.lightCyanPressed,
+    primarySoft: isDark ? "#153936" : "#E3F2F0",
+    primaryBorder: isDark ? "#2A6D68" : "#A9D9D5",
+    onPrimary: isDark ? "#091117" : "#F7F7F3",
+    projection: isDark ? tokens.color.indigo : tokens.color.lightIndigo,
+    projectionSoft: isDark ? "#202D4A" : "#E9EDFA",
+    target: isDark ? tokens.color.ochre : tokens.color.lightOchre,
+    targetSoft: isDark ? "#382C1F" : "#F4E9DA",
     positive: isDark ? tokens.color.emerald : tokens.color.lightEmerald,
+    positiveSoft: isDark ? "#17382C" : "#E5F5ED",
     negative: isDark ? tokens.color.red : tokens.color.lightRed,
+    negativeSoft: isDark ? "#40202A" : "#FBE8EC",
     warning: isDark ? tokens.color.amber : tokens.color.lightAmber,
-    nav: isDark ? "rgba(18,19,24,0.92)" : "rgba(245,247,244,0.96)",
-    shadow: isDark ? "rgba(0,240,255,0.12)" : "rgba(24,50,56,0.1)",
+    warningSoft: isDark ? "#3C2D18" : "#F8EEDC",
+    information: isDark ? tokens.color.indigo : tokens.color.lightIndigo,
+    chartEtf: isDark ? "#55CCC5" : "#198F89",
+    chartCash: isDark ? "#9DACC0" : "#8091A7",
+    chartRealEstate: isDark ? "#D7A15A" : "#AE702A",
+    chartBlue: isDark ? "#91A6EF" : "#4765B3",
+    chartCoral: isDark ? "#D8897D" : "#A65F58",
+    chartSage: isDark ? "#86A096" : "#657E72",
+    nav: isDark ? "rgba(17,27,35,0.97)" : "rgba(252,253,251,0.97)",
+    shadow: isDark ? "rgba(0,0,0,0.38)" : "rgba(20,33,31,0.10)",
+    scrim: isDark ? "rgba(3,7,10,0.68)" : "rgba(22,34,31,0.24)",
   };
+}
+
+export function resolveThemeMode(
+  preference: FireSnapshot["themeMode"] | null | undefined,
+  system: ReturnType<typeof useColorScheme>,
+): "dark" | "light" {
+  if (preference === "dark" || preference === "light") {
+    return preference;
+  }
+  return system === "dark" ? "dark" : "light";
 }
 
 export function useThemeColors() {
   const system = useColorScheme();
   const { snapshot } = useFireStore();
-  const mode = snapshot.themeMode ?? (system === "light" ? "light" : "dark");
+  const mode = resolveThemeMode(snapshot.themeMode, system);
   return useMemo(() => getThemeColors(mode), [mode]);
 }
 

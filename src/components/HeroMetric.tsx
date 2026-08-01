@@ -1,7 +1,10 @@
 import { StyleSheet, Text, View } from "react-native";
+import Animated, { Easing, FadeInUp, FadeOut } from "react-native-reanimated";
 
 import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
+import { useReducedMotion } from "../hooks/useReducedMotion";
+import { TimeLensValue, type TimeLensKind } from "./TimeLens";
 
 function splitMetricValue(value: string) {
   const daysMatch = value.match(/^(.+?)\s+(days?)$/i);
@@ -17,13 +20,16 @@ export function HeroMetric({
   value,
   caption,
   align = "left",
+  timeLens,
 }: {
   label: string;
   value: string;
   caption?: string;
   align?: "left" | "center" | "right";
+  timeLens?: { amount: number; kind: TimeLensKind; disabled?: boolean };
 }) {
   const colors = useThemeColors();
+  const reducedMotion = useReducedMotion();
   const alignItems = align === "left" ? "flex-start" : align === "right" ? "flex-end" : "center";
   const textAlign = align;
   const captionJustify =
@@ -40,23 +46,42 @@ export function HeroMetric({
       <Text style={[styles.label, typography.button, { color: colors.textMuted, textAlign }]}>
         {label}
       </Text>
-      <View style={[styles.valueRow, { justifyContent: captionJustify }]}>
-        <Text
-          selectable
-          adjustsFontSizeToFit
-          minimumFontScale={0.72}
-          numberOfLines={1}
-          style={[styles.value, typography.display, { color: colors.text, textAlign }]}
-        >
-          {metric.number}
-          {metric.unit ? (
-            <Text style={[styles.unit, typography.display, { color: colors.text }]}>
-              {" "}
-              {metric.unit}
-            </Text>
-          ) : null}
-        </Text>
-      </View>
+      <Animated.View
+        key={value}
+        entering={
+          reducedMotion ? undefined : FadeInUp.duration(220).easing(Easing.bezier(0.16, 1, 0.3, 1))
+        }
+        exiting={reducedMotion ? undefined : FadeOut.duration(90)}
+        style={[styles.valueRow, { justifyContent: captionJustify }]}
+      >
+        {timeLens ? (
+          <TimeLensValue
+            amount={timeLens.amount}
+            kind={timeLens.kind}
+            moneyText={value}
+            disabled={timeLens.disabled}
+            style={styles.timeLensValue}
+            textStyle={[styles.value, typography.display, { color: colors.text, textAlign }]}
+            minimumFontScale={0.72}
+          />
+        ) : (
+          <Text
+            selectable
+            adjustsFontSizeToFit
+            minimumFontScale={0.72}
+            numberOfLines={1}
+            style={[styles.value, typography.display, { color: colors.text, textAlign }]}
+          >
+            {metric.number}
+            {metric.unit ? (
+              <Text style={[styles.unit, typography.display, { color: colors.text }]}>
+                {" "}
+                {metric.unit}
+              </Text>
+            ) : null}
+          </Text>
+        )}
+      </Animated.View>
       {captionParts.length > 0 ? (
         <View style={[styles.captionWrap, { justifyContent: captionJustify }]}>
           {captionParts.map((part, index) => (
@@ -92,10 +117,11 @@ const styles = StyleSheet.create({
   value: {
     maxWidth: "100%",
     flexShrink: 1,
-    fontSize: 48,
-    lineHeight: 70,
+    fontSize: 44,
+    lineHeight: 60,
     fontVariant: ["tabular-nums"],
   },
+  timeLensValue: { maxWidth: "100%", flexShrink: 1 },
   unit: {
     fontSize: 24,
     lineHeight: 38,

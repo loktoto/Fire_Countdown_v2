@@ -1,46 +1,57 @@
-import { BlurView } from "expo-blur";
 import type { ReactNode } from "react";
 import { StyleProp, StyleSheet, View, ViewStyle } from "react-native";
+import Animated from "react-native-reanimated";
 
+import { enter } from "../design/motion";
 import { tokens } from "../design/tokens";
 import { useThemeColors } from "../design/theme";
+import { useReducedMotion } from "../hooks/useReducedMotion";
 
 export function GlassCard({
   children,
   style,
   compact = false,
+  tone = "default",
+  motionIndex = 0,
 }: {
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
   compact?: boolean;
+  tone?: "default" | "accent";
+  motionIndex?: number;
 }) {
   const colors = useThemeColors();
+  const reducedMotion = useReducedMotion();
   return (
-    <BlurView
-      tint={colors.mode === "dark" ? "dark" : "default"}
-      intensity={colors.mode === "dark" ? 36 : 0}
+    <Animated.View
+      entering={reducedMotion ? undefined : enter(motionIndex)}
       style={[
         styles.card,
         {
-          backgroundColor: colors.surface,
-          borderColor: colors.surfaceBorder,
+          backgroundColor: tone === "accent" ? colors.primarySoft : colors.surface,
+          borderColor: tone === "accent" ? `${colors.primary}42` : colors.surfaceBorder,
           padding: compact ? tokens.spacing.md : tokens.spacing.lg,
+          boxShadow:
+            colors.mode === "dark"
+              ? "0 1px 0 rgba(255,255,255,0.015)"
+              : "0 1px 2px rgba(34,57,51,0.035)",
         },
         style,
       ]}
     >
       <View style={styles.content}>{children}</View>
-    </BlurView>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
     overflow: "hidden",
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderRadius: tokens.radius.card,
+    borderCurve: "continuous",
   },
   content: {
-    gap: 18,
+    gap: tokens.spacing.md,
   },
 });
