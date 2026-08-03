@@ -1,24 +1,26 @@
 import type { AssetQuoteCache } from "../features/types";
 
+function quoteTimestamp(quote: AssetQuoteCache) {
+  const timestamp = Date.parse(quote.receivedAt);
+  return Number.isFinite(timestamp) ? timestamp : Number.NEGATIVE_INFINITY;
+}
+
 function keepNewest(target: Map<string, AssetQuoteCache>, quote: AssetQuoteCache) {
   const current = target.get(quote.assetId);
-  const quoteTime = Date.parse(quote.receivedAt);
-  const currentTime = current ? Date.parse(current.receivedAt) : Number.NEGATIVE_INFINITY;
-  if (!current || quoteTime > currentTime) {
+  if (!current || quoteTimestamp(quote) > quoteTimestamp(current)) {
     target.set(quote.assetId, quote);
   }
 }
 
 export function mergeQuoteCache(current: AssetQuoteCache[], incoming: AssetQuoteCache[]) {
-  const newestIncoming = new Map<string, AssetQuoteCache>();
-  incoming.forEach((quote) => keepNewest(newestIncoming, quote));
+  const newest = new Map<string, AssetQuoteCache>();
 
-  const retained = new Map<string, AssetQuoteCache>();
-  current.forEach((quote) => {
-    if (!newestIncoming.has(quote.assetId)) {
-      keepNewest(retained, quote);
-    }
-  });
+  // Existing cache entries are considered first so an equal or invalid incoming
+  // timestamp cannot replace the value already shown to the user. Within either
+  // input, the first row wins a timestamp tie and a valid timestamp outranks an
+  // invalid one.
+  current.forEach((quote) => keepNewest(newest, quote));
+  incoming.forEach((quote) => keepNewest(newest, quote));
 
-  return [...newestIncoming.values(), ...retained.values()];
+  return [...newest.values()];
 }
