@@ -1,10 +1,4 @@
-import {
-  ActivityIndicator,
-  StyleSheet,
-  Text,
-  View,
-  type ColorSchemeName,
-} from "react-native";
+import { ActivityIndicator, StyleSheet, Text, View, type ColorSchemeName } from "react-native";
 
 import { tokens } from "../design/tokens";
 
@@ -31,10 +25,7 @@ export function systemLocale() {
   }
 }
 
-export function loadingScreenPresentation(
-  colorScheme: ColorSchemeName,
-  locale: string,
-) {
+export function loadingScreenPresentation(colorScheme: ColorSchemeName, locale: string) {
   const dark = colorScheme === "dark";
   return {
     backgroundColor: dark ? tokens.color.obsidian : tokens.color.offWhite,
@@ -60,10 +51,7 @@ export function LoadingScreen({ colorScheme, locale }: LoadingScreenProps) {
         color={presentation.indicatorColor}
         size="small"
       />
-      <Text
-        testID="loading-title"
-        style={[styles.title, { color: presentation.titleColor }]}
-      >
+      <Text testID="loading-title" style={[styles.title, { color: presentation.titleColor }]}>
         Fire Countdown
       </Text>
       <Text
