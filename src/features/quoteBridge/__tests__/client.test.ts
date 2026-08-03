@@ -79,6 +79,60 @@ describe("Quote Bridge client", () => {
     ]);
   });
 
+  it("sends quote reads as authenticated POSTs without token query parameters", async () => {
+    fetchMock.mockResolvedValue(response({ quotes: [] }));
+
+    const legacySettings = {
+      ...settings,
+      scriptUrl: `${settings.scriptUrl}?token=legacy-token&action=quotes&baseCurrency=USD&keep=1`,
+    };
+    await expect(getQuotes(legacySettings, "hkd")).resolves.toEqual([]);
+
+    const [requestUrl, init] = fetchMock.mock.calls[0]!;
+    expect(requestUrl).toBe(`${settings.scriptUrl}?keep=1`);
+    expect(requestUrl).not.toContain("secret-token");
+    expect(requestUrl).not.toContain("legacy-token");
+    expect(init).toMatchObject({
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(JSON.parse(init.body as string)).toEqual({
+      token: "secret-token",
+      action: "quotes",
+      baseCurrency: "HKD",
+    });
+  });
+
+  it("redacts credentials from bridge errors and returned quote payloads", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        response({
+          quotes: [
+            {
+              assetId: "asset-stock",
+              ticker: "VOO",
+              price: 101.25,
+              currency: "USD",
+              status: "ok",
+              debug: "secret-token",
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        response({ error: "Rejected secret-token and secret-token" }, false, 401),
+      );
+
+    const quotes = await getQuotes(settings, "HKD");
+    expect(JSON.stringify(quotes)).not.toContain("secret-token");
+    expect(quotes[0]?.raw).toContain("[REDACTED]");
+
+    const error = await getQuotes(settings, "HKD").catch((reason: unknown) => reason);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain("[REDACTED]");
+    expect((error as Error).message).not.toContain("secret-token");
+  });
+
   it("rejects malformed quote payloads so existing cache is not replaced", async () => {
     fetchMock.mockResolvedValue(response({ quotes: [{ assetId: "asset-stock", price: "NaN" }] }));
     await expect(getQuotes(settings, "HKD")).rejects.toThrow("no usable quotes");
@@ -97,7 +151,9 @@ describe("Quote Bridge client", () => {
 
     fetchMock.mockResolvedValue(response({ ok: true }));
     await upsertAsset(settings, seedSnapshot.assets[0]!, "HKD");
-    const [, init] = fetchMock.mock.calls[0]!;
+    const [requestUrl, init] = fetchMock.mock.calls[0]!;
+    expect(requestUrl).toBe(settings.scriptUrl);
+    expect(requestUrl).not.toContain("secret-token");
     expect(init.method).toBe("POST");
     expect(JSON.parse(init.body as string)).toMatchObject({
       token: "secret-token",
