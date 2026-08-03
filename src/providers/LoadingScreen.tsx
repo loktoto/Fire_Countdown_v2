@@ -31,7 +31,10 @@ export function systemLocale() {
   }
 }
 
-export function loadingScreenPresentation(colorScheme: ColorSchemeName, locale: string) {
+export function loadingScreenPresentation(
+  colorScheme: ColorSchemeName,
+  locale: string,
+) {
   const dark = colorScheme === "dark";
   return {
     backgroundColor: dark ? tokens.color.obsidian : tokens.color.offWhite,
