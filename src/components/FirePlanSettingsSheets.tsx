@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import Animated from "react-native-reanimated";
 
-import { fieldLabelWithUnit } from "./firePlanPresentation";
+import { fieldLabelWithUnit, optionalCurrentAgeFromText } from "./firePlanPresentation";
 import { MotionPressable } from "./MotionPressable";
 import { sheetBackdropEnter, sheetBackdropExit, sheetEnter, sheetExit } from "../design/motion";
 import { tokens } from "../design/tokens";
@@ -463,10 +463,10 @@ function FirePlanEditorContent({
   const [withdrawalRate, setWithdrawalRate] = useState(percentText(goal.withdrawalRate));
   const [inflationRate, setInflationRate] = useState(percentText(goal.inflationRate));
 
+  const parsedCurrentAge = optionalCurrentAgeFromText(currentAge);
   const canSave =
     name.trim().length > 0 &&
-    numberFromText(currentAge) > 0 &&
-    numberFromText(currentAge) <= 120 &&
+    parsedCurrentAge !== undefined &&
     numberFromText(targetMonthlySpending) >= 0 &&
     numberFromText(monthlySaving) >= 0 &&
     numberFromText(withdrawalRate) > 0 &&
@@ -475,13 +475,14 @@ function FirePlanEditorContent({
     numberFromText(inflationRate, 0) <= 1000;
 
   function save() {
-    if (!canSave) {
+    const nextCurrentAge = optionalCurrentAgeFromText(currentAge);
+    if (!canSave || nextCurrentAge === undefined) {
       return;
     }
 
     onSave(goal.id, {
       name: name.trim(),
-      currentAge: Math.max(1, Math.min(120, Math.floor(numberFromText(currentAge)))),
+      currentAge: nextCurrentAge,
       targetMonthlySpending: numberFromText(targetMonthlySpending),
       monthlySaving: numberFromText(monthlySaving),
       withdrawalRate: numberFromText(withdrawalRate) / 100,
