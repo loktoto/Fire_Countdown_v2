@@ -1,6 +1,7 @@
 import { defaultScenario, deriveFireView, monthlyCategoryLeaders } from "../selectors";
 import { seedSnapshot } from "../../data/seed";
 import type { Transaction } from "../../features/types";
+import { daysBetweenIso } from "../../utils/format";
 
 const startDate = "2026-06-29";
 const timestamp = "2026-06-30T00:00:00.000Z";
@@ -25,6 +26,54 @@ function withTransaction(transaction: Pick<Transaction, "amount" | "type">) {
   };
 }
 
+function crossingFixture({
+  assetValue,
+  monthlySaving,
+  target,
+}: {
+  assetValue: number;
+  monthlySaving: number;
+  target: number;
+}) {
+  return {
+    ...seedSnapshot,
+    transactions: [],
+    assets: [
+      {
+        ...seedSnapshot.assets[1]!,
+        manualValue: assetValue,
+        quantity: null,
+        updateMethod: "manual" as const,
+        expectedAnnualReturn: 0,
+        includeInFire: true,
+        currency: "HKD",
+      },
+    ],
+    quoteCache: [],
+    goals: [
+      {
+        ...seedSnapshot.goals[0]!,
+        targetMonthlySpending: target / 12,
+        withdrawalRate: 1,
+        inflationRate: 0,
+        monthlySaving,
+      },
+    ],
+    milestones: [],
+    scenarios: [
+      {
+        ...seedSnapshot.scenarios[1]!,
+        expectedReturnAdjustment: 0,
+        inflationAdjustment: 0,
+        withdrawalRateAdjustment: 0,
+        monthlySavingAdjustment: 0,
+        targetSpendingAdjustment: 0,
+        isDefault: true,
+      },
+    ],
+  };
+}
+
 describe("deriveFireView", () => {
   it("moves Home FIRE outputs when saved transaction cashflow changes", () => {
     const base = deriveFireView(seedSnapshot, startDate);
@@ -42,6 +91,44 @@ describe("deriveFireView", () => {
     expect(income.projectedFireDays!).toBeLessThan(base.projectedFireDays!);
     expect(expense.progress).toBeLessThan(base.progress);
     expect(income.progress).toBeGreaterThan(base.progress);
+  });
+
+  it("derives the displayed FIRE date from the same interpolated crossing as the countdown", () => {
+    const crossingStart = "2026-01-01";
+    const view = deriveFireView(
+      crossingFixture({ assetValue: 0, monthlySaving: 200, target: 100 }),
+      crossingStart,
+    );
+
+    expect(view.projectedFireDays).toBeCloseTo(15.5, 1);
+    expect(view.projectedFireDate).toBe("2026-01-17");
+    expect(daysBetweenIso(crossingStart, view.projectedFireDate!)).toBe(
+      Math.round(view.projectedFireDays!),
+    );
+  });
+
+  it("returns no FIRE date when the projection never crosses the target", () => {
+    const view = deriveFireView(
+      crossingFixture({ assetValue: 0, monthlySaving: 0, target: 100 }),
+      "2026-01-01",
+    );
+
+    expect(view.projectedFireDays).toBeNull();
+    expect(view.projectedFireDate).toBeNull();
+  });
+
+  it("uses the start date when FIRE is already reached", () => {
+    const crossingStart = "2026-01-01";
+    const view = deriveFireView(
+      crossingFixture({ assetValue: 1000, monthlySaving: 0, target: 100 }),
+      crossingStart,
+    );
+
+    expect(view.projectedFireDays).toBe(0);
+    expect(view.projectedFireDate).toBe(crossingStart);
+    expect(daysBetweenIso(crossingStart, view.projectedFireDate!)).toBe(
+      Math.round(view.projectedFireDays!),
+    );
   });
 
   it("keeps future-dated transactions out of today's FIRE balance", () => {
