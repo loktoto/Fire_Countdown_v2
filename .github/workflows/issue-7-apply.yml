@@ -1,0 +1,194 @@
+name: Apply issue 7 secure quote reads
+
+on:
+  push:
+    branches:
+      - agent/issue-7-secure-quote-reads
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out issue branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: agent/issue-7-secure-quote-reads
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Apply exact secure-read changes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              file = Path(path)
+              text = file.read_text(encoding="utf-8")
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"Expected one match in {path}, found {count}: {old!r}")
+              file.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          replace_once(
+              "src/features/quoteBridge/client.ts",
+              '''  if (!settings.scriptUrl) {
+    throw new Error("Missing Script URL");
+  }
+  const token = await readQuoteToken();
+  if (!token) {
+    throw new Error("Missing API token");
+  }
+
+  const url = validateQuoteBridgeUrl(settings.scriptUrl);
+  url.searchParams.set("action", "quotes");
+  url.searchParams.set("token", token);
+  if (baseCurrency) {
+    url.searchParams.set("baseCurrency", baseCurrency.trim().toUpperCase());
+  }
+
+  const json = await fetchJson(url.toString());''',
+              '''  const json = await authenticatedPost(settings, {
+    action: "quotes",
+    ...(baseCurrency ? { baseCurrency: baseCurrency.trim().toUpperCase() } : {}),
+  });''',
+          )
+
+          replace_once(
+              "src/features/quoteBridge/client.ts",
+              '''async function fetchJson(input: string, init?: RequestInit, service = "Quote Bridge") {''',
+              '''function redactCredential(value: string, credential: string) {
+  return value
+    .split(credential)
+    .join("[REDACTED]")
+    .split(encodeURIComponent(credential))
+    .join("[REDACTED]");
+}
+
+async function fetchJson(input: string, init?: RequestInit, service = "Quote Bridge") {''',
+          )
+
+          replace_once(
+              "src/features/quoteBridge/client.ts",
+              '''  const url = validateQuoteBridgeUrl(settings.scriptUrl);
+
+  return fetchJson(url.toString(), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, ...body }),
+  });''',
+              '''  const url = validateQuoteBridgeUrl(settings.scriptUrl);
+  for (const [key, value] of Array.from(url.searchParams.entries())) {
+    const normalizedKey = key.toLowerCase();
+    if (
+      normalizedKey === "token" ||
+      normalizedKey === "action" ||
+      normalizedKey === "basecurrency" ||
+      value.includes(token)
+    ) {
+      url.searchParams.delete(key);
+    }
+  }
+
+  const requestUrl = url.toString();
+  if (requestUrl.includes(token) || requestUrl.includes(encodeURIComponent(token))) {
+    throw new Error("Script URL must not contain API token");
+  }
+
+  try {
+    return await fetchJson(requestUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, ...body }),
+    });
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(redactCredential(error.message, token));
+    }
+    throw error;
+  }''',
+          )
+
+          test_path = Path("src/features/quoteBridge/__tests__/client.test.ts")
+          test_text = test_path.read_text(encoding="utf-8")
+          marker = '''  it("rejects malformed quote payloads so existing cache is not replaced", async () => {'''
+          if test_text.count(marker) != 1:
+              raise SystemExit("Expected one malformed-payload test marker")
+          added_tests = '''  it("sends quote reads as authenticated POSTs without token query parameters", async () => {
+    fetchMock.mockResolvedValue(response({ quotes: [] }));
+
+    const legacySettings = {
+      ...settings,
+      scriptUrl: `${settings.scriptUrl}?token=legacy-token&action=quotes&baseCurrency=USD&keep=1`,
+    };
+    await expect(getQuotes(legacySettings, "hkd")).resolves.toEqual([]);
+
+    const [requestUrl, init] = fetchMock.mock.calls[0]!;
+    expect(requestUrl).toBe(`${settings.scriptUrl}?keep=1`);
+    expect(requestUrl).not.toContain("secret-token");
+    expect(requestUrl).not.toContain("legacy-token");
+    expect(init).toMatchObject({
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(JSON.parse(init.body as string)).toEqual({
+      token: "secret-token",
+      action: "quotes",
+      baseCurrency: "HKD",
+    });
+  });
+
+  it("redacts credentials from custom bridge error messages", async () => {
+    fetchMock.mockResolvedValue(
+      response({ error: "Rejected secret-token and secret-token" }, false, 401),
+    );
+
+    const error = await getQuotes(settings, "HKD").catch((reason: unknown) => reason);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain("[REDACTED]");
+    expect((error as Error).message).not.toContain("secret-token");
+  });
+
+'''
+          test_text = test_text.replace(marker, added_tests + marker, 1)
+
+          old_mutation = '''    const [, init] = fetchMock.mock.calls[0]!;
+    expect(init.method).toBe("POST");'''
+          new_mutation = '''    const [requestUrl, init] = fetchMock.mock.calls[0]!;
+    expect(requestUrl).toBe(settings.scriptUrl);
+    expect(requestUrl).not.toContain("secret-token");
+    expect(init.method).toBe("POST");'''
+          if test_text.count(old_mutation) != 1:
+              raise SystemExit("Expected one mutation request assertion")
+          test_text = test_text.replace(old_mutation, new_mutation, 1)
+          test_path.write_text(test_text, encoding="utf-8")
+          PY
+
+          npx prettier --write \
+            src/features/quoteBridge/client.ts \
+            src/features/quoteBridge/__tests__/client.test.ts
+          npm run typecheck
+          npm test -- --runInBand --watch=false src/features/quoteBridge/__tests__/client.test.ts
+          git diff --check
+
+      - name: Commit secure quote reads
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            src/features/quoteBridge/client.ts \
+            src/features/quoteBridge/__tests__/client.test.ts
+          git commit -m "Remove quote tokens from bridge URLs"
+          git push origin HEAD:agent/issue-7-secure-quote-reads
