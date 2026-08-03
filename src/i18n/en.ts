@@ -46,6 +46,7 @@ export const en = {
     showAssetAmounts: "Show asset amounts",
   },
   timeLens: {
+    kicker: "TIME LENS",
     money: "Money",
     lastWorkday: "Last Workday",
     freedomYear: "Freedom Year",

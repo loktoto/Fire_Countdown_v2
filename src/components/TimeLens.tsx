@@ -93,6 +93,7 @@ function formatDays(days: number) {
 
 function TimeLensOverlay({ state, visible }: { state: LensState | null; visible: boolean }) {
   const colors = useThemeColors();
+  const t = useI18n();
   const { width, height } = useWindowDimensions();
   const progress = useSharedValue(0);
 
@@ -143,7 +144,7 @@ function TimeLensOverlay({ state, visible }: { state: LensState | null; visible:
         />
         <View style={[styles.lensInnerRing, { borderColor: `${colors.primary}40` }]} />
         <Text style={[styles.lensEyebrow, typography.button, { color: colors.primary }]}>
-          TIME LENS
+          {t.timeLens.kicker}
         </Text>
         <Animated.View
           key={mode.id}
