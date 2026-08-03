@@ -1,6 +1,7 @@
 name: Apply issue 7 secure quote reads
 
 on:
+  pull_request:
   push:
     branches:
       - agent/issue-7-secure-quote-reads
