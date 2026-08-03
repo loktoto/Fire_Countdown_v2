@@ -238,9 +238,7 @@ export async function getQuotes(
 
   const receivedAt = new Date().toISOString();
   const quotes = json.quotes
-    .map((quote, index) =>
-      parseBridgeQuote(redactCredentialValue(quote, token), receivedAt, index),
-    )
+    .map((quote, index) => parseBridgeQuote(redactCredentialValue(quote, token), receivedAt, index))
     .filter((quote): quote is AssetQuoteCache => quote !== null);
 
   if (json.quotes.length > 0 && quotes.length === 0) {
