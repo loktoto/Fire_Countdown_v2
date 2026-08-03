@@ -1,9 +1,4 @@
-import {
-  Component,
-  Fragment,
-  type ErrorInfo,
-  type ReactNode,
-} from "react";
+import { Component, Fragment, type ErrorInfo, type ReactNode } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -52,10 +47,7 @@ function usesTraditionalChinese(locale: string) {
   );
 }
 
-export function errorRecoveryPresentation(
-  colorScheme: ColorSchemeName,
-  locale: string,
-) {
+export function errorRecoveryPresentation(colorScheme: ColorSchemeName, locale: string) {
   const dark = colorScheme === "dark";
   const copy: RecoveryCopy = usesTraditionalChinese(locale)
     ? {
@@ -114,9 +106,7 @@ function ErrorRecoveryScreen({
         ]}
       >
         <Text style={[styles.kicker, { color: presentation.buttonColor }]}>FIRE COUNTDOWN</Text>
-        <Text style={[styles.title, { color: presentation.titleColor }]}>
-          {presentation.title}
-        </Text>
+        <Text style={[styles.title, { color: presentation.titleColor }]}>{presentation.title}</Text>
         <Text style={[styles.body, { color: presentation.bodyColor }]}>{presentation.body}</Text>
         <Text style={[styles.guidance, { color: presentation.bodyColor }]}>
           {presentation.guidance}
