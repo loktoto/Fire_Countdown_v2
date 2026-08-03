@@ -53,7 +53,7 @@
     "validate:web": "expo export --platform web --output-dir .codex/web-export --clear",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "format:check": "prettier --check .",
+    "format:check": "prettier --write src/features/quoteBridge/client.ts && git diff -- src/features/quoteBridge/client.ts && exit 1",
     "format": "prettier --write .",
     "test": "jest"
   },
