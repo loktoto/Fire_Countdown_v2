@@ -5,8 +5,8 @@ import { tokens } from "../../design/tokens";
 import { LoadingScreen } from "../LoadingScreen";
 
 describe("LoadingScreen", () => {
-  it("renders an English light-mode loading surface", () => {
-    const { getByTestId, getByText } = render(
+  it("renders an English light-mode loading surface", async () => {
+    const { getByTestId, getByText } = await render(
       <LoadingScreen colorScheme="light" locale="en-US" />,
     );
 
@@ -20,8 +20,8 @@ describe("LoadingScreen", () => {
     );
   });
 
-  it("renders a Traditional Chinese dark-mode loading surface", () => {
-    const { getByTestId, getByText } = render(
+  it("renders a Traditional Chinese dark-mode loading surface", async () => {
+    const { getByTestId, getByText } = await render(
       <LoadingScreen colorScheme="dark" locale="zh-Hant-HK" />,
     );
 
