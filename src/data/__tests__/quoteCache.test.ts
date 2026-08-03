@@ -44,9 +44,7 @@ describe("quote cache", () => {
 
     const merged = mergeQuoteCache([original, other], [staleDuplicate, replacement]);
     expect(merged).toHaveLength(2);
-    expect(merged.find((item) => item.assetId === original.assetId)?.id).toBe(
-      "replacement",
-    );
+    expect(merged.find((item) => item.assetId === original.assetId)?.id).toBe("replacement");
     expect(merged.find((item) => item.assetId === other.assetId)?.id).toBe("other");
   });
 
@@ -136,14 +134,12 @@ describe("quote cache", () => {
       price: 120,
     });
 
-    const newerThenOlder = mergeQuoteCache(
-      mergeQuoteCache([initial], [newerResponse]),
-      [olderResponse],
-    );
-    const olderThenNewer = mergeQuoteCache(
-      mergeQuoteCache([initial], [olderResponse]),
-      [newerResponse],
-    );
+    const newerThenOlder = mergeQuoteCache(mergeQuoteCache([initial], [newerResponse]), [
+      olderResponse,
+    ]);
+    const olderThenNewer = mergeQuoteCache(mergeQuoteCache([initial], [olderResponse]), [
+      newerResponse,
+    ]);
 
     expect(newerThenOlder).toEqual([newerResponse]);
     expect(olderThenNewer).toEqual([newerResponse]);
