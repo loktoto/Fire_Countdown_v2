@@ -21,6 +21,8 @@ describe("locales", () => {
 
   it("preserves valid Traditional Chinese UTF-8 content", () => {
     expect(zhHant.tabs.home).toBe("\u9996\u9801");
+    expect(zhHant.timeLens.kicker).toBe("時間透鏡");
+    expect(zhHant.timeLens.kicker).not.toContain("TIME LENS");
     expect(JSON.stringify(zhHant)).not.toContain("\uFFFD");
   });
 });
