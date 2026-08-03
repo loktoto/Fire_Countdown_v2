@@ -44,7 +44,9 @@ describe("quote cache", () => {
 
     const merged = mergeQuoteCache([original, other], [staleDuplicate, replacement]);
     expect(merged).toHaveLength(2);
-    expect(merged.find((item) => item.assetId === original.assetId)?.id).toBe("replacement");
+    expect(merged.find((item) => item.assetId === original.assetId)?.id).toBe(
+      "replacement",
+    );
     expect(merged.find((item) => item.assetId === other.assetId)?.id).toBe("other");
   });
 
@@ -96,7 +98,11 @@ describe("quote cache", () => {
   });
 
   it("lets valid timestamps outrank invalid timestamps deterministically", () => {
-    const invalidCurrent = quote({ id: "invalid-current", receivedAt: "not-a-date", price: 80 });
+    const invalidCurrent = quote({
+      id: "invalid-current",
+      receivedAt: "not-a-date",
+      price: 80,
+    });
     const invalidIncoming = quote({
       id: "invalid-incoming",
       receivedAt: "also-not-a-date",
