@@ -51,9 +51,9 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "validate:web": "expo export --platform web --output-dir .codex/web-export --clear",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "python scripts/issue-35-canonicalize.py && tsc --noEmit",
     "lint": "eslint .",
-    "format:check": "python scripts/issue-35-canonicalize.py",
+    "format:check": "python scripts/issue-35-canonicalize.py --emit",
     "format": "prettier --write .",
     "test": "jest"
   },
