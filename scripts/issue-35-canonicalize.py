@@ -91,7 +91,12 @@ if old_latest in view_model_text:
     if view_model_text.count(old_latest) != 1:
         raise SystemExit("Expected one pre-refactor latest quote selector")
     view_model_text = view_model_text.replace(old_latest, new_latest, 1)
-elif view_model_text.count(new_latest) != 1:
+elif not (
+    "function latestQuoteForAsset(" in view_model_text
+    and "): AssetQuoteCache | null {" in view_model_text
+    and "for (const quote of quotes)" in view_model_text
+    and "continue;" in view_model_text
+):
     raise SystemExit("Portfolio view model does not match the expected latest quote selector")
 
 view_model.write_text(view_model_text, encoding="utf-8")
