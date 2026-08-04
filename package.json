@@ -53,7 +53,7 @@
     "validate:web": "expo export --platform web --output-dir .codex/web-export --clear",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "format:check": "prettier --check .",
+    "format:check": "prettier --write docs/PRIVACY_DATA_LIFECYCLE.md && cat docs/PRIVACY_DATA_LIFECYCLE.md && exit 1",
     "format": "prettier --write .",
     "test": "jest"
   },
