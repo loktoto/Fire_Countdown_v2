@@ -5,10 +5,7 @@ import { createElement, type ReactNode } from "react";
 import { useFireStore } from "../../data/fireStore";
 import { seedSnapshot } from "../../data/seed";
 import type { Asset, AssetQuoteCache } from "../../features/types";
-import {
-  shapePortfolioAssetRows,
-  usePortfolioViewModel,
-} from "../usePortfolioViewModel";
+import { shapePortfolioAssetRows, usePortfolioViewModel } from "../usePortfolioViewModel";
 
 jest.mock("../../data/fireStore", () => ({ useFireStore: jest.fn() }));
 

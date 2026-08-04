@@ -7,19 +7,10 @@ import type { Asset, AssetQuoteCache } from "../features/types";
 import { todayIso } from "../utils/format";
 import { useQuoteRefresh } from "./useQuoteRefresh";
 
-export type PortfolioAssetFreshness =
-  | "fresh"
-  | "delayed"
-  | "stale"
-  | "cached"
-  | "unavailable";
+export type PortfolioAssetFreshness = "fresh" | "delayed" | "stale" | "cached" | "unavailable";
 
 export type PortfolioAssetFallbackState =
-  | "none"
-  | "manual"
-  | "manual_fallback"
-  | "missing"
-  | "unsupported_currency";
+  "none" | "manual" | "manual_fallback" | "missing" | "unsupported_currency";
 
 export type PortfolioAssetInclusionState = "included" | "excluded" | "archived";
 export type PortfolioAssetCurrencyState = "supported" | "unsupported";
@@ -39,13 +30,13 @@ function normalizeCurrency(value?: string | null) {
   return (value ?? "").trim().toUpperCase();
 }
 
-function latestQuoteForAsset(assetId: string, quotes: AssetQuoteCache[]) {
+function latestQuoteForAsset(assetId: string, quotes: AssetQuoteCache[]): AssetQuoteCache | null {
   let latest: AssetQuoteCache | null = null;
   let latestTime = Number.NEGATIVE_INFINITY;
 
-  quotes.forEach((quote) => {
+  for (const quote of quotes) {
     if (quote.assetId !== assetId) {
-      return;
+      continue;
     }
 
     const receivedAt = Date.parse(quote.receivedAt);
@@ -53,7 +44,7 @@ function latestQuoteForAsset(assetId: string, quotes: AssetQuoteCache[]) {
       latest = quote;
       latestTime = receivedAt;
     }
-  });
+  }
 
   return latest;
 }
@@ -105,8 +96,7 @@ export function shapePortfolioAssetRows(
     const resolution = resolveAssetValue(asset, quotes, baseCurrency);
     const latestQuote = latestQuoteForAsset(asset.id, quotes);
     const currencyState =
-      baseCurrency &&
-      normalizeCurrency(resolution.currency) !== normalizeCurrency(baseCurrency)
+      baseCurrency && normalizeCurrency(resolution.currency) !== normalizeCurrency(baseCurrency)
         ? "unsupported"
         : "supported";
 
@@ -117,11 +107,7 @@ export function shapePortfolioAssetRows(
       quoteChange: latestQuote?.changePercent ?? null,
       freshness: quoteFreshness(resolution, latestQuote),
       fallbackState: fallbackState(resolution),
-      inclusionState: asset.archivedAt
-        ? "archived"
-        : asset.includeInFire
-          ? "included"
-          : "excluded",
+      inclusionState: asset.archivedAt ? "archived" : asset.includeInFire ? "included" : "excluded",
       currencyState,
     };
   });
@@ -167,10 +153,7 @@ export function usePortfolioViewModel() {
       if (currencyState === "unsupported") {
         return;
       }
-      groups.set(
-        asset.assetClass,
-        (groups.get(asset.assetClass) ?? 0) + resolution.value,
-      );
+      groups.set(asset.assetClass, (groups.get(asset.assetClass) ?? 0) + resolution.value);
     });
     return [...groups.entries()].map(([label, value]) => ({ label, value }));
   }, [assetRows]);

@@ -21,7 +21,6 @@ import { getPortfolioLayout, portfolioAssetColorRole } from "../components/portf
 import { ScreenScaffold } from "../components/ScreenScaffold";
 import { StatusBadge } from "../components/StatusBadge";
 import { TimeLensValue } from "../components/TimeLens";
-import { resolveAssetValue } from "../engine/fireEngine";
 import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
 import type { Asset, Milestone, ProjectionScenario } from "../features/types";
@@ -390,12 +389,7 @@ export function PortfolioScreen() {
             { borderColor: colors.surfaceBorder, backgroundColor: colors.surface },
           ]}
         >
-          {vm.assets.map((asset) => {
-            const resolved = resolveAssetValue(asset, vm.quoteCache, goalCurrency);
-            const latestQuote = vm.quoteCache
-              .filter((quote) => quote.assetId === asset.id)
-              .sort((a, b) => Date.parse(b.receivedAt) - Date.parse(a.receivedAt))[0];
-            const quoteChange = latestQuote?.changePercent;
+          {vm.assetRows.map(({ asset, latestQuote, quoteChange, resolution: resolved }) => {
             const assetAccent = colors[portfolioAssetColorRole(asset.assetClass)];
             return (
               <View
@@ -528,7 +522,7 @@ export function PortfolioScreen() {
               </View>
             );
           })}
-          {vm.assets.length === 0 ? (
+          {vm.assetRows.length === 0 ? (
             <Text style={[styles.emptyAssets, typography.body, { color: colors.textMuted }]}>
               {t.portfolio.noAssets}
             </Text>
