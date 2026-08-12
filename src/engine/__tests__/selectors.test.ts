@@ -56,6 +56,12 @@ describe("deriveFireView", () => {
     expect(future.transactionAdjustment).toBe(base.transactionAdjustment);
     expect(future.includedAssets).toBe(base.includedAssets);
     expect(future.projectedFireDate).toBe(base.projectedFireDate);
+
+    const baseOnExecutionDate = deriveFireView(seedSnapshot, "2026-07-01");
+    const executed = deriveFireView(futureSnapshot, "2026-07-01");
+    expect(executed.transactionAdjustment).toBe(baseOnExecutionDate.transactionAdjustment + 100000);
+    expect(executed.includedAssets).toBe(baseOnExecutionDate.includedAssets + 100000);
+    expect(executed.projectedFireDays!).toBeLessThan(baseOnExecutionDate.projectedFireDays!);
   });
 
   it("keeps other-currency transactions out of base-currency FIRE totals", () => {

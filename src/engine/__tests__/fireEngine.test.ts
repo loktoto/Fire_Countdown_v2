@@ -193,11 +193,25 @@ describe("fireEngine", () => {
     expect(transactionCashflowNet([futureTransaction], "2026-07-01")).toBe(50000);
   });
 
-  it("does not preview a future transaction as an immediate FIRE impact", () => {
-    const preview = transactionPreviewImpact({
+  it("previews future-dated cashflow without making it available before its date", () => {
+    const futureIncome = transactionPreviewImpact({
       transactions: seedSnapshot.transactions,
       draft: {
-        amount: 50000,
+        amount: 20000,
+        categoryId: "cat-salary",
+        currency: "HKD",
+        date: "2026-07-01",
+        type: "income",
+      },
+      assets: seedSnapshot.assets,
+      quotes: seedSnapshot.quoteCache,
+      goal,
+      startDate: "2026-06-29",
+    });
+    const futureExpense = transactionPreviewImpact({
+      transactions: seedSnapshot.transactions,
+      draft: {
+        amount: 20000,
         categoryId: "cat-food",
         currency: "HKD",
         date: "2026-07-01",
@@ -209,8 +223,29 @@ describe("fireEngine", () => {
       startDate: "2026-06-29",
     });
 
-    expect(preview.impactDays).toBe(0);
-    expect(preview.simulatedDays).toBe(preview.baseDays);
+    expect(futureIncome.impactDays).toBeLessThan(0);
+    expect(futureIncome.simulatedDays).toBeGreaterThanOrEqual(2);
+    expect(futureExpense.impactDays).toBeGreaterThan(0);
+  });
+
+  it("never previews FIRE before a future income is available", () => {
+    const preview = transactionPreviewImpact({
+      transactions: seedSnapshot.transactions,
+      draft: {
+        amount: 100000000,
+        categoryId: "cat-salary",
+        currency: "HKD",
+        date: "2027-06-29",
+        type: "income",
+      },
+      assets: seedSnapshot.assets,
+      quotes: seedSnapshot.quoteCache,
+      goal,
+      startDate: "2026-06-29",
+    });
+
+    expect(preview.simulatedDays).toBeGreaterThanOrEqual(365);
+    expect(preview.impactDays).toBeLessThan(0);
   });
 
   it("models retirement withdrawals instead of savings after FIRE when requested", () => {

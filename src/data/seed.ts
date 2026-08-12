@@ -90,6 +90,7 @@ export const seedSnapshot: FireSnapshot = {
       updatedAt: now,
     },
   ],
+  recurringTransactions: [],
   assetTypes: [
     {
       id: "type-etf",

@@ -1,4 +1,5 @@
 export type TransactionType = "expense" | "income";
+export type RecurrenceFrequency = "weekly" | "biweekly" | "monthly" | "yearly";
 export type UpdateMethod = "manual" | "google_sheet_quote" | "hybrid";
 export type QuoteStatus = "ok" | "delayed" | "stale" | "failed" | "unsupported" | "manual";
 export type QuoteProvider = "free_market" | "custom_bridge";
@@ -19,6 +20,20 @@ export type Transaction = BaseEntity & {
   categoryId: string;
   date: string;
   note?: string | null;
+  recurringTransactionId?: string | null;
+  recurrenceDate?: string | null;
+};
+
+export type RecurringTransaction = BaseEntity & {
+  type: TransactionType;
+  amount: number;
+  currency: string;
+  categoryId: string;
+  note?: string | null;
+  frequency: RecurrenceFrequency;
+  startDate: string;
+  nextDate: string;
+  isActive: boolean;
 };
 
 export type Category = BaseEntity & {
@@ -134,6 +149,7 @@ export type QuoteBridgeSettings = {
 
 export type FireSnapshot = {
   transactions: Transaction[];
+  recurringTransactions: RecurringTransaction[];
   categories: Category[];
   assetTypes: AssetType[];
   assets: Asset[];

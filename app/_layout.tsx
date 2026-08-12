@@ -14,6 +14,12 @@ export default function RootLayout() {
             presentation: "modal",
           }}
         />
+        <Stack.Screen
+          name="recurring"
+          options={{
+            presentation: "modal",
+          }}
+        />
       </Stack>
     </Providers>
   );

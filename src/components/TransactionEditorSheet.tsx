@@ -193,6 +193,16 @@ function TransactionEditorContent({
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
       >
+        {transaction.recurringTransactionId ? (
+          <View style={[styles.recurringNotice, { backgroundColor: colors.primarySoft }]}>
+            <MaterialCommunityIcons name="repeat" size={19} color={colors.primary} />
+            <Text
+              style={[styles.recurringNoticeText, typography.body, { color: colors.textMuted }]}
+            >
+              {t.recurring.singleEditHint}
+            </Text>
+          </View>
+        ) : null}
         <SegmentedControl
           value={type}
           onChange={(nextType) => {
@@ -455,6 +465,14 @@ const styles = StyleSheet.create({
     gap: tokens.spacing.md,
     paddingBottom: tokens.spacing.sm,
   },
+  recurringNotice: {
+    borderRadius: tokens.radius.utility,
+    padding: tokens.spacing.md,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: tokens.spacing.sm,
+  },
+  recurringNoticeText: { flex: 1, fontSize: 13, lineHeight: 18 },
   fieldGroup: {
     gap: tokens.spacing.sm,
   },

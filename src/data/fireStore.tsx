@@ -1,11 +1,29 @@
 import "expo-sqlite/localStorage/install";
 
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { AppState } from "react-native";
 
 import { initializeDatabase } from "./database";
 import { mergeQuoteCache } from "./quoteCache";
 import { seedSnapshot } from "./seed";
-import { readSnapshotFromStorage, writeSnapshotToStorage } from "./snapshotStorage";
+import {
+  readSnapshotFromStorage,
+  type SnapshotStorage,
+  writeSnapshotToStorage,
+} from "./snapshotStorage";
+import {
+  materializeDueRecurringTransactions,
+  recurringDateOnOrAfter,
+  recurringScheduleFromTransaction,
+} from "../features/recurring/recurringEngine";
 import type {
   Asset,
   AssetQuoteCache,
@@ -15,38 +33,54 @@ import type {
   Milestone,
   ProjectionScenario,
   QuoteBridgeSettings,
+  RecurrenceFrequency,
+  RecurringTransaction,
   Transaction,
 } from "../features/types";
 
 type FireStoreContextValue = {
   snapshot: FireSnapshot;
-  resetSeed: () => void;
-  createTransaction: (input: Omit<Transaction, "id" | "createdAt" | "updatedAt">) => void;
-  updateTransaction: (id: string, patch: Partial<Transaction>) => void;
-  archiveTransaction: (id: string) => void;
-  createCategory: (input: Omit<Category, "id" | "createdAt" | "updatedAt">) => Category;
-  archiveCategory: (id: string) => void;
-  createAsset: (input: Omit<Asset, "id" | "createdAt" | "updatedAt">) => void;
-  createMilestone: (input: Omit<Milestone, "id" | "createdAt" | "updatedAt">) => Milestone;
+  persistenceError: { occurredAt: string } | null;
+  dismissPersistenceError: () => void;
+  resetSeed: () => boolean;
+  createTransaction: (
+    input: Omit<Transaction, "id" | "createdAt" | "updatedAt">,
+    recurrence?: { frequency: RecurrenceFrequency },
+  ) => boolean;
+  updateTransaction: (id: string, patch: Partial<Transaction>) => boolean;
+  archiveTransaction: (id: string) => boolean;
+  updateRecurringTransaction: (
+    id: string,
+    patch: Partial<Omit<RecurringTransaction, "id" | "createdAt" | "updatedAt">>,
+  ) => boolean;
+  archiveRecurringTransaction: (id: string) => boolean;
+  createCategory: (
+    input: Omit<Category, "id" | "createdAt" | "updatedAt">,
+  ) => Category | null;
+  archiveCategory: (id: string) => boolean;
+  createAsset: (input: Omit<Asset, "id" | "createdAt" | "updatedAt">) => boolean;
+  createMilestone: (
+    input: Omit<Milestone, "id" | "createdAt" | "updatedAt">,
+  ) => Milestone | null;
   createScenario: (
     input: Omit<ProjectionScenario, "id" | "createdAt" | "updatedAt">,
-  ) => ProjectionScenario;
-  archiveMilestone: (id: string) => void;
-  archiveScenario: (id: string) => void;
-  archiveAsset: (id: string) => void;
-  updateAsset: (id: string, patch: Partial<Asset>) => void;
-  updateCategory: (id: string, patch: Partial<Category>) => void;
-  updateGoal: (id: string, patch: Partial<FireGoal>) => void;
-  updateMilestone: (id: string, patch: Partial<Milestone>) => void;
-  updateScenario: (id: string, patch: Partial<ProjectionScenario>) => void;
-  updateQuoteSettings: (patch: Partial<QuoteBridgeSettings>) => void;
-  saveQuotes: (quotes: AssetQuoteCache[]) => void;
-  setThemeMode: (mode: FireSnapshot["themeMode"]) => void;
-  setHapticsEnabled: (enabled: boolean) => void;
-  setFireCompanion: (id: FireSnapshot["fireCompanionId"]) => void;
-  setFireDestination: (id: FireSnapshot["fireDestinationId"]) => void;
-  setCurrency: (currency: string) => void;
-  setLanguage: (language: FireSnapshot["language"]) => void;
+  ) => ProjectionScenario | null;
+  archiveMilestone: (id: string) => boolean;
+  archiveScenario: (id: string) => boolean;
+  archiveAsset: (id: string) => boolean;
+  updateAsset: (id: string, patch: Partial<Asset>) => boolean;
+  updateCategory: (id: string, patch: Partial<Category>) => boolean;
+  updateGoal: (id: string, patch: Partial<FireGoal>) => boolean;
+  updateMilestone: (id: string, patch: Partial<Milestone>) => boolean;
+  updateScenario: (id: string, patch: Partial<ProjectionScenario>) => boolean;
+  updateQuoteSettings: (patch: Partial<QuoteBridgeSettings>) => boolean;
+  saveQuotes: (quotes: AssetQuoteCache[]) => boolean;
+  setThemeMode: (mode: FireSnapshot["themeMode"]) => boolean;
+  setHapticsEnabled: (enabled: boolean) => boolean;
+  setFireCompanion: (id: FireSnapshot["fireCompanionId"]) => boolean;
+  setFireDestination: (id: FireSnapshot["fireDestinationId"]) => boolean;
+  setCurrency: (currency: string) => boolean;
+  setLanguage: (language: FireSnapshot["language"]) => boolean;
 };
 
 const FireStoreContext = createContext<FireStoreContextValue | null>(null);
@@ -59,9 +93,43 @@ function id(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function FireStoreProvider({ children }: { children: React.ReactNode }) {
-  const [snapshot, setSnapshot] = useState<FireSnapshot>(() =>
-    readSnapshotFromStorage(localStorage),
+function todayIso() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function readMaterializedSnapshot(storage: SnapshotStorage) {
+  const stored = readSnapshotFromStorage(storage);
+  const materialized = materializeDueRecurringTransactions(stored, todayIso(), nowIso());
+  if (materialized === stored) {
+    return { snapshot: stored, persistenceError: null };
+  }
+
+  if (writeSnapshotToStorage(storage, materialized)) {
+    return { snapshot: materialized, persistenceError: null };
+  }
+
+  return {
+    snapshot: stored,
+    persistenceError: { occurredAt: nowIso() },
+  };
+}
+
+export function FireStoreProvider({
+  children,
+  storage = localStorage,
+}: {
+  children: React.ReactNode;
+  storage?: SnapshotStorage;
+}) {
+  const [initialState] = useState(() => readMaterializedSnapshot(storage));
+  const [snapshot, setSnapshot] = useState<FireSnapshot>(initialState.snapshot);
+  const snapshotRef = useRef(initialState.snapshot);
+  const [persistenceError, setPersistenceError] = useState<{ occurredAt: string } | null>(
+    initialState.persistenceError,
   );
 
   useEffect(() => {
@@ -70,35 +138,80 @@ export function FireStoreProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const commit = useCallback((updater: (current: FireSnapshot) => FireSnapshot) => {
-    setSnapshot((current) => {
-      const next = updater(current);
-      return writeSnapshotToStorage(localStorage, next) ? next : current;
+  const commit = useCallback(
+    (updater: (current: FireSnapshot) => FireSnapshot) => {
+      const current = snapshotRef.current;
+      const updated = updater(current);
+      const next = materializeDueRecurringTransactions(updated, todayIso(), nowIso());
+      if (next === current) {
+        return true;
+      }
+      if (!writeSnapshotToStorage(storage, next)) {
+        setPersistenceError({ occurredAt: nowIso() });
+        return false;
+      }
+
+      snapshotRef.current = next;
+      setSnapshot(next);
+      setPersistenceError(null);
+      return true;
+    },
+    [storage],
+  );
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        commit((current) => current);
+      }
     });
-  }, []);
+    return () => subscription.remove();
+  }, [commit]);
 
   const value = useMemo<FireStoreContextValue>(
     () => ({
       snapshot,
+      persistenceError,
+      dismissPersistenceError: () => setPersistenceError(null),
       resetSeed: () => {
-        if (writeSnapshotToStorage(localStorage, seedSnapshot)) {
-          setSnapshot(seedSnapshot);
+        if (!writeSnapshotToStorage(storage, seedSnapshot)) {
+          setPersistenceError({ occurredAt: nowIso() });
+          return false;
         }
+        snapshotRef.current = seedSnapshot;
+        setSnapshot(seedSnapshot);
+        setPersistenceError(null);
+        return true;
       },
-      createTransaction: (input) =>
+      createTransaction: (input, recurrence) =>
         commit((current) => {
           const timestamp = nowIso();
+          const transactionId = id("txn");
+          const scheduleId = recurrence ? id("rec") : null;
+          const transaction: Transaction = {
+            ...input,
+            id: transactionId,
+            recurringTransactionId: scheduleId,
+            recurrenceDate: scheduleId ? input.date : null,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+          };
+          const recurringTransaction: RecurringTransaction | null = recurrence
+            ? recurringScheduleFromTransaction({
+                id: scheduleId!,
+                transaction: input,
+                frequency: recurrence.frequency,
+                throughDate: todayIso(),
+                createdAt: timestamp,
+              })
+            : null;
+
           return {
             ...current,
-            transactions: [
-              {
-                ...input,
-                id: id("txn"),
-                createdAt: timestamp,
-                updatedAt: timestamp,
-              },
-              ...current.transactions,
-            ],
+            transactions: [transaction, ...current.transactions],
+            recurringTransactions: recurringTransaction
+              ? [recurringTransaction, ...current.recurringTransactions]
+              : current.recurringTransactions,
           };
         }),
       updateTransaction: (transactionId, patch) =>
@@ -119,6 +232,47 @@ export function FireStoreProvider({ children }: { children: React.ReactNode }) {
               : transaction,
           ),
         })),
+      updateRecurringTransaction: (recurringTransactionId, patch) =>
+        commit((current) => ({
+          ...current,
+          recurringTransactions: current.recurringTransactions.map((schedule) => {
+            if (schedule.id !== recurringTransactionId) {
+              return schedule;
+            }
+
+            const timestamp = nowIso();
+            const updated = { ...schedule, ...patch, updatedAt: timestamp };
+            const timingChanged =
+              patch.startDate !== undefined ||
+              patch.frequency !== undefined ||
+              (patch.isActive === true && !schedule.isActive);
+
+            return timingChanged && updated.isActive
+              ? {
+                  ...updated,
+                  nextDate: recurringDateOnOrAfter(
+                    updated.startDate,
+                    updated.frequency,
+                    todayIso(),
+                  ),
+                }
+              : updated;
+          }),
+        })),
+      archiveRecurringTransaction: (recurringTransactionId) =>
+        commit((current) => ({
+          ...current,
+          recurringTransactions: current.recurringTransactions.map((schedule) =>
+            schedule.id === recurringTransactionId
+              ? {
+                  ...schedule,
+                  isActive: false,
+                  archivedAt: nowIso(),
+                  updatedAt: nowIso(),
+                }
+              : schedule,
+          ),
+        })),
       createCategory: (input) => {
         const timestamp = nowIso();
         const category = {
@@ -127,11 +281,11 @@ export function FireStoreProvider({ children }: { children: React.ReactNode }) {
           createdAt: timestamp,
           updatedAt: timestamp,
         };
-        commit((current) => ({
+        const persisted = commit((current) => ({
           ...current,
           categories: [...current.categories, category],
         }));
-        return category;
+        return persisted ? category : null;
       },
       archiveCategory: (categoryId) =>
         commit((current) => ({
@@ -166,11 +320,11 @@ export function FireStoreProvider({ children }: { children: React.ReactNode }) {
           createdAt: timestamp,
           updatedAt: timestamp,
         };
-        commit((current) => ({
+        const persisted = commit((current) => ({
           ...current,
           milestones: [...current.milestones, milestone],
         }));
-        return milestone;
+        return persisted ? milestone : null;
       },
       createScenario: (input) => {
         const timestamp = nowIso();
@@ -180,7 +334,7 @@ export function FireStoreProvider({ children }: { children: React.ReactNode }) {
           createdAt: timestamp,
           updatedAt: timestamp,
         };
-        commit((current) => ({
+        const persisted = commit((current) => ({
           ...current,
           scenarios: [
             ...current.scenarios.map((entry) =>
@@ -189,7 +343,7 @@ export function FireStoreProvider({ children }: { children: React.ReactNode }) {
             scenario,
           ],
         }));
-        return scenario;
+        return persisted ? scenario : null;
       },
       archiveMilestone: (milestoneId) =>
         commit((current) => ({
@@ -371,7 +525,7 @@ export function FireStoreProvider({ children }: { children: React.ReactNode }) {
           language,
         })),
     }),
-    [commit, snapshot],
+    [commit, persistenceError, snapshot, storage],
   );
 
   return <FireStoreContext.Provider value={value}>{children}</FireStoreContext.Provider>;

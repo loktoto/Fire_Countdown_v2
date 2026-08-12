@@ -605,11 +605,16 @@ export function transactionPreviewImpact(input: {
   );
   const draftAmount = finiteNumber(input.draft.amount);
   const draftDelta =
-    input.draft.date <= startDate &&
     normalizeCurrency(input.draft.currency) === normalizeCurrency(input.goal.baseCurrency)
       ? input.draft.type === "income"
         ? draftAmount
         : -draftAmount
+      : 0;
+  const startTime = Date.parse(startDate);
+  const draftTime = Date.parse(input.draft.date);
+  const draftDelayDays =
+    Number.isFinite(startTime) && Number.isFinite(draftTime)
+      ? Math.max(0, (draftTime - startTime) / dayMs)
       : 0;
   const baseEstimate = estimateDaysToFire({
     assets: input.assets,
@@ -621,23 +626,62 @@ export function transactionPreviewImpact(input: {
     months,
   });
 
+  if (
+    draftDelta !== 0 &&
+    draftDelayDays > 0 &&
+    baseEstimate.days !== null &&
+    draftDelayDays > baseEstimate.days
+  ) {
+    return {
+      impactDays: 0,
+      baseDays: baseEstimate.days,
+      simulatedDays: baseEstimate.days,
+    };
+  }
+
+  let projectionDraftDelta = draftDelta;
+  if (draftDelta !== 0 && draftDelayDays > 0) {
+    const previewRuntime = createProjectionRuntime({
+      assets: input.assets,
+      quotes: input.quotes,
+      goal: input.goal,
+      scenario: input.scenario,
+      startDate,
+      months: 0,
+    });
+    const delayInProjectionMonths = draftDelayDays / (365.2425 / 12);
+    const growthUntilDraft = Math.pow(
+      1 + previewRuntime.monthlyExpectedReturn,
+      delayInProjectionMonths,
+    );
+
+    // Compare the same projection paths without pretending future cash is available today.
+    // The present-value equivalent preserves its eventual effect, while the crossing below is
+    // clamped so a future income can never make FIRE appear to happen before its entry date.
+    projectionDraftDelta = draftDelta / growthUntilDraft;
+  }
+
   const simulatedEstimate = estimateDaysToFire({
     assets: input.assets,
     quotes: input.quotes,
     goal: input.goal,
     scenario: input.scenario,
     startDate,
-    initialFireAssetAdjustment: savedTransactionDelta + draftDelta,
+    initialFireAssetAdjustment: savedTransactionDelta + projectionDraftDelta,
     months,
   });
 
   const baseDays = baseEstimate.days;
   let simulatedDays = simulatedEstimate.days;
 
-  if (baseDays !== null && simulatedDays === null && draftDelta < 0) {
+  if (draftDelta > 0 && draftDelayDays > 0 && simulatedDays !== null) {
+    simulatedDays = Math.max(simulatedDays, draftDelayDays);
+  }
+
+  if (baseDays !== null && simulatedDays === null && projectionDraftDelta < 0) {
     const dailyGapClosure = baseEstimate.crossingGapClosurePerDay;
     if (dailyGapClosure !== null) {
-      simulatedDays = baseDays + Math.abs(draftDelta) / dailyGapClosure;
+      simulatedDays = baseDays + Math.abs(projectionDraftDelta) / dailyGapClosure;
     }
   }
 

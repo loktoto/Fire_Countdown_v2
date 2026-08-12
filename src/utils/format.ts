@@ -148,3 +148,16 @@ export function formatDateInputLabel(date: string, locale?: string) {
     weekday: "short",
   });
 }
+
+export function formatCompactDateInputLabel(
+  date: string,
+  locale?: string,
+  referenceDate = todayIso(),
+) {
+  const { year, month, day } = isoDateParts(date);
+  return new Date(year, month - 1, day).toLocaleDateString(locale, {
+    ...(date === referenceDate ? {} : { year: "numeric" as const }),
+    month: "short",
+    day: "numeric",
+  });
+}

@@ -6,6 +6,7 @@ describe("exportData", () => {
     const csv = buildCsvExport(seedSnapshot);
 
     expect(csv).toContain("Transactions");
+    expect(csv).toContain("Recurring Cashflow");
     expect(csv).toContain("Assets");
     expect(csv).toContain("FIRE Goals");
     expect(csv).toContain("FIRE Methods");

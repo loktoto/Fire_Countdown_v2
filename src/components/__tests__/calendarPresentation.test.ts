@@ -1,7 +1,11 @@
 import {
+  calendarActivityColorRole,
+  calendarItemInteraction,
   calendarLayout,
   calendarNetColorRole,
   calendarSummaryColorRole,
+  calendarTransactionColorRole,
+  recurringScheduleRoute,
 } from "../calendarPresentation";
 
 describe("calendar presentation", () => {
@@ -30,5 +34,50 @@ describe("calendar presentation", () => {
     expect(calendarNetColorRole(0)).toBe("textMuted");
     expect(calendarNetColorRole(4_832)).toBe("positive");
     expect(calendarNetColorRole(-1_200)).toBe("negative");
+  });
+
+  it("keeps future transactions neutral until their FIRE execution date", () => {
+    expect(
+      calendarActivityColorRole({ hasIncome: true, hasExpense: false, isFuture: true }),
+    ).toBe("textTertiary");
+    expect(
+      calendarActivityColorRole({ hasIncome: false, hasExpense: true, isFuture: true }),
+    ).toBe("textTertiary");
+    expect(
+      calendarActivityColorRole({ hasIncome: true, hasExpense: true, isFuture: false }),
+    ).toBe("primary");
+    expect(calendarTransactionColorRole({ type: "income", isPendingFireImpact: true })).toBe(
+      "textMuted",
+    );
+    expect(calendarTransactionColorRole({ type: "expense", isPendingFireImpact: true })).toBe(
+      "textMuted",
+    );
+    expect(calendarTransactionColorRole({ type: "income", isPendingFireImpact: false })).toBe(
+      "positive",
+    );
+    expect(calendarTransactionColorRole({ type: "expense", isPendingFireImpact: false })).toBe(
+      "negative",
+    );
+  });
+
+  it("routes projected rows to their recurring schedule and real rows to history editing", () => {
+    expect(
+      calendarItemInteraction({
+        id: "projection-rec-salary-2026-09-03",
+        isProjected: true,
+        recurringTransactionId: "rec-salary",
+      }),
+    ).toEqual({ kind: "recurring", scheduleId: "rec-salary" });
+    expect(
+      calendarItemInteraction({
+        id: "txn-rec-salary-2026-08-03",
+        isProjected: false,
+        recurringTransactionId: "rec-salary",
+      }),
+    ).toEqual({ kind: "transaction", transactionId: "txn-rec-salary-2026-08-03" });
+    expect(recurringScheduleRoute("rec-salary")).toEqual({
+      pathname: "/recurring",
+      params: { scheduleId: "rec-salary" },
+    });
   });
 });

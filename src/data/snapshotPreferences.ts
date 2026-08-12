@@ -9,6 +9,7 @@ import type {
   Milestone,
   ProjectionScenario,
   QuoteBridgeSettings,
+  RecurringTransaction,
   Transaction,
 } from "../features/types";
 
@@ -52,6 +53,12 @@ const destinationIds = new Set<FireSnapshot["fireDestinationId"]>([
   "travel",
   "sunrise",
 ]);
+const recurrenceFrequencies = new Set<RecurringTransaction["frequency"]>([
+  "weekly",
+  "biweekly",
+  "monthly",
+  "yearly",
+]);
 
 function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -63,6 +70,17 @@ function isString(value: unknown): value is string {
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
+}
+
+function isIsoDate(value: unknown): value is string {
+  if (!isString(value) || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+  const [year, month, day] = value.split("-").map(Number);
+  const parsed = new Date(year!, month! - 1, day!);
+  return (
+    parsed.getFullYear() === year && parsed.getMonth() === month! - 1 && parsed.getDate() === day
+  );
 }
 
 function isBaseEntity(value: UnknownRecord) {
@@ -78,8 +96,24 @@ function isTransaction(value: unknown): value is Transaction {
     value.amount >= 0 &&
     isString(value.currency) &&
     isString(value.categoryId) &&
-    isString(value.date) &&
-    /^\d{4}-\d{2}-\d{2}$/.test(value.date)
+    isIsoDate(value.date)
+  );
+}
+
+function isRecurringTransaction(value: unknown): value is RecurringTransaction {
+  return (
+    isRecord(value) &&
+    isBaseEntity(value) &&
+    (value.type === "expense" || value.type === "income") &&
+    isFiniteNumber(value.amount) &&
+    value.amount > 0 &&
+    isString(value.currency) &&
+    isString(value.categoryId) &&
+    recurrenceFrequencies.has(value.frequency as RecurringTransaction["frequency"]) &&
+    isIsoDate(value.startDate) &&
+    isIsoDate(value.nextDate) &&
+    value.nextDate >= value.startDate &&
+    typeof value.isActive === "boolean"
   );
 }
 
@@ -240,6 +274,11 @@ export function hydrateSnapshotPreferences(parsed: Partial<FireSnapshot>): FireS
 
   return {
     transactions: validItems(raw.transactions, isTransaction, seedSnapshot.transactions),
+    recurringTransactions: validItems(
+      raw.recurringTransactions,
+      isRecurringTransaction,
+      seedSnapshot.recurringTransactions,
+    ),
     categories: validItems(raw.categories, isCategory, seedSnapshot.categories),
     assetTypes: requiredItems(raw.assetTypes, isAssetType, seedSnapshot.assetTypes),
     assets: validItems(raw.assets, isAsset, seedSnapshot.assets),

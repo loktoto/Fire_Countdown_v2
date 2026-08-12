@@ -35,11 +35,12 @@ import { StatusBadge } from "../components/StatusBadge";
 import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
 import type { FireSnapshot, Milestone, ProjectionScenario } from "../features/types";
+import { useRecurringViewModel } from "../hooks/useRecurringViewModel";
 import { useSettingsViewModel } from "../hooks/useSettingsViewModel";
 import { useI18n } from "../i18n";
 import { buildCsvExport, buildGoogleSheetsExport } from "../utils/exportData";
 import { shareExportWithFallback } from "../utils/shareExport";
-import { shortDateTime } from "../utils/format";
+import { formatCompactDateInputLabel, shortDateTime } from "../utils/format";
 
 const currencyOptions = ["HKD", "USD", "TWD", "JPY", "EUR", "GBP", "CNY", "SGD"].map(
   (currency) => ({
@@ -140,7 +141,7 @@ function SettingsRow({
       <MotionPressable
         onPress={onPress}
         haptic="selection"
-        accessibilityLabel={`${title}${value ? `, ${value}` : ""}`}
+        accessibilityLabel={[title, value, supporting].filter(Boolean).join(", ")}
         style={rowStyle}
       >
         {content}
@@ -269,6 +270,7 @@ export function SettingsScreen() {
   const t = useI18n();
   const router = useRouter();
   const vm = useSettingsViewModel();
+  const recurringVm = useRecurringViewModel();
   const [milestoneListOpen, setMilestoneListOpen] = useState(false);
   const [scenarioListOpen, setScenarioListOpen] = useState(false);
   const [firePlanEditorOpen, setFirePlanEditorOpen] = useState(false);
@@ -293,6 +295,13 @@ export function SettingsScreen() {
     vm.snapshot.quoteSettings.enabled && vm.quoteUrlValid && vm.quoteAssetCount > 0;
   const refreshFailed = vm.refreshQuotes.error instanceof Error;
   const credentialFailed = vm.saveToken.error instanceof Error;
+  const recurringStatus = recurringVm.nextSchedule
+    ? t.recurring.nextDate(
+        formatCompactDateInputLabel(recurringVm.nextSchedule.nextDate, t.locale),
+      )
+    : recurringVm.schedules.length > 0
+      ? t.recurring.pausedNoBackfill
+      : t.recurring.createFromLog;
   const exportOptions: { label: string; value: ExportFormat }[] = [
     { label: t.settings.csvFile, value: "csv" },
     { label: t.settings.googleSheetsFile, value: "sheets" },
@@ -483,7 +492,9 @@ export function SettingsScreen() {
               <Switch
                 accessibilityLabel={t.settings.hapticFeedback}
                 value={vm.snapshot.hapticsEnabled}
-                onValueChange={vm.setHapticsEnabled}
+                onValueChange={(enabled) => {
+                  vm.setHapticsEnabled(enabled);
+                }}
                 trackColor={{ false: colors.surfaceBorder, true: colors.primary }}
                 thumbColor={colors.mode === "dark" ? colors.text : colors.surface}
               />
@@ -518,6 +529,21 @@ export function SettingsScreen() {
       </GlassCard>
 
       <GlassCard style={styles.settingsCard} motionIndex={1}>
+        <SettingsRow
+          icon="calendar-sync"
+          title={t.recurring.title}
+          value={
+            recurringVm.schedules.length > 0
+              ? t.recurring.activeCount(recurringVm.activeCount)
+              : undefined
+          }
+          supporting={recurringStatus}
+          onPress={() => router.push("/recurring")}
+          divider={false}
+        />
+      </GlassCard>
+
+      <GlassCard style={styles.settingsCard} motionIndex={2}>
         <SettingsSectionHeading title={t.settings.fireSettings} />
         <SettingsRow
           title={t.common.currentAge}
@@ -572,7 +598,7 @@ export function SettingsScreen() {
         </View>
       </GlassCard>
 
-      <GlassCard style={styles.settingsCard} motionIndex={2}>
+      <GlassCard style={styles.settingsCard} motionIndex={3}>
         <View style={styles.sectionHeader}>
           <SettingsSectionHeading
             title={t.settings.marketData}
@@ -641,7 +667,9 @@ export function SettingsScreen() {
             <Switch
               accessibilityLabel={t.settings.enableLiveQuotes}
               value={vm.snapshot.quoteSettings.enabled}
-              onValueChange={(enabled) => vm.updateQuoteSettings({ enabled })}
+              onValueChange={(enabled) => {
+                vm.updateQuoteSettings({ enabled });
+              }}
               trackColor={{ false: colors.surfaceBorder, true: colors.primary }}
               thumbColor={colors.mode === "dark" ? colors.text : colors.surface}
             />
@@ -792,7 +820,7 @@ export function SettingsScreen() {
         ) : null}
       </GlassCard>
 
-      <GlassCard style={styles.settingsCard} motionIndex={3}>
+      <GlassCard style={styles.settingsCard} motionIndex={4}>
         <SettingsSectionHeading title={t.settings.maintenance} />
         <View style={styles.rowGroup}>
           <SettingsRow
