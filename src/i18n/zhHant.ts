@@ -48,6 +48,7 @@ export const zhHant: I18nStrings = {
     showAssetAmounts: "顯示資產金額",
   },
   timeLens: {
+    kicker: "時間透鏡",
     money: "金額",
     lastWorkday: "最後工作日",
     freedomYear: "自由年份",

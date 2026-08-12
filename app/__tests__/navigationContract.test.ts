@@ -24,13 +24,17 @@ describe("locked navigation contract", () => {
   it("lands on Log and keeps Settings outside the bottom tabs", () => {
     expect(indexSource).toContain('<Redirect href="/(tabs)/log" />');
     expect(tabsSource).not.toContain('name="settings"');
-    expect(rootSource).toContain('<Stack.Screen\n          name="settings"');
+    expect(rootSource).toMatch(/<Stack\.Screen\s+name="settings"/);
     expect(rootSource).toContain('presentation: "modal"');
   });
 
   it("keeps recurring cashflow in a shared modal outside the bottom tabs", () => {
     expect(tabsSource).not.toContain('name="recurring"');
-    expect(rootSource).toContain('<Stack.Screen\n          name="recurring"');
+    expect(rootSource).toMatch(/<Stack\.Screen\s+name="recurring"/);
     expect(settingsSource).toContain('router.push("/recurring")');
+  });
+
+  it("places the recovery boundary outside Providers and the routed stack", () => {
+    expect(rootSource).toMatch(/<AppErrorBoundary>\s*<Providers>/);
   });
 });

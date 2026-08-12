@@ -12,7 +12,7 @@ import {
   weightedExpectedReturn,
 } from "./fireEngine";
 import type { FireSnapshot, ProjectionScenario, TransactionType } from "../features/types";
-import { todayIso } from "../utils/format";
+import { addIsoDays, todayIso } from "../utils/format";
 
 export type CategoryCashflowLeader = {
   type: TransactionType;
@@ -121,12 +121,14 @@ export function deriveFireView(
     months: 900,
     postFireWithdrawal: true,
   });
-  const reached = projection.find((point) => point.reached);
   const totalAssetValue =
     totalAssets(snapshot.assets, snapshot.quoteCache, goal.baseCurrency) + transactionAdjustment;
   const includedAssetValue =
     includedFireAssets(snapshot.assets, snapshot.quoteCache, goal.baseCurrency) +
     transactionAdjustment;
+  const projectedFireDays = daysToFire(projection, date);
+  const projectedFireDate =
+    projectedFireDays === null ? null : addIsoDays(date, Math.round(projectedFireDays));
 
   return {
     goal,
@@ -146,8 +148,8 @@ export function deriveFireView(
     transactionAdjustment,
     projection,
     chartProjection,
-    projectedFireDays: daysToFire(projection, date),
-    projectedFireDate: reached?.date ?? null,
+    projectedFireDays,
+    projectedFireDate,
     milestones: milestoneETAs({
       milestones: snapshot.milestones,
       projection,

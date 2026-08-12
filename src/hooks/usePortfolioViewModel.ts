@@ -1,10 +1,117 @@
 import { useMemo } from "react";
 
-import { resolveAssetValue } from "../engine/fireEngine";
-import { deriveFireView, mainGoal } from "../engine/selectors";
 import { useFireStore } from "../data/fireStore";
-import { useQuoteRefresh } from "./useQuoteRefresh";
+import { resolveAssetValue, type AssetValueResolution } from "../engine/fireEngine";
+import { deriveFireView, mainGoal } from "../engine/selectors";
+import type { Asset, AssetQuoteCache } from "../features/types";
 import { todayIso } from "../utils/format";
+import { useQuoteRefresh } from "./useQuoteRefresh";
+
+export type PortfolioAssetFreshness = "fresh" | "delayed" | "stale" | "cached" | "unavailable";
+
+export type PortfolioAssetFallbackState =
+  "none" | "manual" | "manual_fallback" | "missing" | "unsupported_currency";
+
+export type PortfolioAssetInclusionState = "included" | "excluded" | "archived";
+export type PortfolioAssetCurrencyState = "supported" | "unsupported";
+
+export type PortfolioAssetRow = {
+  asset: Asset;
+  resolution: AssetValueResolution;
+  latestQuote: AssetQuoteCache | null;
+  quoteChange: number | null;
+  freshness: PortfolioAssetFreshness;
+  fallbackState: PortfolioAssetFallbackState;
+  inclusionState: PortfolioAssetInclusionState;
+  currencyState: PortfolioAssetCurrencyState;
+};
+
+function normalizeCurrency(value?: string | null) {
+  return (value ?? "").trim().toUpperCase();
+}
+
+function latestQuoteForAsset(assetId: string, quotes: AssetQuoteCache[]): AssetQuoteCache | null {
+  let latest: AssetQuoteCache | null = null;
+  let latestTime = Number.NEGATIVE_INFINITY;
+
+  for (const quote of quotes) {
+    if (quote.assetId !== assetId) {
+      continue;
+    }
+
+    const receivedAt = Date.parse(quote.receivedAt);
+    if (Number.isFinite(receivedAt) && receivedAt > latestTime) {
+      latest = quote;
+      latestTime = receivedAt;
+    }
+  }
+
+  return latest;
+}
+
+function quoteFreshness(
+  resolution: AssetValueResolution,
+  quote: AssetQuoteCache | null,
+): PortfolioAssetFreshness {
+  if (resolution.source !== "quote" || !quote) {
+    return "unavailable";
+  }
+  if (quote.source === "CACHE") {
+    return "cached";
+  }
+
+  switch (quote.status) {
+    case "ok":
+      return "fresh";
+    case "delayed":
+      return "delayed";
+    case "stale":
+      return "stale";
+    case "failed":
+    case "unsupported":
+    case "manual":
+      return "unavailable";
+  }
+}
+
+function fallbackState(resolution: AssetValueResolution): PortfolioAssetFallbackState {
+  switch (resolution.source) {
+    case "quote":
+      return "none";
+    case "manual":
+      return "manual";
+    case "manual_fallback":
+      return "manual_fallback";
+    case "none":
+      return resolution.status === "fx_missing" ? "unsupported_currency" : "missing";
+  }
+}
+
+export function shapePortfolioAssetRows(
+  assets: Asset[],
+  quotes: AssetQuoteCache[],
+  baseCurrency?: string,
+): PortfolioAssetRow[] {
+  return assets.map((asset) => {
+    const resolution = resolveAssetValue(asset, quotes, baseCurrency);
+    const latestQuote = latestQuoteForAsset(asset.id, quotes);
+    const currencyState =
+      baseCurrency && normalizeCurrency(resolution.currency) !== normalizeCurrency(baseCurrency)
+        ? "unsupported"
+        : "supported";
+
+    return {
+      asset,
+      resolution,
+      latestQuote,
+      quoteChange: latestQuote?.changePercent ?? null,
+      freshness: quoteFreshness(resolution, latestQuote),
+      fallbackState: fallbackState(resolution),
+      inclusionState: asset.archivedAt ? "archived" : asset.includeInFire ? "included" : "excluded",
+      currencyState,
+    };
+  });
+}
 
 export function usePortfolioViewModel() {
   const store = useFireStore();
@@ -26,10 +133,15 @@ export function usePortfolioViewModel() {
   const fire = useMemo(() => deriveFireView(snapshot, today), [snapshot, today]);
   const goal = mainGoal(snapshot);
   const goalBaseCurrency = goal?.baseCurrency;
-  const assets = useMemo(
-    () => snapshot.assets.filter((asset) => !asset.archivedAt),
-    [snapshot.assets],
+  const allAssetRows = useMemo(
+    () => shapePortfolioAssetRows(snapshot.assets, snapshot.quoteCache, goalBaseCurrency),
+    [goalBaseCurrency, snapshot.assets, snapshot.quoteCache],
   );
+  const assetRows = useMemo(
+    () => allAssetRows.filter((row) => row.inclusionState !== "archived"),
+    [allAssetRows],
+  );
+  const assets = useMemo(() => assetRows.map((row) => row.asset), [assetRows]);
   const rawMilestones = [...snapshot.milestones]
     .filter((milestone) => !milestone.archivedAt && (!goal || milestone.goalId === goal.id))
     .sort((a, b) => a.order - b.order);
@@ -37,24 +149,20 @@ export function usePortfolioViewModel() {
 
   const allocation = useMemo(() => {
     const groups = new Map<string, number>();
-    assets.forEach((asset) => {
-      const resolution = resolveAssetValue(asset, snapshot.quoteCache, goalBaseCurrency);
-      if (
-        goalBaseCurrency &&
-        resolution.currency.trim().toUpperCase() !== goalBaseCurrency.trim().toUpperCase()
-      ) {
+    assetRows.forEach(({ asset, currencyState, resolution }) => {
+      if (currencyState === "unsupported") {
         return;
       }
-      const value = resolution.value;
-      groups.set(asset.assetClass, (groups.get(asset.assetClass) ?? 0) + value);
+      groups.set(asset.assetClass, (groups.get(asset.assetClass) ?? 0) + resolution.value);
     });
     return [...groups.entries()].map(([label, value]) => ({ label, value }));
-  }, [assets, goalBaseCurrency, snapshot.quoteCache]);
+  }, [assetRows]);
 
   return {
     ...fire,
     ...quoteRefresh,
     assets,
+    assetRows,
     allocation,
     quoteCache: snapshot.quoteCache,
     assetTypes: snapshot.assetTypes,

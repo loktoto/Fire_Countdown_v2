@@ -21,4 +21,5 @@
 - Make a backup before broad edits.
 - Keep screens out of direct storage and direct FIRE math; use view models and engine selectors.
 - Keep app local-first. Do not commit secrets or hardcode quote API tokens.
+- Treat `docs/PRIVACY_DATA_LIFECYCLE.md` as the privacy and local-data contract; update it with storage, credential, export, reset, network, telemetry, backup, or biometric changes.
 - Use Expo Go-compatible dependencies first; do not run native/EAS builds unless explicitly requested.
