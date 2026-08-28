@@ -52,6 +52,42 @@ describe("quote cache", () => {
     expect(mergeQuoteCache(seedSnapshot.quoteCache, [])).toEqual(seedSnapshot.quoteCache);
   });
 
+  it("keeps a usable cached quote when a newer refresh row failed", () => {
+    const cached = quote({
+      id: "cached-usable",
+      receivedAt: "2026-08-03T09:00:00.000Z",
+      price: 120,
+    });
+    const failed = {
+      ...quote({
+        id: "refresh-failed",
+        receivedAt: "2026-08-03T10:00:00.000Z",
+        price: 999,
+      }),
+      status: "failed" as const,
+    };
+
+    expect(mergeQuoteCache([cached], [failed])).toEqual([cached]);
+  });
+
+  it("replaces an unusable row with an older usable quote", () => {
+    const failed = {
+      ...quote({
+        id: "failed-current",
+        receivedAt: "2026-08-03T10:00:00.000Z",
+        price: 999,
+      }),
+      status: "unsupported" as const,
+    };
+    const usable = quote({
+      id: "usable-fallback",
+      receivedAt: "2026-08-03T09:00:00.000Z",
+      price: 120,
+    });
+
+    expect(mergeQuoteCache([failed], [usable])).toEqual([usable]);
+  });
+
   it("does not replace a newer cached quote with an older incoming quote", () => {
     const current = quote({
       id: "current-newer",

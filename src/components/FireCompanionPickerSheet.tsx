@@ -19,7 +19,7 @@ export function FireCompanionPickerSheet({
 }: {
   visible: boolean;
   value: FireCompanionId;
-  onSelect: (id: FireCompanionId) => void;
+  onSelect: (id: FireCompanionId) => boolean;
   onClose: () => void;
 }) {
   const colors = useThemeColors();
@@ -76,8 +76,9 @@ export function FireCompanionPickerSheet({
                 <MotionPressable
                   key={id}
                   onPress={() => {
-                    onSelect(id);
-                    onClose();
+                    if (onSelect(id)) {
+                      onClose();
+                    }
                   }}
                   haptic="selection"
                   accessibilityLabel={label}

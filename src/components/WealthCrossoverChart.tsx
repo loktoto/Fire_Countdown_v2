@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { Platform, StyleSheet, Text, View } from "react-native";
 import type { GestureResponderEvent, LayoutChangeEvent } from "react-native";
 import Svg, {
@@ -175,7 +175,7 @@ function tooltipLayout(anchor: ScreenPoint) {
   };
 }
 
-export function WealthCrossoverChart({
+export const WealthCrossoverChart = memo(function WealthCrossoverChartBase({
   projection,
   currency = "HKD",
   currentAge,
@@ -523,7 +523,7 @@ export function WealthCrossoverChart({
       </Text>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   legendRow: {

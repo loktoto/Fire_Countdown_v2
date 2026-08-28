@@ -54,14 +54,10 @@ type FireStoreContextValue = {
     patch: Partial<Omit<RecurringTransaction, "id" | "createdAt" | "updatedAt">>,
   ) => boolean;
   archiveRecurringTransaction: (id: string) => boolean;
-  createCategory: (
-    input: Omit<Category, "id" | "createdAt" | "updatedAt">,
-  ) => Category | null;
+  createCategory: (input: Omit<Category, "id" | "createdAt" | "updatedAt">) => Category | null;
   archiveCategory: (id: string) => boolean;
   createAsset: (input: Omit<Asset, "id" | "createdAt" | "updatedAt">) => boolean;
-  createMilestone: (
-    input: Omit<Milestone, "id" | "createdAt" | "updatedAt">,
-  ) => Milestone | null;
+  createMilestone: (input: Omit<Milestone, "id" | "createdAt" | "updatedAt">) => Milestone | null;
   createScenario: (
     input: Omit<ProjectionScenario, "id" | "createdAt" | "updatedAt">,
   ) => ProjectionScenario | null;

@@ -188,10 +188,7 @@ describe("recurring Calendar projections", () => {
       todayDate: "2026-02-01",
     });
 
-    expect(projections.map((projection) => projection.date)).toEqual([
-      "2026-02-28",
-      "2026-03-31",
-    ]);
+    expect(projections.map((projection) => projection.date)).toEqual(["2026-02-28", "2026-03-31"]);
   });
 
   it("projects weekly, biweekly, and yearly schedules from their original anchors", () => {
@@ -217,7 +214,10 @@ describe("recurring Calendar projections", () => {
     });
 
     expect(
-      shortTermProjections.map((projection) => [projection.recurringTransactionId, projection.date]),
+      shortTermProjections.map((projection) => [
+        projection.recurringTransactionId,
+        projection.date,
+      ]),
     ).toEqual([
       ["rec-weekly", "2026-08-10"],
       ["rec-biweekly", "2026-08-17"],

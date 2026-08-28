@@ -68,8 +68,8 @@ export function AssetEditorSheet({
   asset: Asset | null;
   isCreating?: boolean;
   onClose: () => void;
-  onSave: (assetId: string, patch: AssetPatch) => void;
-  onArchive?: (assetId: string) => void;
+  onSave: (assetId: string, patch: AssetPatch) => boolean;
+  onArchive?: (assetId: string) => boolean;
 }) {
   if (!visible || !asset) {
     return null;
@@ -100,8 +100,8 @@ function AssetEditorContent({
   asset: Asset;
   isCreating: boolean;
   onClose: () => void;
-  onSave: (assetId: string, patch: AssetPatch) => void;
-  onArchive?: (assetId: string) => void;
+  onSave: (assetId: string, patch: AssetPatch) => boolean;
+  onArchive?: (assetId: string) => boolean;
 }) {
   const colors = useThemeColors();
   const t = useI18n();
@@ -156,7 +156,7 @@ function AssetEditorContent({
     const normalizedNotes = notes.trim();
     const quantityValue = quantityNumber;
 
-    onSave(asset.id, {
+    const persisted = onSave(asset.id, {
       name: name.trim(),
       assetClass,
       manualValue: manualValueNumber,
@@ -169,7 +169,9 @@ function AssetEditorContent({
       includeInFire,
       notes: normalizedNotes.length > 0 ? normalizedNotes : null,
     });
-    onClose();
+    if (persisted) {
+      onClose();
+    }
   }
 
   return (
@@ -584,8 +586,9 @@ function AssetEditorContent({
               setConfirmingArchive(true);
               return;
             }
-            onArchive(asset.id);
-            onClose();
+            if (onArchive(asset.id)) {
+              onClose();
+            }
           }}
           accessibilityLabel={
             confirmingArchive ? t.assets.confirmDeleteAsset : t.assets.deleteAsset

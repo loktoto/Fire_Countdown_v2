@@ -115,8 +115,8 @@ describe("Calendar history workflow", () => {
   });
 
   it("edits, moves, and archives existing history through store actions", async () => {
-    const updateTransaction = jest.fn();
-    const archiveTransaction = jest.fn();
+    const updateTransaction = jest.fn(() => true);
+    const archiveTransaction = jest.fn(() => true);
     useFireStoreMock.mockReturnValue({
       snapshot: seedSnapshot,
       updateTransaction,
@@ -140,6 +140,29 @@ describe("Calendar history workflow", () => {
 
     await act(() => result.current.deleteTransaction("txn-1"));
     expect(archiveTransaction).toHaveBeenCalledWith("txn-1");
+  });
+
+  it("keeps the selected day when an edited transaction cannot be persisted", async () => {
+    const updateTransaction = jest.fn(() => false);
+    useFireStoreMock.mockReturnValue({
+      snapshot: seedSnapshot,
+      updateTransaction,
+      archiveTransaction: jest.fn(() => true),
+    });
+    const { result } = await renderHook(() => useCalendarViewModel());
+    let saved = true;
+
+    await act(() => result.current.setSelectedDate("2026-06-01"));
+    await act(async () => {
+      saved = result.current.saveTransactionEdit("txn-1", {
+        amount: 225,
+        date: "2026-07-01",
+        note: null,
+      });
+    });
+
+    expect(saved).toBe(false);
+    expect(result.current.selectedDate).toBe("2026-06-01");
   });
 
   it("surfaces the next active recurring entry without mixing it into day history", async () => {

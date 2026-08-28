@@ -22,8 +22,12 @@ export function useLogViewModel() {
   const [recurringFrequency, setRecurringFrequency] = useState<RecurrenceFrequency>(
     persistedDraft?.recurringFrequency ?? "monthly",
   );
-  const categories = snapshot.categories.filter(
-    (category) => category.type === type && !category.isHidden && !category.archivedAt,
+  const categories = useMemo(
+    () =>
+      snapshot.categories.filter(
+        (category) => category.type === type && !category.isHidden && !category.archivedAt,
+      ),
+    [snapshot.categories, type],
   );
   const [categoryId, setCategoryId] = useState(
     persistedDraft?.categoryId ?? categories[0]?.id ?? "cat-food",

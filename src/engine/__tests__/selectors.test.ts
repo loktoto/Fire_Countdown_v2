@@ -1,4 +1,11 @@
-import { defaultScenario, deriveFireView, monthlyCategoryLeaders } from "../selectors";
+import {
+  defaultScenario,
+  deriveFireView,
+  deriveWhatIfLab,
+  monthlyCategoryLeaders,
+  monthlyMoneyTimeConversions,
+  scenarioWhatIfInputs,
+} from "../selectors";
 import { seedSnapshot } from "../../data/seed";
 import type { Transaction } from "../../features/types";
 import { daysBetweenIso } from "../../utils/format";
@@ -171,6 +178,98 @@ describe("deriveFireView", () => {
     expect(leaders.expense?.amount).toBe(120);
     expect(leaders.income?.categoryName).toBe("Dividend");
     expect(leaders.income?.amount).toBe(5000);
+  });
+
+  it("converts this month's executed income and expense leaders into marginal FIRE days", () => {
+    const conversions = monthlyMoneyTimeConversions(seedSnapshot, startDate);
+
+    expect(conversions).toHaveLength(2);
+    expect(conversions[0]).toMatchObject({
+      type: "income",
+      categoryName: "Dividend",
+      amount: 5000,
+      currency: "HKD",
+      transactionCount: 1,
+    });
+    expect(conversions[0]!.impactDays).toBeLessThan(0);
+    expect(conversions[1]).toMatchObject({
+      type: "expense",
+      categoryName: "Food",
+      amount: 120,
+      currency: "HKD",
+      transactionCount: 1,
+    });
+    expect(conversions[1]!.impactDays).toBeGreaterThan(0);
+  });
+
+  it("keeps future, archived, and other-currency entries out of Money to Time", () => {
+    const snapshot = {
+      ...seedSnapshot,
+      transactions: [
+        {
+          ...seedSnapshot.transactions[0]!,
+          id: "future-salary",
+          type: "income" as const,
+          categoryId: "cat-salary",
+          amount: 100000,
+          date: "2026-06-30",
+        },
+        {
+          ...seedSnapshot.transactions[0]!,
+          id: "archived-food",
+          amount: 100000,
+          archivedAt: timestamp,
+        },
+        {
+          ...seedSnapshot.transactions[1]!,
+          id: "usd-dividend",
+          amount: 100000,
+          currency: "USD",
+        },
+        ...seedSnapshot.transactions,
+      ],
+    };
+
+    const conversions = monthlyMoneyTimeConversions(snapshot, startDate);
+
+    expect(conversions.map((entry) => [entry.categoryName, entry.amount])).toEqual([
+      ["Dividend", 5000],
+      ["Food", 120],
+    ]);
+  });
+
+  it("runs What-if inputs as a deterministic sandbox without mutating the saved plan", () => {
+    const baselineScenario = seedSnapshot.scenarios.find((scenario) => scenario.isDefault)!;
+    const baselineInputs = scenarioWhatIfInputs(seedSnapshot, baselineScenario);
+    const before = JSON.stringify(seedSnapshot);
+
+    const result = deriveWhatIfLab(seedSnapshot, startDate, baselineScenario, {
+      monthlySaving: baselineInputs.monthlySaving + 12000,
+      expectedReturn: baselineInputs.expectedReturn + 0.03,
+      targetMonthlySpending: baselineInputs.targetMonthlySpending - 8000,
+    });
+
+    expect(result.baseline.projectedFireDays).not.toBeNull();
+    expect(result.result.projectedFireDays).not.toBeNull();
+    expect(result.impactDays).toBeLessThan(0);
+    expect(result.drivers).toHaveLength(3);
+    result.drivers.forEach((driver) => expect(driver.impactDays).toBeLessThanOrEqual(0));
+    expect(JSON.stringify(seedSnapshot)).toBe(before);
+  });
+
+  it("keeps a no-change What-if projection identical and repairs non-finite inputs", () => {
+    const baselineScenario = seedSnapshot.scenarios.find((scenario) => scenario.isDefault)!;
+    const baselineInputs = scenarioWhatIfInputs(seedSnapshot, baselineScenario);
+    const unchanged = deriveWhatIfLab(seedSnapshot, startDate, baselineScenario, baselineInputs);
+    const repaired = deriveWhatIfLab(seedSnapshot, startDate, baselineScenario, {
+      ...baselineInputs,
+      expectedReturn: Number.NaN,
+    });
+
+    expect(unchanged.impactDays).toBe(0);
+    expect(unchanged.result).toEqual(unchanged.baseline);
+    expect(repaired.inputs.expectedReturn).toBe(baselineInputs.expectedReturn);
+    expect(repaired.impactDays).toBe(0);
   });
 
   it("reflects newly added milestones in the Home milestone journey", () => {

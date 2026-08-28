@@ -19,6 +19,9 @@ describe("locked navigation contract", () => {
     expect(routeNames).toEqual(["home", "calendar", "log", "dashboard", "portfolio"]);
     expect(tabsSource).toContain('initialRouteName="log"');
     expect(tabsSource).toContain('<Tabs.Screen name="log" options={{ title: "+" }} />');
+    expect(tabsSource).toContain(
+      '<Tabs.Screen name="dashboard" options={{ title: "Dashboard" }} />',
+    );
   });
 
   it("lands on Log and keeps Settings outside the bottom tabs", () => {

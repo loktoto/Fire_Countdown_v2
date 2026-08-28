@@ -154,11 +154,7 @@ export function projectRecurringOccurrences({
       while (occurrenceDate <= throughDate && processed < MAX_MATERIALIZED_OCCURRENCES) {
         const occurrence = occurrenceDate;
         const key = occurrenceKey(schedule.id, occurrence);
-        if (
-          occurrence >= fromDate &&
-          occurrence > todayDate &&
-          !existingOccurrences.has(key)
-        ) {
+        if (occurrence >= fromDate && occurrence > todayDate && !existingOccurrences.has(key)) {
           projections.push({
             id: `projection-rec-${schedule.id}-${occurrence}`,
             type: schedule.type,

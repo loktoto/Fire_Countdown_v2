@@ -64,8 +64,8 @@ export function TransactionEditorSheet({
   transaction: CalendarTransaction | null;
   categories: Category[];
   onClose: () => void;
-  onSave: (id: string, patch: TransactionPatch) => void;
-  onDelete: (id: string) => void;
+  onSave: (id: string, patch: TransactionPatch) => boolean;
+  onDelete: (id: string) => boolean;
 }) {
   const colors = useThemeColors();
   const reducedMotion = useReducedMotion();
@@ -123,8 +123,8 @@ function TransactionEditorContent({
   transaction: CalendarTransaction;
   categories: Category[];
   onClose: () => void;
-  onSave: (id: string, patch: TransactionPatch) => void;
-  onDelete: (id: string) => void;
+  onSave: (id: string, patch: TransactionPatch) => boolean;
+  onDelete: (id: string) => boolean;
 }) {
   const colors = useThemeColors();
   const t = useI18n();
@@ -146,7 +146,7 @@ function TransactionEditorContent({
     if (!canSave) {
       return;
     }
-    onSave(transaction.id, {
+    const persisted = onSave(transaction.id, {
       amount,
       type,
       categoryId: activeCategoryId,
@@ -154,7 +154,9 @@ function TransactionEditorContent({
       date,
       note: note.trim().length > 0 ? note.trim() : null,
     });
-    onClose();
+    if (persisted) {
+      onClose();
+    }
   }
 
   function deleteRecord() {
@@ -163,8 +165,9 @@ function TransactionEditorContent({
       return;
     }
 
-    onDelete(transaction.id);
-    onClose();
+    if (onDelete(transaction.id)) {
+      onClose();
+    }
   }
 
   return (

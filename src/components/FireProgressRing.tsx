@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { memo, useEffect } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Svg, { Circle, Line } from "react-native-svg";
 import Animated, {
@@ -17,7 +17,7 @@ import { useReducedMotion } from "../hooks/useReducedMotion";
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
-export function FireProgressRing({
+export const FireProgressRing = memo(function FireProgressRingBase({
   accessibilityLabel,
   motionKey = 0,
   progress,
@@ -155,7 +155,7 @@ export function FireProgressRing({
       </Animated.View>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   root: {

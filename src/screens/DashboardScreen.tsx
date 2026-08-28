@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 
 import { AppHeader } from "../components/AppHeader";
@@ -11,10 +11,16 @@ import {
   ScenarioEditorSheet,
   ScenarioListSheet,
 } from "../components/FirePlanSettingsSheets";
+import {
+  defaultInsightsMode,
+  InsightsModeTabs,
+  type InsightsMode,
+} from "../components/InsightsModeTabs";
 import { MotionPressable } from "../components/MotionPressable";
 import { ScreenScaffold } from "../components/ScreenScaffold";
 import { TimeLensValue, type TimeLensKind } from "../components/TimeLens";
 import { WealthCrossoverChart } from "../components/WealthCrossoverChart";
+import { WhatIfLab } from "../components/WhatIfLab";
 import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
 import type { CategoryCashflowLeader } from "../engine/selectors";
@@ -297,17 +303,19 @@ export function DashboardScreen() {
   const router = useRouter();
   const vm = useDashboardViewModel();
   const { width, fontScale } = useWindowDimensions();
+  const layout = useMemo(() => getDashboardLayout(width, fontScale), [width, fontScale]);
   const {
     stackForecast,
     stackForecastStats,
     stackCashflowStats,
     stackSectionHeader,
     stackAssumptions,
-  } = getDashboardLayout(width, fontScale);
+  } = layout;
   const [firePlanEditorOpen, setFirePlanEditorOpen] = useState(false);
   const [scenarioListOpen, setScenarioListOpen] = useState(false);
   const [editingScenario, setEditingScenario] = useState<ProjectionScenario | null>(null);
   const [creatingScenario, setCreatingScenario] = useState(false);
+  const [insightsMode, setInsightsMode] = useState<InsightsMode>(defaultInsightsMode);
   const goalCurrency = vm.goal.baseCurrency;
   const fireDuration = fireDurationFromDays(vm.projectedFireDays);
   const projectedFireMonth = vm.projectedFireDate
@@ -356,25 +364,24 @@ export function DashboardScreen() {
   function saveScenario(scenarioId: string, patch: Partial<ProjectionScenario>) {
     if (creatingScenario && editingScenario) {
       const draft = { ...editingScenario, ...patch };
-      vm.createScenario({
-        archivedAt: draft.archivedAt ?? null,
-        expectedReturnAdjustment: draft.expectedReturnAdjustment,
-        inflationAdjustment: draft.inflationAdjustment,
-        isDefault: draft.isDefault,
-        monthlySavingAdjustment: draft.monthlySavingAdjustment,
-        name: draft.name,
-        targetSpendingAdjustment: draft.targetSpendingAdjustment,
-        withdrawalRateAdjustment: draft.withdrawalRateAdjustment ?? 0,
-      });
-    } else {
-      vm.updateScenario(scenarioId, patch);
+      return Boolean(
+        vm.createScenario({
+          archivedAt: draft.archivedAt ?? null,
+          expectedReturnAdjustment: draft.expectedReturnAdjustment,
+          inflationAdjustment: draft.inflationAdjustment,
+          isDefault: draft.isDefault,
+          monthlySavingAdjustment: draft.monthlySavingAdjustment,
+          name: draft.name,
+          targetSpendingAdjustment: draft.targetSpendingAdjustment,
+          withdrawalRateAdjustment: draft.withdrawalRateAdjustment ?? 0,
+        }),
+      );
     }
-    closeScenarioEditor();
+    return vm.updateScenario(scenarioId, patch);
   }
 
   function archiveScenario(scenarioId: string) {
-    vm.archiveScenario(scenarioId);
-    closeScenarioEditor();
+    return vm.archiveScenario(scenarioId);
   }
 
   const assumptions = [
@@ -436,231 +443,245 @@ export function DashboardScreen() {
         }
       />
 
-      <ScenarioSwitcher
-        scenarios={vm.scenarios}
-        value={vm.scenarioId}
-        onChange={vm.setScenarioId}
-      />
+      <InsightsModeTabs value={insightsMode} onChange={setInsightsMode} />
 
-      <View
-        style={[
-          styles.projectionPanel,
-          {
-            backgroundColor: colors.surface,
-            borderColor: colors.surfaceBorder,
-          },
-        ]}
-      >
-        <View style={[styles.forecastHeader, stackForecast && styles.forecastHeaderStack]}>
-          <View style={styles.forecastCopy}>
-            <Text style={[styles.forecastLabel, typography.body, { color: colors.textMuted }]}>
-              {t.dashboard.projectedFire}
-            </Text>
-            <Text
-              numberOfLines={2}
-              style={[styles.forecastDate, typography.display, { color: colors.text }]}
-            >
-              {projectedFireMonth}
-            </Text>
-            <Text style={[styles.forecastMeta, typography.body, { color: colors.textMuted }]}>
-              {vm.scenario?.name ?? t.dashboard.base}
-              {fireDuration === null
-                ? ` · ${t.dashboard.noCrossover}`
-                : ` · ${t.dashboard.fireDistance(fireDuration.years, fireDuration.months)}`}
-            </Text>
-          </View>
+      {insightsMode === "overview" ? (
+        <>
+          <ScenarioSwitcher
+            scenarios={vm.scenarios}
+            value={vm.scenarioId}
+            onChange={vm.setScenarioId}
+          />
+
           <View
             style={[
-              styles.ageBadge,
-              { backgroundColor: colors.surfaceElevated, borderColor: colors.surfaceBorder },
-            ]}
-          >
-            <Text style={[styles.ageText, typography.button, { color: colors.textMuted }]}>
-              {projectedAgeLabel}
-            </Text>
-          </View>
-        </View>
-
-        <View
-          accessible
-          accessibilityRole="progressbar"
-          accessibilityLabel={t.dashboard.fireTargetFunded}
-          accessibilityValue={{
-            min: 0,
-            max: 100,
-            now: Math.round(fundedProgress * 100),
-            text: percent(vm.progress),
-          }}
-          style={[styles.progressTrack, { backgroundColor: colors.surfaceBorder }]}
-        >
-          <View
-            style={[
-              styles.progressFill,
-              { width: `${fundedProgress * 100}%`, backgroundColor: colors.primary },
-            ]}
-          />
-        </View>
-
-        <View style={[styles.forecastStats, stackForecastStats && styles.forecastStatsStack]}>
-          <ForecastStat
-            label={t.dashboard.includedFire}
-            value={money(vm.includedAssets, goalCurrency)}
-            timeLens={{ amount: vm.includedAssets, kind: "asset" }}
-            stacked={stackForecastStats}
-          />
-          <ForecastStat
-            label={t.dashboard.fireTargetFunded}
-            value={percent(vm.progress)}
-            tone="neutral"
-            divider
-            stacked={stackForecastStats}
-          />
-          <ForecastStat
-            label={t.dashboard.fireTarget}
-            value={money(vm.target, goalCurrency)}
-            timeLens={{ amount: vm.target, kind: "spending" }}
-            divider
-            stacked={stackForecastStats}
-          />
-        </View>
-
-        <View style={styles.chartHeader}>
-          <Text style={[styles.sectionTitle, typography.title, { color: colors.text }]}>
-            {t.dashboard.wealthCrossover}
-          </Text>
-        </View>
-        <WealthCrossoverChart
-          key={vm.scenarioId ?? "scenario-base"}
-          projection={vm.chartProjection}
-          currency={goalCurrency}
-          currentAge={vm.goal.currentAge}
-          accentColor={colors.chartEtf}
-          targetColor={colors.chartRealEstate}
-        />
-      </View>
-
-      <View style={styles.section}>
-        <View style={[styles.sectionHeader, stackSectionHeader && styles.sectionHeaderStack]}>
-          <View>
-            <Text style={[styles.sectionTitle, typography.title, { color: colors.text }]}>
-              {t.dashboard.cashflowLeaders}
-            </Text>
-            <Text style={[styles.sectionMeta, typography.body, { color: colors.textMuted }]}>
-              {activityMonthLabel}
-            </Text>
-          </View>
-          <Text
-            style={[
-              styles.todayImpact,
-              typography.button,
+              styles.projectionPanel,
               {
-                color:
-                  vm.todayImpact > 0
-                    ? colors.positive
-                    : vm.todayImpact < 0
-                      ? colors.negative
-                      : colors.textMuted,
+                backgroundColor: colors.surface,
+                borderColor: colors.surfaceBorder,
               },
             ]}
           >
-            {t.dashboard.today(signedMoney(vm.todayImpact, goalCurrency))}
-          </Text>
-        </View>
+            <View style={[styles.forecastHeader, stackForecast && styles.forecastHeaderStack]}>
+              <View style={styles.forecastCopy}>
+                <Text style={[styles.forecastLabel, typography.body, { color: colors.textMuted }]}>
+                  {t.dashboard.projectedFire}
+                </Text>
+                <Text
+                  numberOfLines={2}
+                  style={[styles.forecastDate, typography.display, { color: colors.text }]}
+                >
+                  {projectedFireMonth}
+                </Text>
+                <Text style={[styles.forecastMeta, typography.body, { color: colors.textMuted }]}>
+                  {vm.scenario?.name ?? t.dashboard.base}
+                  {fireDuration === null
+                    ? ` · ${t.dashboard.noCrossover}`
+                    : ` · ${t.dashboard.fireDistance(fireDuration.years, fireDuration.months)}`}
+                </Text>
+              </View>
+              <View
+                style={[
+                  styles.ageBadge,
+                  { backgroundColor: colors.surfaceElevated, borderColor: colors.surfaceBorder },
+                ]}
+              >
+                <Text style={[styles.ageText, typography.button, { color: colors.textMuted }]}>
+                  {projectedAgeLabel}
+                </Text>
+              </View>
+            </View>
 
-        <View
-          style={[
-            styles.cashflowBand,
-            stackCashflowStats && styles.cashflowBandStack,
-            { backgroundColor: colors.backgroundAlt, borderColor: colors.surfaceBorder },
-          ]}
-        >
-          <ForecastStat
-            label={t.common.income}
-            value={money(vm.activityMonthSummary.income, goalCurrency)}
-            timeLens={{ amount: vm.activityMonthSummary.income, kind: "income" }}
-            tone="positive"
-            stacked={stackCashflowStats}
-          />
-          <ForecastStat
-            label={t.common.expense}
-            value={money(vm.activityMonthSummary.expense, goalCurrency)}
-            timeLens={{ amount: vm.activityMonthSummary.expense, kind: "expense" }}
-            tone="negative"
-            divider
-            stacked={stackCashflowStats}
-          />
-          <ForecastStat
-            label={t.common.net}
-            value={signedMoney(vm.activityMonthSummary.net, goalCurrency)}
-            tone={
-              vm.activityMonthSummary.net > 0
-                ? "positive"
-                : vm.activityMonthSummary.net < 0
-                  ? "negative"
-                  : "neutral"
-            }
-            divider
-            stacked={stackCashflowStats}
-          />
-        </View>
+            <View
+              accessible
+              accessibilityRole="progressbar"
+              accessibilityLabel={t.dashboard.fireTargetFunded}
+              accessibilityValue={{
+                min: 0,
+                max: 100,
+                now: Math.round(fundedProgress * 100),
+                text: percent(vm.progress),
+              }}
+              style={[styles.progressTrack, { backgroundColor: colors.surfaceBorder }]}
+            >
+              <View
+                style={[
+                  styles.progressFill,
+                  { width: `${fundedProgress * 100}%`, backgroundColor: colors.primary },
+                ]}
+              />
+            </View>
 
-        <View style={[styles.leaderList, { borderColor: colors.surfaceBorder }]}>
-          <CashflowLeaderRow
-            title={t.dashboard.mostSpending}
-            leader={vm.activityMonthLeaders.expense}
-            fallback={t.dashboard.noSpending}
-            tone="negative"
-            currency={goalCurrency}
-          />
-          <CashflowLeaderRow
-            title={t.dashboard.mostEarning}
-            leader={vm.activityMonthLeaders.income}
-            fallback={t.dashboard.noEarning}
-            tone="positive"
-            currency={goalCurrency}
-            divider
-          />
-        </View>
-      </View>
+            <View style={[styles.forecastStats, stackForecastStats && styles.forecastStatsStack]}>
+              <ForecastStat
+                label={t.dashboard.includedFire}
+                value={money(vm.includedAssets, goalCurrency)}
+                timeLens={{ amount: vm.includedAssets, kind: "asset" }}
+                stacked={stackForecastStats}
+              />
+              <ForecastStat
+                label={t.dashboard.fireTargetFunded}
+                value={percent(vm.progress)}
+                tone="neutral"
+                divider
+                stacked={stackForecastStats}
+              />
+              <ForecastStat
+                label={t.dashboard.fireTarget}
+                value={money(vm.target, goalCurrency)}
+                timeLens={{ amount: vm.target, kind: "spending" }}
+                divider
+                stacked={stackForecastStats}
+              />
+            </View>
 
-      <View style={styles.section}>
-        <View style={[styles.sectionHeader, stackSectionHeader && styles.sectionHeaderStack]}>
-          <View>
-            <Text style={[styles.sectionTitle, typography.title, { color: colors.text }]}>
-              {t.dashboard.assumptions}
-            </Text>
-            <Text style={[styles.sectionMeta, typography.body, { color: colors.textMuted }]}>
-              {vm.scenario?.name ?? t.dashboard.base}
-            </Text>
-          </View>
-          <MotionPressable
-            onPress={openScenarioList}
-            haptic="selection"
-            accessibilityLabel={t.firePlan.editFireMethods}
-            style={styles.inlineEdit}
-          >
-            <Text style={[styles.inlineEditText, typography.button, { color: colors.primary }]}>
-              {t.common.edit}
-            </Text>
-          </MotionPressable>
-        </View>
-        <View style={[styles.assumptionGrid, { borderColor: colors.surfaceBorder }]}>
-          {assumptions.map((assumption, index) => (
-            <AssumptionCell
-              key={assumption.label}
-              label={assumption.label}
-              value={assumption.value}
-              onPress={assumption.onPress}
-              timeLens={assumption.timeLens}
-              leftDivider={!stackAssumptions && index % 2 === 1}
-              bottomDivider={
-                stackAssumptions ? index < assumptions.length - 1 : index < assumptions.length - 2
-              }
-              stacked={stackAssumptions}
+            <View style={styles.chartHeader}>
+              <Text style={[styles.sectionTitle, typography.title, { color: colors.text }]}>
+                {t.dashboard.wealthCrossover}
+              </Text>
+            </View>
+            <WealthCrossoverChart
+              key={vm.scenarioId ?? "scenario-base"}
+              projection={vm.chartProjection}
+              currency={goalCurrency}
+              currentAge={vm.goal.currentAge}
+              accentColor={colors.chartEtf}
+              targetColor={colors.chartRealEstate}
             />
-          ))}
-        </View>
-      </View>
+          </View>
+
+          <View style={styles.section}>
+            <View style={[styles.sectionHeader, stackSectionHeader && styles.sectionHeaderStack]}>
+              <View>
+                <Text style={[styles.sectionTitle, typography.title, { color: colors.text }]}>
+                  {t.dashboard.cashflowLeaders}
+                </Text>
+                <Text style={[styles.sectionMeta, typography.body, { color: colors.textMuted }]}>
+                  {activityMonthLabel}
+                </Text>
+              </View>
+              <Text
+                style={[
+                  styles.todayImpact,
+                  typography.button,
+                  {
+                    color:
+                      vm.todayImpact > 0
+                        ? colors.positive
+                        : vm.todayImpact < 0
+                          ? colors.negative
+                          : colors.textMuted,
+                  },
+                ]}
+              >
+                {t.dashboard.today(signedMoney(vm.todayImpact, goalCurrency))}
+              </Text>
+            </View>
+
+            <View
+              style={[
+                styles.cashflowBand,
+                stackCashflowStats && styles.cashflowBandStack,
+                { backgroundColor: colors.backgroundAlt, borderColor: colors.surfaceBorder },
+              ]}
+            >
+              <ForecastStat
+                label={t.common.income}
+                value={money(vm.activityMonthSummary.income, goalCurrency)}
+                timeLens={{ amount: vm.activityMonthSummary.income, kind: "income" }}
+                tone="positive"
+                stacked={stackCashflowStats}
+              />
+              <ForecastStat
+                label={t.common.expense}
+                value={money(vm.activityMonthSummary.expense, goalCurrency)}
+                timeLens={{ amount: vm.activityMonthSummary.expense, kind: "expense" }}
+                tone="negative"
+                divider
+                stacked={stackCashflowStats}
+              />
+              <ForecastStat
+                label={t.common.net}
+                value={signedMoney(vm.activityMonthSummary.net, goalCurrency)}
+                tone={
+                  vm.activityMonthSummary.net > 0
+                    ? "positive"
+                    : vm.activityMonthSummary.net < 0
+                      ? "negative"
+                      : "neutral"
+                }
+                divider
+                stacked={stackCashflowStats}
+              />
+            </View>
+
+            <View style={[styles.leaderList, { borderColor: colors.surfaceBorder }]}>
+              <CashflowLeaderRow
+                title={t.dashboard.mostSpending}
+                leader={vm.activityMonthLeaders.expense}
+                fallback={t.dashboard.noSpending}
+                tone="negative"
+                currency={goalCurrency}
+              />
+              <CashflowLeaderRow
+                title={t.dashboard.mostEarning}
+                leader={vm.activityMonthLeaders.income}
+                fallback={t.dashboard.noEarning}
+                tone="positive"
+                currency={goalCurrency}
+                divider
+              />
+            </View>
+          </View>
+
+          <View style={styles.section}>
+            <View style={[styles.sectionHeader, stackSectionHeader && styles.sectionHeaderStack]}>
+              <View>
+                <Text style={[styles.sectionTitle, typography.title, { color: colors.text }]}>
+                  {t.dashboard.assumptions}
+                </Text>
+                <Text style={[styles.sectionMeta, typography.body, { color: colors.textMuted }]}>
+                  {vm.scenario?.name ?? t.dashboard.base}
+                </Text>
+              </View>
+              <MotionPressable
+                onPress={openScenarioList}
+                haptic="selection"
+                accessibilityLabel={t.firePlan.editFireMethods}
+                style={styles.inlineEdit}
+              >
+                <Text style={[styles.inlineEditText, typography.button, { color: colors.primary }]}>
+                  {t.common.edit}
+                </Text>
+              </MotionPressable>
+            </View>
+            <View style={[styles.assumptionGrid, { borderColor: colors.surfaceBorder }]}>
+              {assumptions.map((assumption, index) => (
+                <AssumptionCell
+                  key={assumption.label}
+                  label={assumption.label}
+                  value={assumption.value}
+                  onPress={assumption.onPress}
+                  timeLens={assumption.timeLens}
+                  leftDivider={!stackAssumptions && index % 2 === 1}
+                  bottomDivider={
+                    stackAssumptions
+                      ? index < assumptions.length - 1
+                      : index < assumptions.length - 2
+                  }
+                  stacked={stackAssumptions}
+                />
+              ))}
+            </View>
+          </View>
+        </>
+      ) : (
+        <WhatIfLab
+          baselineScenarioId={vm.scenarioId}
+          onManageScenarios={openScenarioList}
+          onSelectScenario={vm.setScenarioId}
+        />
+      )}
 
       <ScenarioListSheet
         visible={scenarioListOpen}

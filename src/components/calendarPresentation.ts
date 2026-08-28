@@ -7,8 +7,7 @@ export function calendarLayout({ fontScale, width }: { fontScale: number; width:
 }
 
 export type CalendarItemInteraction =
-  | { kind: "transaction"; transactionId: string }
-  | { kind: "recurring"; scheduleId: string };
+  { kind: "transaction"; transactionId: string } | { kind: "recurring"; scheduleId: string };
 
 export function recurringScheduleRoute(scheduleId: string) {
   return {

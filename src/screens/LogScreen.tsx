@@ -346,7 +346,9 @@ export function LogScreen() {
               >
                 <View style={styles.categoryRow}>{page.slice(0, 4).map(renderCategoryEntry)}</View>
                 {page.length > 4 ? (
-                  <View style={styles.categoryRow}>{page.slice(4, 8).map(renderCategoryEntry)}</View>
+                  <View style={styles.categoryRow}>
+                    {page.slice(4, 8).map(renderCategoryEntry)}
+                  </View>
                 ) : null}
               </View>
             ))}

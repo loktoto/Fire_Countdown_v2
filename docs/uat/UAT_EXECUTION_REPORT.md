@@ -2,6 +2,8 @@
 
 ## Overall result
 
+> Historical evidence notice (2026-08-28): this report applies only to the named `test/uat-e2e-suite` branch, commit `e3d987a`, Expo Go 56.0.1, and 2026-07-16 execution environment below. It is not current-source release evidence. The current integration review could not execute device UAT because `emulator-5554` was unhealthy and became offline after reboot; see `QUALITY_REPORT.md`.
+
 The 48-case Android UAT suite passed on the Pixel_9a API 37 emulator using Expo Go 56.0.1. The six Android end-to-end journeys passed. Two defects were found during execution and fixed with regression coverage. No Android case is marked `Fail` or `Blocked`.
 
 The iOS device matrix was not available in this environment, so iOS acceptance remains an explicit release risk. PR #1 should remain draft until iOS coverage is completed.

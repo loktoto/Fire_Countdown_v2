@@ -30,16 +30,23 @@ export function useRecurringViewModel() {
         }),
     [categoriesById, snapshot.recurringTransactions],
   );
-  const activeSchedules = schedules.filter((schedule) => schedule.isActive);
-  const monthlyTotals = activeSchedules
-    .filter((schedule) => schedule.currency === snapshot.currency)
-    .reduce(
-      (totals, schedule) => {
-        totals[schedule.type] += monthlyEquivalentAmount(schedule);
-        return totals;
-      },
-      { income: 0, expense: 0 },
-    );
+  const activeSchedules = useMemo(
+    () => schedules.filter((schedule) => schedule.isActive),
+    [schedules],
+  );
+  const monthlyTotals = useMemo(
+    () =>
+      activeSchedules
+        .filter((schedule) => schedule.currency === snapshot.currency)
+        .reduce(
+          (totals, schedule) => {
+            totals[schedule.type] += monthlyEquivalentAmount(schedule);
+            return totals;
+          },
+          { income: 0, expense: 0 },
+        ),
+    [activeSchedules, snapshot.currency],
+  );
 
   return {
     schedules,
@@ -49,8 +56,9 @@ export function useRecurringViewModel() {
       ...monthlyTotals,
       net: monthlyTotals.income - monthlyTotals.expense,
     },
-    categories: snapshot.categories.filter(
-      (category) => !category.isHidden && !category.archivedAt,
+    categories: useMemo(
+      () => snapshot.categories.filter((category) => !category.isHidden && !category.archivedAt),
+      [snapshot.categories],
     ),
     currency: snapshot.currency,
     updateRecurringTransaction,

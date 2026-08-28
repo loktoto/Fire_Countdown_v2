@@ -37,7 +37,10 @@ export function CalendarScreen() {
   const { fontScale, width } = useWindowDimensions();
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
   const [monthPickerVisible, setMonthPickerVisible] = useState(false);
-  const { stackSummary, stackTransactions } = calendarLayout({ fontScale, width });
+  const { stackSummary, stackTransactions } = useMemo(
+    () => calendarLayout({ fontScale, width }),
+    [fontScale, width],
+  );
   const editingTransaction =
     vm.selectedTransactions.find(
       (transaction) => transaction.id === editingTransactionId && !transaction.isProjected,
@@ -266,8 +269,7 @@ export function CalendarScreen() {
                       : colors.text
                     : colors.textTertiary;
                 const hasActualActivity = day.hasIncome || day.hasExpense;
-                const hasProjectedActivity =
-                  day.hasProjectedIncome || day.hasProjectedExpense;
+                const hasProjectedActivity = day.hasProjectedIncome || day.hasProjectedExpense;
                 const actualActivityColor =
                   colors[
                     calendarActivityColorRole({
@@ -414,9 +416,7 @@ export function CalendarScreen() {
               const typeLabel = transaction.type === "income" ? t.common.income : t.common.expense;
               const itemAccessibilityLabel =
                 transaction.isProjected && interaction.kind === "recurring"
-                  ? t.recurring.editSchedule(
-                      transaction.category?.name ?? t.calendar.uncategorized,
-                    )
+                  ? t.recurring.editSchedule(transaction.category?.name ?? t.calendar.uncategorized)
                   : t.calendar.editTransaction(
                       transaction.category?.name ?? t.calendar.uncategorized,
                       signedAmount,

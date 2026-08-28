@@ -129,6 +129,36 @@ describe("fireEngine", () => {
     expect(includedFireAssets([asset], [oldQuote, latestQuote], "HKD")).toBe(120);
   });
 
+  it("ignores a newer failed quote and keeps the last usable valuation", () => {
+    const asset = {
+      ...seedSnapshot.assets[0]!,
+      quantity: 1,
+      manualValue: 80,
+      includeInFire: true,
+    };
+    const usableQuote = {
+      ...seedSnapshot.quoteCache[0]!,
+      id: "usable-quote",
+      assetId: asset.id,
+      price: 120,
+      receivedAt: "2026-08-03T09:00:00.000Z",
+      status: "ok" as const,
+    };
+    const failedQuote = {
+      ...usableQuote,
+      id: "failed-quote",
+      price: 999,
+      receivedAt: "2026-08-03T10:00:00.000Z",
+      status: "failed" as const,
+    };
+
+    expect(totalAssets([asset], [usableQuote, failedQuote], "HKD")).toBe(120);
+    expect(resolveAssetValue(asset, [failedQuote], "HKD")).toMatchObject({
+      value: 80,
+      source: "manual_fallback",
+    });
+  });
+
   it("calculates weighted expected return", () => {
     expect(weightedExpectedReturn(seedSnapshot.assets, seedSnapshot.quoteCache)).toBeCloseTo(
       0.04867,

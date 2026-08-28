@@ -37,15 +37,15 @@ describe("calendar presentation", () => {
   });
 
   it("keeps future transactions neutral until their FIRE execution date", () => {
-    expect(
-      calendarActivityColorRole({ hasIncome: true, hasExpense: false, isFuture: true }),
-    ).toBe("textTertiary");
-    expect(
-      calendarActivityColorRole({ hasIncome: false, hasExpense: true, isFuture: true }),
-    ).toBe("textTertiary");
-    expect(
-      calendarActivityColorRole({ hasIncome: true, hasExpense: true, isFuture: false }),
-    ).toBe("primary");
+    expect(calendarActivityColorRole({ hasIncome: true, hasExpense: false, isFuture: true })).toBe(
+      "textTertiary",
+    );
+    expect(calendarActivityColorRole({ hasIncome: false, hasExpense: true, isFuture: true })).toBe(
+      "textTertiary",
+    );
+    expect(calendarActivityColorRole({ hasIncome: true, hasExpense: true, isFuture: false })).toBe(
+      "primary",
+    );
     expect(calendarTransactionColorRole({ type: "income", isPendingFireImpact: true })).toBe(
       "textMuted",
     );

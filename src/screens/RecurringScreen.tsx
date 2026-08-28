@@ -24,9 +24,7 @@ export function RecurringScreen() {
   const { scheduleId } = useLocalSearchParams<{ scheduleId?: string | string[] }>();
   const requestedScheduleId = Array.isArray(scheduleId) ? scheduleId[0] : scheduleId;
   const { fontScale, width } = useWindowDimensions();
-  const [editingId, setEditingId] = useState<string | null>(
-    () => requestedScheduleId ?? null,
-  );
+  const [editingId, setEditingId] = useState<string | null>(() => requestedScheduleId ?? null);
   const editingSchedule = vm.schedules.find((schedule) => schedule.id === editingId) ?? null;
   const stackSummary = width < 360 || fontScale > 1.25;
   const stackSchedules = width < 380 || fontScale > 1.2;

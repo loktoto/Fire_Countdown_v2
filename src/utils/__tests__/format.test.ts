@@ -8,6 +8,7 @@ import {
   formatCompactDateInputLabel,
   formatDateInputLabel,
   formatMonthYear,
+  formatShortMonthYear,
   percent,
   signedMoney,
 } from "../format";
@@ -55,6 +56,7 @@ describe("date formatting helpers", () => {
 
   it("formats projected months for people instead of storage keys", () => {
     expect(formatMonthYear("2027-12-01", "en-US")).toBe("December 2027");
+    expect(formatShortMonthYear("2027-12-01", "en-US")).toBe("Dec 2027");
   });
 
   it("formats editable dates as readable, locale-aware labels", () => {

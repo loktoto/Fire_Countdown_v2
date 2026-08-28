@@ -296,9 +296,7 @@ export function SettingsScreen() {
   const refreshFailed = vm.refreshQuotes.error instanceof Error;
   const credentialFailed = vm.saveToken.error instanceof Error;
   const recurringStatus = recurringVm.nextSchedule
-    ? t.recurring.nextDate(
-        formatCompactDateInputLabel(recurringVm.nextSchedule.nextDate, t.locale),
-      )
+    ? t.recurring.nextDate(formatCompactDateInputLabel(recurringVm.nextSchedule.nextDate, t.locale))
     : recurringVm.schedules.length > 0
       ? t.recurring.pausedNoBackfill
       : t.recurring.createFromLog;
@@ -348,50 +346,48 @@ export function SettingsScreen() {
   function saveMilestone(milestoneId: string, patch: Partial<Milestone>) {
     if (creatingMilestone && editingMilestone) {
       const draft = { ...editingMilestone, ...patch };
-      vm.createMilestone({
-        archivedAt: draft.archivedAt ?? null,
-        expectedReturnOverride: draft.expectedReturnOverride ?? null,
-        goalId: draft.goalId,
-        isActive: draft.isActive,
-        isHidden: draft.isHidden,
-        name: draft.name,
-        order: draft.order,
-        targetAmount: draft.targetAmount,
-        targetDate: draft.targetDate ?? null,
-      });
-    } else {
-      vm.updateMilestone(milestoneId, patch);
+      return Boolean(
+        vm.createMilestone({
+          archivedAt: draft.archivedAt ?? null,
+          expectedReturnOverride: draft.expectedReturnOverride ?? null,
+          goalId: draft.goalId,
+          isActive: draft.isActive,
+          isHidden: draft.isHidden,
+          name: draft.name,
+          order: draft.order,
+          targetAmount: draft.targetAmount,
+          targetDate: draft.targetDate ?? null,
+        }),
+      );
     }
-    closeMilestoneEditor();
+    return vm.updateMilestone(milestoneId, patch);
   }
 
   function archiveMilestone(milestoneId: string) {
-    vm.archiveMilestone(milestoneId);
-    closeMilestoneEditor();
+    return vm.archiveMilestone(milestoneId);
   }
 
   function saveScenario(scenarioId: string, patch: Partial<ProjectionScenario>) {
     if (creatingScenario && editingScenario) {
       const draft = { ...editingScenario, ...patch };
-      vm.createScenario({
-        archivedAt: draft.archivedAt ?? null,
-        expectedReturnAdjustment: draft.expectedReturnAdjustment,
-        inflationAdjustment: draft.inflationAdjustment,
-        isDefault: draft.isDefault,
-        monthlySavingAdjustment: draft.monthlySavingAdjustment,
-        name: draft.name,
-        targetSpendingAdjustment: draft.targetSpendingAdjustment,
-        withdrawalRateAdjustment: draft.withdrawalRateAdjustment ?? 0,
-      });
-    } else {
-      vm.updateScenario(scenarioId, patch);
+      return Boolean(
+        vm.createScenario({
+          archivedAt: draft.archivedAt ?? null,
+          expectedReturnAdjustment: draft.expectedReturnAdjustment,
+          inflationAdjustment: draft.inflationAdjustment,
+          isDefault: draft.isDefault,
+          monthlySavingAdjustment: draft.monthlySavingAdjustment,
+          name: draft.name,
+          targetSpendingAdjustment: draft.targetSpendingAdjustment,
+          withdrawalRateAdjustment: draft.withdrawalRateAdjustment ?? 0,
+        }),
+      );
     }
-    closeScenarioEditor();
+    return vm.updateScenario(scenarioId, patch);
   }
 
   function archiveScenario(scenarioId: string) {
-    vm.archiveScenario(scenarioId);
-    closeScenarioEditor();
+    return vm.archiveScenario(scenarioId);
   }
 
   async function shareExport(format: ExportFormat) {
@@ -435,8 +431,9 @@ export function SettingsScreen() {
         text: t.settings.resetDemoData,
         style: "destructive",
         onPress: () => {
-          vm.resetSeed();
-          AccessibilityInfo.announceForAccessibility(t.settings.demoDataReset);
+          if (vm.resetSeed()) {
+            AccessibilityInfo.announceForAccessibility(t.settings.demoDataReset);
+          }
         },
       },
     ]);
@@ -639,10 +636,11 @@ export function SettingsScreen() {
             <SegmentedControl
               value={quoteProvider}
               onChange={(provider) => {
-                vm.updateQuoteSettings({ provider, enabled: provider === "free_market" });
-                vm.setTokenDraft("");
-                vm.saveToken.reset();
-                vm.refreshQuotes.reset();
+                if (vm.updateQuoteSettings({ provider, enabled: provider === "free_market" })) {
+                  vm.setTokenDraft("");
+                  vm.saveToken.reset();
+                  vm.refreshQuotes.reset();
+                }
               }}
               options={[
                 { label: t.settings.freeMarket, value: "free_market" },
@@ -891,8 +889,9 @@ export function SettingsScreen() {
         value={vm.snapshot.currency}
         onClose={() => setCurrencyPickerOpen(false)}
         onSelect={(currency) => {
-          vm.setCurrency(currency);
-          setCurrencyPickerOpen(false);
+          if (vm.setCurrency(currency)) {
+            setCurrencyPickerOpen(false);
+          }
         }}
       />
       <FireCompanionPickerSheet
@@ -915,8 +914,9 @@ export function SettingsScreen() {
         value={vm.snapshot.language}
         onClose={() => setLanguagePickerOpen(false)}
         onSelect={(language) => {
-          vm.setLanguage(language as FireSnapshot["language"]);
-          setLanguagePickerOpen(false);
+          if (vm.setLanguage(language as FireSnapshot["language"])) {
+            setLanguagePickerOpen(false);
+          }
         }}
       />
       <PreferenceOptionSheet

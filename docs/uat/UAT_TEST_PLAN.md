@@ -294,7 +294,7 @@ Allow normal display rounding. Any unexplained cross-screen difference is a defe
 
 ---
 
-## F. Home experience — 4 cases
+## F. Home experience — 5 cases
 
 ### UAT-HOME-01 — Baseline FIRE summary is internally consistent
 
@@ -320,6 +320,12 @@ Allow normal display rounding. Any unexplained cross-screen difference is a defe
 - **Priority:** P1
 - **Steps:** Compare current included assets with milestone targets; modify an included asset so one milestone changes status; reopen Home.
 - **Expected:** Milestones remain ordered; achieved/current/future states update logically; hidden or archived milestones are not shown.
+
+### UAT-HOME-05 — Convert this month’s cash flow into FIRE time
+
+- **Priority:** P1
+- **Steps:** Record at least one current-month income and expense in the FIRE goal’s base currency; add a larger future entry, archive another entry, and open Home; tap either Money → time row.
+- **Expected:** Home shows the largest executed income and expense categories for the current month with signed amounts and deterministic marginal FIRE-day changes; favorable time removed is green and negative, unfavorable time added is pink and positive; future, archived, and other-currency entries are excluded; tapping a row opens Calendar; the central countdown ring and all existing Home sections remain available.
 
 ---
 

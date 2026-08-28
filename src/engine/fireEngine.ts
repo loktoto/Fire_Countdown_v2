@@ -6,6 +6,7 @@ import type {
   ProjectionScenario,
   Transaction,
 } from "../features/types";
+import { isUsableQuoteStatus } from "../features/quoteStatus";
 
 export type AssetValueResolution = {
   assetId: string;
@@ -32,6 +33,9 @@ type ProjectionInput = {
   months?: number;
   initialFireAssetAdjustment?: number;
   postFireWithdrawal?: boolean;
+  // Optional pre-computed weighted expected return, so callers that already
+  // valued the assets can skip the redundant scan inside the projection.
+  weightedAnnualReturn?: number;
 };
 
 type ProjectionRuntime = {
@@ -62,7 +66,7 @@ function latestQuote(assetId: string, quotes: AssetQuoteCache[]) {
   let latestTime = Number.NEGATIVE_INFINITY;
 
   quotes.forEach((quote) => {
-    if (quote.assetId !== assetId) {
+    if (quote.assetId !== assetId || !isUsableQuoteStatus(quote.status)) {
       return;
     }
 
@@ -76,7 +80,7 @@ function latestQuote(assetId: string, quotes: AssetQuoteCache[]) {
   return latest;
 }
 
-function latestQuotesByAsset(quotes: AssetQuoteCache[]) {
+export function latestQuotesByAsset(quotes: AssetQuoteCache[]) {
   const latest = new Map<string, AssetQuoteCache>();
   const latestTimes = new Map<string, number>();
 
@@ -90,6 +94,10 @@ function latestQuotesByAsset(quotes: AssetQuoteCache[]) {
   });
 
   return latest;
+}
+
+export function latestUsableQuotesByAsset(quotes: AssetQuoteCache[]) {
+  return latestQuotesByAsset(quotes.filter((quote) => isUsableQuoteStatus(quote.status)));
 }
 
 function normalizeCurrency(currency?: string | null) {
@@ -190,7 +198,13 @@ function resolveAssetValueFromQuote(
     };
   }
 
-  if (quote && Number.isFinite(quote.price) && quote.price > 0 && quantity > 0) {
+  if (
+    quote &&
+    isUsableQuoteStatus(quote.status) &&
+    Number.isFinite(quote.price) &&
+    quote.price > 0 &&
+    quantity > 0
+  ) {
     const price = convertedQuotePrice(quote, resolvedCurrency);
 
     if (price) {
@@ -249,25 +263,57 @@ export function resolveAssetValue(
   return resolveAssetValueFromQuote(asset, latestQuote(asset.id, quotes), baseCurrency);
 }
 
-export function totalAssets(assets: Asset[], quotes: AssetQuoteCache[], baseCurrency?: string) {
-  const latestQuotes = latestQuotesByAsset(quotes);
+// Same as resolveAssetValue but reuses a prebuilt latest-quote map so callers
+// resolving many assets avoid rescanning the full quote cache per asset.
+export function resolveAssetValueFromMap(
+  asset: Asset,
+  quotesByAsset: Map<string, AssetQuoteCache>,
+  baseCurrency?: string,
+): AssetValueResolution {
+  return resolveAssetValueFromQuote(
+    asset,
+    quotesByAsset.get(asset.id),
+    baseCurrency ?? asset.currency,
+  );
+}
+
+// Single-pass valuation of all active assets: builds the latest-quote map once
+// and derives totals, FIRE-included total, and return-weighted return together.
+export function valueAssets(assets: Asset[], quotes: AssetQuoteCache[], baseCurrency?: string) {
+  const quotesByAsset = latestUsableQuotesByAsset(quotes);
+  const base = baseCurrency ? normalizeCurrency(baseCurrency) : "";
   let total = 0;
+  let includedTotal = 0;
+  let weightedDenominator = 0;
+  let weightedSum = 0;
 
   assets.forEach((asset) => {
     if (asset.archivedAt) {
       return;
     }
 
-    const resolution = resolveAssetValueFromQuote(asset, latestQuotes.get(asset.id), baseCurrency);
-    if (
-      !baseCurrency ||
-      normalizeCurrency(resolution.currency) === normalizeCurrency(baseCurrency)
-    ) {
-      total += resolution.value;
+    const resolution = resolveAssetValueFromQuote(asset, quotesByAsset.get(asset.id), baseCurrency);
+    if (base && normalizeCurrency(resolution.currency) !== base) {
+      return;
+    }
+    const value = resolution.value;
+    total += value;
+    if (asset.includeInFire) {
+      includedTotal += value;
+      weightedDenominator += value;
+      weightedSum += value * finiteNumber(asset.expectedAnnualReturn);
     }
   });
 
-  return total;
+  return {
+    total,
+    includedTotal,
+    weightedReturn: weightedDenominator > 0 ? weightedSum / weightedDenominator : 0,
+  };
+}
+
+export function totalAssets(assets: Asset[], quotes: AssetQuoteCache[], baseCurrency?: string) {
+  return valueAssets(assets, quotes, baseCurrency).total;
 }
 
 export function includedFireAssets(
@@ -275,24 +321,15 @@ export function includedFireAssets(
   quotes: AssetQuoteCache[],
   baseCurrency?: string,
 ) {
-  const latestQuotes = latestQuotesByAsset(quotes);
-  let total = 0;
+  return valueAssets(assets, quotes, baseCurrency).includedTotal;
+}
 
-  assets.forEach((asset) => {
-    if (asset.archivedAt || !asset.includeInFire) {
-      return;
-    }
-
-    const resolution = resolveAssetValueFromQuote(asset, latestQuotes.get(asset.id), baseCurrency);
-    if (
-      !baseCurrency ||
-      normalizeCurrency(resolution.currency) === normalizeCurrency(baseCurrency)
-    ) {
-      total += resolution.value;
-    }
-  });
-
-  return total;
+export function weightedExpectedReturn(
+  assets: Asset[],
+  quotes: AssetQuoteCache[],
+  baseCurrency?: string,
+) {
+  return valueAssets(assets, quotes, baseCurrency).weightedReturn;
 }
 
 export function transactionCashflowNet(
@@ -314,39 +351,6 @@ export function transactionCashflowNet(
     );
 }
 
-export function weightedExpectedReturn(
-  assets: Asset[],
-  quotes: AssetQuoteCache[],
-  baseCurrency?: string,
-) {
-  const latestQuotes = latestQuotesByAsset(quotes);
-  let denominator = 0;
-  let weightedTotal = 0;
-
-  assets.forEach((asset) => {
-    if (asset.archivedAt || !asset.includeInFire) {
-      return;
-    }
-
-    const resolution = resolveAssetValueFromQuote(asset, latestQuotes.get(asset.id), baseCurrency);
-    if (
-      baseCurrency &&
-      normalizeCurrency(resolution.currency) !== normalizeCurrency(baseCurrency)
-    ) {
-      return;
-    }
-    const value = resolution.value;
-    denominator += value;
-    weightedTotal += value * finiteNumber(asset.expectedAnnualReturn);
-  });
-
-  if (denominator <= 0) {
-    return 0;
-  }
-
-  return weightedTotal / denominator;
-}
-
 export function fireTarget(goal: FireGoal, scenario?: ProjectionScenario) {
   const spending = Math.max(
     0,
@@ -365,7 +369,8 @@ function createProjectionRuntime(input: ProjectionInput): ProjectionRuntime {
     10,
     Math.max(
       -0.95,
-      weightedExpectedReturn(input.assets, input.quotes, input.goal.baseCurrency) +
+      (input.weightedAnnualReturn ??
+        weightedExpectedReturn(input.assets, input.quotes, input.goal.baseCurrency)) +
         finiteNumber(scenario?.expectedReturnAdjustment),
     ),
   );

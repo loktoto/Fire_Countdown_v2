@@ -53,7 +53,7 @@ SecureStore is appropriate for a small credential, not for the full financial sn
 - iOS stores values in Keychain; a value can persist after uninstall when the same bundle identifier is installed again. This behavior is not guaranteed and must not be used as a backup strategy.
 - A future credential protected with `requireAuthentication` can become unreadable after biometric enrollment changes.
 
-Official reference: https://docs.expo.dev/versions/v56.0.0/sdk/securestore/
+Official reference: https://docs.expo.dev/versions/v57.0.0/sdk/securestore/
 
 ## Network destinations
 
@@ -166,7 +166,7 @@ An optional app lock could reduce casual access when a device is already unlocke
 
 Official references:
 
-- https://docs.expo.dev/versions/v56.0.0/sdk/securestore/
+- https://docs.expo.dev/versions/v57.0.0/sdk/securestore/
 - https://docs.expo.dev/versions/latest/sdk/local-authentication/
 
 ### Release gate for a future app lock

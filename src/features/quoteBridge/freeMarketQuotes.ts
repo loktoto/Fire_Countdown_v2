@@ -1,26 +1,21 @@
-import * as SecureStore from "expo-secure-store";
+import type { Asset, AssetQuoteCache } from "../types";
 
-import type { Asset, AssetQuoteCache, QuoteBridgeSettings, QuoteProvider } from "../types";
+import {
+  exchangeCode,
+  inferredQuoteCurrency,
+  normalizeCurrency,
+  normalizeSymbol,
+  quoteSymbolForAsset,
+  safeSymbol,
+  type UnknownRecord,
+} from "./quoteSymbols";
 
-// SecureStore keys cannot contain a colon on Android. Keep this stable so the
-// credential can be saved and read consistently across Expo Go sessions.
-const CUSTOM_BRIDGE_TOKEN_KEY = "fire-countdown-v2.quote-token";
 const FREE_STOCK_BATCH_URL = "https://api.robinhood.com/quotes/";
 const FREE_STOCK_QUOTE_URL = "https://stockprices.dev/api";
 const FREE_CRYPTO_QUOTE_URL = "https://api.coinbase.com/v2/prices";
 const FREE_FX_RATE_URL = "https://api.frankfurter.dev/v2/rate";
 const FREE_QUOTE_CONCURRENCY = 2;
 const REQUEST_TIMEOUT_MS = 15_000;
-const quoteStatuses = new Set<AssetQuoteCache["status"]>([
-  "ok",
-  "delayed",
-  "stale",
-  "failed",
-  "unsupported",
-  "manual",
-]);
-
-type UnknownRecord = Record<string, unknown>;
 
 type AssetQuoteRequest = {
   asset: Asset;
@@ -42,164 +37,16 @@ function optionalPositiveNumber(value: unknown) {
   return parsed !== null && parsed > 0 ? parsed : null;
 }
 
-function optionalNonNegativeNumber(value: unknown) {
-  const parsed = finiteNumber(value);
-  return parsed !== null && parsed >= 0 ? parsed : null;
-}
-
-function normalizeCurrency(value?: string | null) {
-  const currency = (value ?? "").trim().toUpperCase();
-  return /^[A-Z]{3}$/.test(currency) ? currency : "";
-}
-
-function normalizeSymbol(value: string) {
-  return value.trim().toUpperCase().replace(/\s+/g, "");
-}
-
-function safeSymbol(value?: string | null) {
-  const symbol = normalizeSymbol(value ?? "");
-  return symbol && /^[A-Z0-9.^=/_:-]{1,40}$/.test(symbol) ? symbol : null;
-}
-
-function exchangeCode(value?: string | null) {
-  const exchange = normalizeSymbol(value ?? "");
-  const aliases: Record<string, string> = {
-    NYSEARCA: "NYSE",
-    NASDAQGS: "NASDAQ",
-    NASDAQGM: "NASDAQ",
-    NASDAQCM: "NASDAQ",
-    HKG: "HKEX",
-    TYO: "JPX",
-  };
-  return aliases[exchange] ?? exchange;
-}
-
-export function quoteSymbolForAsset(asset: Asset) {
-  const ticker = safeSymbol(asset.ticker);
-  if (ticker) {
-    if (asset.assetClass === "crypto" && !ticker.includes("/")) {
-      return `${ticker}/USD`;
-    }
-    const exchange = exchangeCode(asset.exchange);
-    return exchange && !ticker.includes(":") && !ticker.includes("/")
-      ? `${ticker}:${exchange}`
-      : ticker;
-  }
-
-  const googleSymbol = safeSymbol(asset.googleFinanceSymbol);
-  if (!googleSymbol) {
-    return null;
-  }
-  const parts = googleSymbol.split(":");
-  if (parts.length === 2) {
-    return `${parts[1]}:${exchangeCode(parts[0])}`;
-  }
-  return googleSymbol;
-}
-
-function inferredQuoteCurrency(asset: Asset, baseCurrency: string) {
-  const ticker = safeSymbol(asset.ticker);
-  if (ticker?.includes("/")) {
-    return normalizeCurrency(ticker.split("/").at(-1)) || "USD";
-  }
-  if (asset.assetClass === "crypto") {
-    return "USD";
-  }
-
-  const exchange = exchangeCode(asset.exchange ?? asset.googleFinanceSymbol?.split(":")[0] ?? "");
-  const exchangeCurrencies: Record<string, string> = {
-    AMEX: "USD",
-    NASDAQ: "USD",
-    NYSE: "USD",
-    HKEX: "HKD",
-    JPX: "JPY",
-    LSE: "GBP",
-    SGX: "SGD",
-    SSE: "CNY",
-    SZSE: "CNY",
-    TWSE: "TWD",
-  };
-  return exchangeCurrencies[exchange] ?? (normalizeCurrency(asset.currency) || baseCurrency);
-}
-
-export function validateQuoteBridgeUrl(value: string) {
-  let url: URL;
-  try {
-    url = new URL(value.trim());
-  } catch {
-    throw new Error("Invalid Script URL");
-  }
-
-  if (url.protocol !== "https:") {
-    throw new Error("Script URL must use HTTPS");
-  }
-  return url;
-}
-
-export function isValidQuoteBridgeUrl(value?: string | null) {
-  if (!value?.trim()) {
-    return false;
-  }
-  try {
-    validateQuoteBridgeUrl(value);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function saveSecureCredential(key: string, credential: string) {
-  const normalized = credential.trim();
-  if (!normalized) {
-    throw new Error("API credential cannot be empty");
-  }
-  await SecureStore.setItemAsync(key, normalized);
-}
-
-export async function saveQuoteToken(token: string) {
-  await saveSecureCredential(CUSTOM_BRIDGE_TOKEN_KEY, token);
-}
-
-export async function readQuoteToken() {
-  return SecureStore.getItemAsync(CUSTOM_BRIDGE_TOKEN_KEY);
-}
-
-export async function clearQuoteToken() {
-  await SecureStore.deleteItemAsync(CUSTOM_BRIDGE_TOKEN_KEY);
-}
-
-export async function saveQuoteCredential(provider: QuoteProvider, credential: string) {
-  if (provider === "free_market") {
-    throw new Error("Free quotes do not require an API credential");
-  }
-  return saveQuoteToken(credential);
-}
-
-export async function readQuoteCredential(provider: QuoteProvider) {
-  return provider === "free_market" ? null : readQuoteToken();
-}
-
-async function fetchJson(input: string, init?: RequestInit, service = "Quote Bridge") {
+async function fetchJson(input: string, init?: RequestInit, service = "Free market quotes") {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   try {
     const response = await fetch(input, { ...init, signal: controller.signal });
     const json: unknown = await response.json().catch(() => null);
-    const remoteError =
-      typeof json === "string" && json.trim()
-        ? json.trim()
-        : isRecord(json) && typeof json.error === "string"
-          ? json.error
-          : isRecord(json) && json.status === "error" && typeof json.message === "string"
-            ? json.message
-            : null;
 
     if (!response.ok) {
-      throw new Error(remoteError ?? `${service} HTTP ${response.status}`);
-    }
-    if (remoteError) {
-      throw new Error(remoteError);
+      throw new Error(`${service} HTTP ${response.status}`);
     }
     if (!isRecord(json)) {
       throw new Error(`${service} returned an invalid response`);
@@ -213,95 +60,6 @@ async function fetchJson(input: string, init?: RequestInit, service = "Quote Bri
   } finally {
     clearTimeout(timeout);
   }
-}
-
-function parseBridgeQuote(
-  value: unknown,
-  receivedAt: string,
-  index: number,
-): AssetQuoteCache | null {
-  if (!isRecord(value)) {
-    return null;
-  }
-
-  const assetId = typeof value.assetId === "string" ? value.assetId.trim() : "";
-  const symbol = String(value.ticker ?? value.symbol ?? "").trim();
-  const price = optionalPositiveNumber(value.price);
-  const currency = normalizeCurrency(String(value.currency ?? ""));
-  const status = String(value.status ?? "ok") as AssetQuoteCache["status"];
-  if (
-    !assetId ||
-    !price ||
-    !currency ||
-    !quoteStatuses.has(status) ||
-    status === "failed" ||
-    status === "unsupported"
-  ) {
-    return null;
-  }
-
-  const convertedCurrencyValue =
-    value.convertedCurrency ?? value.localCurrency ?? value.baseCurrency;
-  const convertedCurrency = normalizeCurrency(
-    typeof convertedCurrencyValue === "string" ? convertedCurrencyValue : "",
-  );
-  const raw = JSON.stringify(value);
-
-  return {
-    id: `quote-${assetId}-${Date.parse(receivedAt)}-${index}`,
-    assetId,
-    symbol,
-    price,
-    currency,
-    convertedPrice: optionalPositiveNumber(
-      value.convertedPrice ?? value.localPrice ?? value.priceInBaseCurrency,
-    ),
-    convertedCurrency: convertedCurrency || null,
-    fxRate: optionalPositiveNumber(value.fxRate ?? value.exchangeRate),
-    asOf: typeof value.tradeTime === "string" ? value.tradeTime : null,
-    receivedAt,
-    source: "GOOGLEFINANCE",
-    status,
-    delayMinutes: optionalNonNegativeNumber(value.dataDelay),
-    change: finiteNumber(value.change),
-    changePercent: finiteNumber(value.changePercent),
-    marketOpen: typeof value.marketOpen === "boolean" ? value.marketOpen : null,
-    raw: raw.length > 4000 ? raw.slice(0, 4000) : raw,
-  } satisfies AssetQuoteCache;
-}
-
-export async function getQuotes(
-  settings: QuoteBridgeSettings,
-  baseCurrency?: string,
-): Promise<AssetQuoteCache[]> {
-  if (!settings.scriptUrl) {
-    throw new Error("Missing Script URL");
-  }
-  const token = await readQuoteToken();
-  if (!token) {
-    throw new Error("Missing API token");
-  }
-
-  const url = validateQuoteBridgeUrl(settings.scriptUrl);
-  url.searchParams.set("action", "quotes");
-  url.searchParams.set("token", token);
-  if (baseCurrency) {
-    url.searchParams.set("baseCurrency", baseCurrency.trim().toUpperCase());
-  }
-
-  const json = await fetchJson(url.toString());
-  if (!Array.isArray(json.quotes)) {
-    throw new Error("Quote Bridge response is missing quotes");
-  }
-  const receivedAt = new Date().toISOString();
-  const quotes = json.quotes
-    .map((quote, index) => parseBridgeQuote(quote, receivedAt, index))
-    .filter((quote): quote is AssetQuoteCache => quote !== null);
-
-  if (json.quotes.length > 0 && quotes.length === 0) {
-    throw new Error("Quote Bridge returned no usable quotes");
-  }
-  return quotes;
 }
 
 function activeQuoteRequests(assets: Asset[], baseCurrency: string) {
@@ -674,54 +432,4 @@ export async function getFreeMarketQuotes(
     throw new Error("Free quote services returned no usable quotes; cached values are unchanged");
   }
   return quotes;
-}
-
-export async function getPortfolioQuotes(
-  settings: QuoteBridgeSettings,
-  assets: Asset[],
-  baseCurrency: string,
-  _quoteCache: AssetQuoteCache[] = [],
-) {
-  return settings.provider === "free_market"
-    ? getFreeMarketQuotes(assets, baseCurrency)
-    : getQuotes(settings, baseCurrency);
-}
-
-async function authenticatedPost(settings: QuoteBridgeSettings, body: UnknownRecord) {
-  if (!settings.scriptUrl) {
-    throw new Error("Missing Script URL");
-  }
-  const token = await readQuoteToken();
-  if (!token) {
-    throw new Error("Missing API token");
-  }
-  const url = validateQuoteBridgeUrl(settings.scriptUrl);
-
-  return fetchJson(url.toString(), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ token, ...body }),
-  });
-}
-
-export async function upsertAsset(
-  settings: QuoteBridgeSettings,
-  asset: Asset,
-  baseCurrency?: string,
-) {
-  await authenticatedPost(settings, {
-    action: "upsertAsset",
-    assetId: asset.id,
-    ticker: asset.googleFinanceSymbol ?? asset.ticker ?? "",
-    assetType: asset.assetClass,
-    quantity: asset.quantity ?? 0,
-    manualValue: asset.manualValue ?? 0,
-    currency: asset.currency,
-    baseCurrency,
-    updateMethod: asset.updateMethod,
-  });
-}
-
-export async function archiveAsset(settings: QuoteBridgeSettings, assetId: string) {
-  await authenticatedPost(settings, { action: "archiveAsset", assetId });
 }

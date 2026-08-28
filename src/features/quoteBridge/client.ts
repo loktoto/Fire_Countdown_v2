@@ -1,27 +1,51 @@
 import type { Asset, AssetQuoteCache, QuoteBridgeSettings } from "../types";
+import { getFreeMarketQuotes } from "./freeMarketQuotes";
 import {
   clearQuoteToken,
-  getFreeMarketQuotes,
-  isValidQuoteBridgeUrl,
-  quoteSymbolForAsset,
   readQuoteCredential,
   readQuoteToken,
   saveQuoteCredential,
   saveQuoteToken,
-  validateQuoteBridgeUrl,
-} from "./deprecatedQueryClient";
+} from "./quoteCredentials";
+import { quoteSymbolForAsset } from "./quoteSymbols";
+
+export { getFreeMarketQuotes };
 
 export {
   clearQuoteToken,
-  getFreeMarketQuotes,
-  isValidQuoteBridgeUrl,
-  quoteSymbolForAsset,
   readQuoteCredential,
   readQuoteToken,
   saveQuoteCredential,
   saveQuoteToken,
-  validateQuoteBridgeUrl,
 };
+
+export { quoteSymbolForAsset };
+
+export function validateQuoteBridgeUrl(value: string) {
+  let url: URL;
+  try {
+    url = new URL(value.trim());
+  } catch {
+    throw new Error("Invalid Script URL");
+  }
+
+  if (url.protocol !== "https:") {
+    throw new Error("Script URL must use HTTPS");
+  }
+  return url;
+}
+
+export function isValidQuoteBridgeUrl(value?: string | null) {
+  if (!value?.trim()) {
+    return false;
+  }
+  try {
+    validateQuoteBridgeUrl(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 const REQUEST_TIMEOUT_MS = 15_000;
 const quoteStatuses = new Set<AssetQuoteCache["status"]>([

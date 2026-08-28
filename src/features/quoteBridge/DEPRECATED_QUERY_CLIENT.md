@@ -1,7 +1,13 @@
-# Deprecated query-token client boundary
+# Quote bridge modules (deprecation resolved)
 
-`deprecatedQueryClient.ts` preserves the existing free-market quote implementation and SecureStore credential helpers while the custom-bridge transport is migrated.
+The former `deprecatedQueryClient.ts` boundary has been decomposed into
+dedicated supported modules:
 
-Do not import its `getQuotes`, `getPortfolioQuotes`, `upsertAsset`, or `archiveAsset` exports. Those legacy functions may place authentication data in query parameters. The supported public module is `client.ts`, which owns every custom-bridge network call and sends credentials only in authenticated HTTPS POST bodies.
+- `client.ts` — public entry: custom-bridge transport (HTTPS POST only),
+  script URL validation, and re-exports.
+- `freeMarketQuotes.ts` — free stock/ETF/crypto quotes and FX rates.
+- `quoteCredentials.ts` — SecureStore credential helpers.
+- `quoteSymbols.ts` — ticker/symbol normalization helpers.
 
-This boundary is temporary. Remove the deprecated module after the free-market implementation and credential helpers are extracted into dedicated modules. No new production import may target `deprecatedQueryClient.ts` outside `client.ts`.
+No legacy query-token transport remains in the codebase. Do not place
+credentials in query parameters; all authenticated calls use POST bodies.

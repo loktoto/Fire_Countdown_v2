@@ -43,8 +43,8 @@ export function RecurringEditorSheet({
   schedule: RecurringTransaction | null;
   categories: Category[];
   onClose: () => void;
-  onSave: (id: string, patch: RecurringPatch) => void;
-  onArchive: (id: string) => void;
+  onSave: (id: string, patch: RecurringPatch) => boolean;
+  onArchive: (id: string) => boolean;
 }) {
   if (!visible || !schedule) {
     return null;
@@ -72,8 +72,8 @@ function RecurringEditorContent({
   schedule: RecurringTransaction;
   categories: Category[];
   onClose: () => void;
-  onSave: (id: string, patch: RecurringPatch) => void;
-  onArchive: (id: string) => void;
+  onSave: (id: string, patch: RecurringPatch) => boolean;
+  onArchive: (id: string) => boolean;
 }) {
   const colors = useThemeColors();
   const t = useI18n();
@@ -103,7 +103,7 @@ function RecurringEditorContent({
     if (!canSave) {
       return;
     }
-    onSave(schedule.id, {
+    const persisted = onSave(schedule.id, {
       type,
       amount,
       categoryId: activeCategoryId,
@@ -112,7 +112,9 @@ function RecurringEditorContent({
       startDate,
       isActive,
     });
-    onClose();
+    if (persisted) {
+      onClose();
+    }
   }
 
   function archive() {
@@ -120,8 +122,9 @@ function RecurringEditorContent({
       setConfirmingArchive(true);
       return;
     }
-    onArchive(schedule.id);
-    onClose();
+    if (onArchive(schedule.id)) {
+      onClose();
+    }
   }
 
   return (

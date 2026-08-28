@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 
 import { AllocationBar } from "../components/AllocationBar";
@@ -78,10 +78,8 @@ export function PortfolioScreen() {
         : lastQuoteUpdate
           ? t.portfolio.pricesUpdated(lastQuoteUpdate)
           : t.portfolio.pricesNeverUpdated;
-  const { stackAssetRows, stackSectionHeaders, stackQuickActions } = getPortfolioLayout(
-    width,
-    fontScale,
-  );
+  const layout = useMemo(() => getPortfolioLayout(width, fontScale), [width, fontScale]);
+  const { stackAssetRows, stackSectionHeaders, stackQuickActions } = layout;
 
   useFocusEffect(
     useCallback(() => {
@@ -89,9 +87,10 @@ export function PortfolioScreen() {
     }, [refreshIfDue]),
   );
 
-  function privateMoney(value: number, currency?: string) {
-    return assetAmountsHidden ? "***" : money(value, currency);
-  }
+  const privateMoney = useCallback(
+    (value: number, currency?: string) => (assetAmountsHidden ? "***" : money(value, currency)),
+    [assetAmountsHidden],
+  );
 
   function assetClassLabel(assetClass: Asset["assetClass"]) {
     switch (assetClass) {
@@ -140,7 +139,7 @@ export function PortfolioScreen() {
   function saveAsset(assetId: string, patch: Partial<Asset>) {
     if (creatingAsset && editingAsset) {
       const draft = { ...editingAsset, ...patch };
-      vm.createAsset({
+      return vm.createAsset({
         archivedAt: null,
         assetClass: draft.assetClass,
         currency: draft.currency,
@@ -156,10 +155,8 @@ export function PortfolioScreen() {
         typeId: draft.typeId,
         updateMethod: draft.updateMethod,
       });
-    } else {
-      vm.updateAsset(assetId, patch);
     }
-    closeAssetEditor();
+    return vm.updateAsset(assetId, patch);
   }
 
   function addMilestone() {
@@ -203,50 +200,48 @@ export function PortfolioScreen() {
   function saveMilestone(milestoneId: string, patch: Partial<Milestone>) {
     if (creatingMilestone && editingMilestone) {
       const draft = { ...editingMilestone, ...patch };
-      vm.createMilestone({
-        archivedAt: draft.archivedAt ?? null,
-        expectedReturnOverride: draft.expectedReturnOverride ?? null,
-        goalId: draft.goalId,
-        isActive: draft.isActive,
-        isHidden: draft.isHidden,
-        name: draft.name,
-        order: draft.order,
-        targetAmount: draft.targetAmount,
-        targetDate: draft.targetDate ?? null,
-      });
-    } else {
-      vm.updateMilestone(milestoneId, patch);
+      return Boolean(
+        vm.createMilestone({
+          archivedAt: draft.archivedAt ?? null,
+          expectedReturnOverride: draft.expectedReturnOverride ?? null,
+          goalId: draft.goalId,
+          isActive: draft.isActive,
+          isHidden: draft.isHidden,
+          name: draft.name,
+          order: draft.order,
+          targetAmount: draft.targetAmount,
+          targetDate: draft.targetDate ?? null,
+        }),
+      );
     }
-    closeMilestoneEditor();
+    return vm.updateMilestone(milestoneId, patch);
   }
 
   function saveScenario(scenarioId: string, patch: Partial<ProjectionScenario>) {
     if (creatingScenario && editingScenario) {
       const draft = { ...editingScenario, ...patch };
-      vm.createScenario({
-        archivedAt: draft.archivedAt ?? null,
-        expectedReturnAdjustment: draft.expectedReturnAdjustment,
-        inflationAdjustment: draft.inflationAdjustment,
-        isDefault: draft.isDefault,
-        monthlySavingAdjustment: draft.monthlySavingAdjustment,
-        name: draft.name,
-        targetSpendingAdjustment: draft.targetSpendingAdjustment,
-        withdrawalRateAdjustment: draft.withdrawalRateAdjustment ?? 0,
-      });
-    } else {
-      vm.updateScenario(scenarioId, patch);
+      return Boolean(
+        vm.createScenario({
+          archivedAt: draft.archivedAt ?? null,
+          expectedReturnAdjustment: draft.expectedReturnAdjustment,
+          inflationAdjustment: draft.inflationAdjustment,
+          isDefault: draft.isDefault,
+          monthlySavingAdjustment: draft.monthlySavingAdjustment,
+          name: draft.name,
+          targetSpendingAdjustment: draft.targetSpendingAdjustment,
+          withdrawalRateAdjustment: draft.withdrawalRateAdjustment ?? 0,
+        }),
+      );
     }
-    closeScenarioEditor();
+    return vm.updateScenario(scenarioId, patch);
   }
 
   function archiveMilestone(milestoneId: string) {
-    vm.archiveMilestone(milestoneId);
-    closeMilestoneEditor();
+    return vm.archiveMilestone(milestoneId);
   }
 
   function archiveScenario(scenarioId: string) {
-    vm.archiveScenario(scenarioId);
-    closeScenarioEditor();
+    return vm.archiveScenario(scenarioId);
   }
 
   return (

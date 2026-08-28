@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { memo, type ReactNode } from "react";
 import { StyleProp, StyleSheet, View, ViewStyle } from "react-native";
 import Animated from "react-native-reanimated";
 
@@ -7,7 +7,7 @@ import { tokens } from "../design/tokens";
 import { useThemeColors } from "../design/theme";
 import { useReducedMotion } from "../hooks/useReducedMotion";
 
-export function GlassCard({
+export const GlassCard = memo(function GlassCard({
   children,
   style,
   compact = false,
@@ -42,7 +42,7 @@ export function GlassCard({
       <View style={styles.content}>{children}</View>
     </Animated.View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   card: {

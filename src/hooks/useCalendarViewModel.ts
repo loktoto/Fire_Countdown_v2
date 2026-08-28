@@ -156,19 +156,24 @@ export function useCalendarViewModel() {
 
     return [...actualTransactions, ...scheduledTransactions];
   }, [categoriesById, projectedTransactions, selectedDate, snapshot.transactions, today]);
-  const activeRecurringTransactions = snapshot.recurringTransactions
-    .filter((schedule) => schedule.isActive && !schedule.archivedAt)
-    .sort((left, right) => left.nextDate.localeCompare(right.nextDate));
+  const activeRecurringTransactions = useMemo(
+    () =>
+      [...snapshot.recurringTransactions]
+        .filter((schedule) => schedule.isActive && !schedule.archivedAt)
+        .sort((left, right) => left.nextDate.localeCompare(right.nextDate)),
+    [snapshot.recurringTransactions],
+  );
 
   function saveTransactionEdit(id: string, patch: EditableTransactionPatch) {
     const nextPatch = { ...patch };
     if (typeof nextPatch.note === "string" && nextPatch.note.trim().length === 0) {
       nextPatch.note = null;
     }
-    updateTransaction(id, nextPatch);
-    if (nextPatch.date) {
+    const persisted = updateTransaction(id, nextPatch);
+    if (persisted && nextPatch.date) {
       selectDate(nextPatch.date);
     }
+    return persisted;
   }
 
   function selectDate(date: string) {

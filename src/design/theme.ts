@@ -5,9 +5,23 @@ import { tokens } from "./tokens";
 import { useFireStore } from "../data/fireStore";
 import type { FireSnapshot } from "../features/types";
 
-export type ThemeColors = ReturnType<typeof getThemeColors>;
+export type ThemeColors = ReturnType<typeof buildThemeColors>;
 
-export function getThemeColors(mode: "dark" | "light") {
+// Memoize the two possible palettes once: useThemeColors is called by nearly
+// every component, so rebuilding the object per call wastes allocations.
+const themeColorCache: Partial<Record<"dark" | "light", ThemeColors>> = {};
+
+export function getThemeColors(mode: "dark" | "light"): ThemeColors {
+  const cached = themeColorCache[mode];
+  if (cached) {
+    return cached;
+  }
+  const built = buildThemeColors(mode);
+  themeColorCache[mode] = built;
+  return built;
+}
+
+function buildThemeColors(mode: "dark" | "light") {
   const isDark = mode === "dark";
 
   return {
