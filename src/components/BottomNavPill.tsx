@@ -1,10 +1,18 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import Animated, { Easing, FadeInDown, ZoomIn } from "react-native-reanimated";
+import Animated, {
+  Easing,
+  FadeInDown,
+  FadeInUp,
+  FadeOutDown,
+  ZoomIn,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { MotionPressable } from "./MotionPressable";
 import { typography, useThemeColors } from "../design/theme";
+import { useLogEntryFlow } from "../features/logEntryFlow/LogEntryFlowContext";
 import { useI18n } from "../i18n";
 import { useReducedMotion } from "../hooks/useReducedMotion";
 import { useKeyboardInset } from "../hooks/useKeyboardInset";
@@ -37,6 +45,14 @@ export function BottomNavPill({ state, navigation }: TabBarProps) {
   const t = useI18n();
   const reducedMotion = useReducedMotion();
   const imeInset = useKeyboardInset();
+  const entryFlow = useLogEntryFlow();
+  const currentRoute = state.routes[state.index]?.name ?? "log";
+  const isEntryMode = currentRoute === "log";
+  const returnRouteRef = useRef("home");
+  const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [savingSuccess, setSavingSuccess] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const tabLabels: Record<string, string> = {
     home: t.tabs.home,
     calendar: t.tabs.calendar,
@@ -44,6 +60,59 @@ export function BottomNavPill({ state, navigation }: TabBarProps) {
     dashboard: t.tabs.dashboard,
     portfolio: t.tabs.portfolio,
   };
+
+  useEffect(() => {
+    if (!isEntryMode) {
+      returnRouteRef.current = currentRoute;
+    }
+  }, [currentRoute, isEntryMode]);
+
+  const exitEntryMode = useCallback(() => {
+    navigation.navigate(returnRouteRef.current);
+  }, [navigation]);
+
+  useEffect(() => {
+    entryFlow.registerExitHandler(exitEntryMode);
+    return () => entryFlow.registerExitHandler(null);
+  }, [entryFlow, exitEntryMode]);
+
+  useEffect(
+    () => () => {
+      if (successTimerRef.current) {
+        clearTimeout(successTimerRef.current);
+      }
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+    },
+    [],
+  );
+
+  function completeEntry() {
+    if (!entryFlow.canSave) {
+      entryFlow.showValidation();
+      return;
+    }
+
+    const result = entryFlow.save();
+    if (!result.saved) {
+      return;
+    }
+
+    setSavingSuccess(true);
+    setToastMessage(result.message ?? t.log.transactionSaved);
+    if (successTimerRef.current) {
+      clearTimeout(successTimerRef.current);
+    }
+    successTimerRef.current = setTimeout(() => {
+      setSavingSuccess(false);
+      exitEntryMode();
+    }, 260);
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    toastTimerRef.current = setTimeout(() => setToastMessage(null), 2800);
+  }
 
   if (imeInset > 0) {
     return null;
@@ -54,6 +123,26 @@ export function BottomNavPill({ state, navigation }: TabBarProps) {
       pointerEvents="box-none"
       style={[styles.wrap, { bottom: Math.max(insets.bottom, minimumBottomNavigationInset) }]}
     >
+      {toastMessage ? (
+        <Animated.View
+          accessibilityLiveRegion="polite"
+          entering={reducedMotion ? undefined : FadeInUp.duration(200)}
+          exiting={reducedMotion ? undefined : FadeOutDown.duration(160)}
+          style={[
+            styles.toast,
+            {
+              backgroundColor: colors.text,
+              borderColor: colors.surfaceBorder,
+              boxShadow: `0 10px 28px ${colors.shadow}`,
+            },
+          ]}
+        >
+          <MaterialCommunityIcons name="check-circle" size={19} color={colors.positive} />
+          <Text style={[styles.toastText, typography.button, { color: colors.background }]}>
+            {toastMessage}
+          </Text>
+        </Animated.View>
+      ) : null}
       <View
         style={[
           styles.pill,
@@ -73,6 +162,11 @@ export function BottomNavPill({ state, navigation }: TabBarProps) {
           const focused = state.index === index;
           const isLog = route.name === "log";
           const pressTab = () => {
+            if (isLog && isEntryMode) {
+              completeEntry();
+              return;
+            }
+
             const event = navigation.emit?.({
               type: "tabPress",
               target: route.key,
@@ -89,23 +183,32 @@ export function BottomNavPill({ state, navigation }: TabBarProps) {
               key={route.key}
               accessibilityLabel={isLog ? t.log.title : label}
               accessibilityRole="tab"
-              accessibilityState={{ selected: focused }}
+              accessibilityState={{
+                selected: focused,
+                disabled: isLog && isEntryMode && !entryFlow.canSave,
+              }}
               onPress={pressTab}
-              haptic={isLog ? "medium" : "selection"}
+              haptic={isLog ? (isEntryMode && !entryFlow.canSave ? false : "medium") : "selection"}
               style={[
                 styles.item,
                 isLog && [
                   styles.center,
                   {
-                    backgroundColor: colors.primaryFill,
+                    backgroundColor:
+                      isEntryMode && !entryFlow.canSave && !savingSuccess
+                        ? colors.surfaceElevated
+                        : savingSuccess
+                          ? colors.positive
+                          : colors.primaryFill,
                     borderColor: colors.background,
-                    boxShadow: `0 6px 16px ${colors.shadow}`,
+                    boxShadow:
+                      isEntryMode && !entryFlow.canSave ? "none" : `0 6px 16px ${colors.shadow}`,
                   },
                 ],
               ]}
             >
               <Animated.View
-                key={`${route.name}-${focused ? "active" : "idle"}`}
+                key={`${route.name}-${isLog && isEntryMode ? "confirm" : focused ? "active" : "idle"}-${savingSuccess ? "saved" : "ready"}`}
                 entering={
                   reducedMotion
                     ? undefined
@@ -113,9 +216,17 @@ export function BottomNavPill({ state, navigation }: TabBarProps) {
                 }
               >
                 <MaterialCommunityIcons
-                  name={meta.icon}
-                  size={isLog ? 30 : 21}
-                  color={isLog ? colors.onPrimary : focused ? colors.primary : colors.textMuted}
+                  name={isLog && isEntryMode ? "check" : meta.icon}
+                  size={isLog ? 33 : 21}
+                  color={
+                    isLog
+                      ? isEntryMode && !entryFlow.canSave && !savingSuccess
+                        ? colors.disabled
+                        : colors.onPrimary
+                      : focused
+                        ? colors.primary
+                        : colors.textMuted
+                  }
                 />
               </Animated.View>
               {!isLog ? (
@@ -167,6 +278,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 6,
   },
+  toast: {
+    position: "absolute",
+    left: 12,
+    right: 12,
+    bottom: bottomNavigationPillHeight + 12,
+    minHeight: 48,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 16,
+    borderCurve: "continuous",
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  toastText: { fontSize: 13, lineHeight: 18, textAlign: "center" },
   item: {
     flex: 1,
     alignItems: "center",
@@ -178,12 +305,12 @@ const styles = StyleSheet.create({
   },
   center: {
     flex: 0,
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+    width: 62,
+    height: 62,
+    borderRadius: 31,
     borderWidth: 3,
-    marginHorizontal: 4,
-    marginTop: -12,
+    marginHorizontal: 6,
+    marginTop: -15,
   },
   label: {
     fontSize: 10,

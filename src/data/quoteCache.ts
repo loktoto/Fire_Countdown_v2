@@ -1,4 +1,5 @@
 import type { AssetQuoteCache } from "../features/types";
+import { isUsableQuoteStatus } from "../features/quoteStatus";
 
 function quoteTimestamp(quote: AssetQuoteCache) {
   const timestamp = Date.parse(quote.receivedAt);
@@ -7,7 +8,21 @@ function quoteTimestamp(quote: AssetQuoteCache) {
 
 function keepNewest(target: Map<string, AssetQuoteCache>, quote: AssetQuoteCache) {
   const current = target.get(quote.assetId);
-  if (!current || quoteTimestamp(quote) > quoteTimestamp(current)) {
+  if (!current) {
+    target.set(quote.assetId, quote);
+    return;
+  }
+
+  const currentIsUsable = isUsableQuoteStatus(current.status);
+  const incomingIsUsable = isUsableQuoteStatus(quote.status);
+  if (currentIsUsable !== incomingIsUsable) {
+    if (incomingIsUsable) {
+      target.set(quote.assetId, quote);
+    }
+    return;
+  }
+
+  if (quoteTimestamp(quote) > quoteTimestamp(current)) {
     target.set(quote.assetId, quote);
   }
 }

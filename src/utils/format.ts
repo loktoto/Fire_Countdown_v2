@@ -9,6 +9,20 @@ export function percent(value: number, digits = 1) {
   return `${normalized.toFixed(digits)}%`;
 }
 
+// Cached formatters: creating an Intl.DateTimeFormat per call is expensive,
+// and these helpers run inside list rows and calendar cells on every render.
+const dateTimeFormatCache = new Map<string, Intl.DateTimeFormat>();
+
+function cachedFormatter(locale: string, options: Intl.DateTimeFormatOptions) {
+  const key = `${locale}|${JSON.stringify(options)}`;
+  let formatter = dateTimeFormatCache.get(key);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(locale || "en-US", options);
+    dateTimeFormatCache.set(key, formatter);
+  }
+  return formatter;
+}
+
 export function shortDateTime(value: string | null | undefined, locale = "en-US") {
   if (!value) {
     return "";
@@ -17,7 +31,7 @@ export function shortDateTime(value: string | null | undefined, locale = "en-US"
   if (!Number.isFinite(date.getTime())) {
     return "";
   }
-  return new Intl.DateTimeFormat(locale, {
+  return cachedFormatter(locale, {
     month: "short",
     day: "numeric",
     hour: "numeric",
@@ -85,20 +99,28 @@ export function daysInIsoMonth(date: string) {
 
 export function formatMonthYear(date: string, locale?: string) {
   const parts = isoDateParts(date);
-  return new Date(parts.year, parts.month - 1, 1).toLocaleDateString(locale, {
+  return cachedFormatter(locale ?? "en-US", {
     month: "long",
     year: "numeric",
-  });
+  }).format(new Date(parts.year, parts.month - 1, 1));
+}
+
+export function formatShortMonthYear(date: string, locale?: string) {
+  const parts = isoDateParts(date);
+  return cachedFormatter(locale ?? "en-US", {
+    month: "short",
+    year: "numeric",
+  }).format(new Date(parts.year, parts.month - 1, 1));
 }
 
 export function formatFullDate(date: string, locale?: string) {
   const parts = isoDateParts(date);
-  return new Date(parts.year, parts.month - 1, parts.day).toLocaleDateString(locale, {
+  return cachedFormatter(locale ?? "en-US", {
     weekday: "long",
     year: "numeric",
     month: "long",
     day: "numeric",
-  });
+  }).format(new Date(parts.year, parts.month - 1, parts.day));
 }
 
 export function formatLogDateLabel(date: string, today = todayIso()) {
@@ -110,11 +132,11 @@ export function formatLogDateLabel(date: string, today = todayIso()) {
     return "Yesterday";
   }
 
-  return new Date(`${date}T00:00:00`).toLocaleDateString(undefined, {
+  return cachedFormatter("en-US", {
     weekday: "short",
     month: "short",
     day: "numeric",
-  });
+  }).format(new Date(`${date}T00:00:00`));
 }
 
 export function formatLogDateChipLabel(date: string, today = todayIso()) {
@@ -126,25 +148,38 @@ export function formatLogDateChipLabel(date: string, today = todayIso()) {
     return "Yday";
   }
 
-  return new Date(`${date}T00:00:00`).toLocaleDateString(undefined, {
+  return cachedFormatter("en-US", {
     weekday: "short",
     day: "numeric",
-  });
+  }).format(new Date(`${date}T00:00:00`));
 }
 
 export function formatShortDate(date: string) {
-  return new Date(`${date}T00:00:00`).toLocaleDateString(undefined, {
+  return cachedFormatter("en-US", {
     month: "short",
     day: "numeric",
-  });
+  }).format(new Date(`${date}T00:00:00`));
 }
 
 export function formatDateInputLabel(date: string, locale?: string) {
   const { year, month, day } = isoDateParts(date);
-  return new Date(year, month - 1, day).toLocaleDateString(locale, {
+  return cachedFormatter(locale ?? "en-US", {
     year: "numeric",
     month: "short",
     day: "numeric",
     weekday: "short",
+  }).format(new Date(year, month - 1, day));
+}
+
+export function formatCompactDateInputLabel(
+  date: string,
+  locale?: string,
+  referenceDate = todayIso(),
+) {
+  const { year, month, day } = isoDateParts(date);
+  return new Date(year, month - 1, day).toLocaleDateString(locale, {
+    ...(date === referenceDate ? {} : { year: "numeric" as const }),
+    month: "short",
+    day: "numeric",
   });
 }

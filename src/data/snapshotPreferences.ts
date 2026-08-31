@@ -9,6 +9,7 @@ import type {
   Milestone,
   ProjectionScenario,
   QuoteBridgeSettings,
+  RecurringTransaction,
   Transaction,
 } from "../features/types";
 
@@ -52,6 +53,12 @@ const destinationIds = new Set<FireSnapshot["fireDestinationId"]>([
   "travel",
   "sunrise",
 ]);
+const recurrenceFrequencies = new Set<RecurringTransaction["frequency"]>([
+  "weekly",
+  "biweekly",
+  "monthly",
+  "yearly",
+]);
 
 function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -63,6 +70,17 @@ function isString(value: unknown): value is string {
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
+}
+
+function isIsoDate(value: unknown): value is string {
+  if (!isString(value) || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+  const [year, month, day] = value.split("-").map(Number);
+  const parsed = new Date(year!, month! - 1, day!);
+  return (
+    parsed.getFullYear() === year && parsed.getMonth() === month! - 1 && parsed.getDate() === day
+  );
 }
 
 function isBaseEntity(value: UnknownRecord) {
@@ -78,8 +96,24 @@ function isTransaction(value: unknown): value is Transaction {
     value.amount >= 0 &&
     isString(value.currency) &&
     isString(value.categoryId) &&
-    isString(value.date) &&
-    /^\d{4}-\d{2}-\d{2}$/.test(value.date)
+    isIsoDate(value.date)
+  );
+}
+
+function isRecurringTransaction(value: unknown): value is RecurringTransaction {
+  return (
+    isRecord(value) &&
+    isBaseEntity(value) &&
+    (value.type === "expense" || value.type === "income") &&
+    isFiniteNumber(value.amount) &&
+    value.amount > 0 &&
+    isString(value.currency) &&
+    isString(value.categoryId) &&
+    recurrenceFrequencies.has(value.frequency as RecurringTransaction["frequency"]) &&
+    isIsoDate(value.startDate) &&
+    isIsoDate(value.nextDate) &&
+    value.nextDate >= value.startDate &&
+    typeof value.isActive === "boolean"
   );
 }
 
@@ -175,10 +209,95 @@ function isScenario(value: unknown): value is ProjectionScenario {
     isString(value.name) &&
     isFiniteNumber(value.expectedReturnAdjustment) &&
     isFiniteNumber(value.inflationAdjustment) &&
+    (value.withdrawalRateAdjustment === undefined ||
+      isFiniteNumber(value.withdrawalRateAdjustment)) &&
     isFiniteNumber(value.monthlySavingAdjustment) &&
     isFiniteNumber(value.targetSpendingAdjustment) &&
     typeof value.isDefault === "boolean"
   );
+}
+
+export type SnapshotIntegrityMode = "legacy" | "current";
+
+/**
+ * Validate a persisted snapshot before hydration can discard invalid rows or
+ * replace required collections with demo defaults. The returned issue codes
+ * intentionally contain no financial values, so they are safe to use in
+ * diagnostics and tests.
+ */
+export function snapshotIntegrityIssues(
+  value: unknown,
+  mode: SnapshotIntegrityMode = "current",
+): string[] {
+  if (!isRecord(value)) {
+    return ["snapshot.not_object"];
+  }
+
+  const issues: string[] = [];
+  const validateCollection = <T>(
+    key: string,
+    guard: (item: unknown) => item is T,
+    requiredNonEmpty = false,
+  ) => {
+    const collection = value[key];
+    if (!Array.isArray(collection)) {
+      issues.push(`${key}.missing_or_invalid`);
+      return;
+    }
+    if (requiredNonEmpty && collection.length === 0) {
+      issues.push(`${key}.empty`);
+    }
+    collection.forEach((item, index) => {
+      if (!guard(item)) {
+        issues.push(`${key}.${index}.invalid`);
+      }
+    });
+
+    const ids = collection
+      .filter(isRecord)
+      .map((item) => item.id)
+      .filter(isString);
+    if (new Set(ids).size !== ids.length) {
+      issues.push(`${key}.duplicate_id`);
+    }
+  };
+
+  validateCollection("transactions", isTransaction);
+  validateCollection("recurringTransactions", isRecurringTransaction);
+  validateCollection("categories", isCategory);
+  validateCollection("assetTypes", isAssetType, true);
+  validateCollection("assets", isAsset);
+  validateCollection("quoteCache", isQuote);
+  validateCollection("goals", isGoal, true);
+  validateCollection("milestones", isMilestone);
+  validateCollection("scenarios", isScenario, true);
+
+  if (!isQuoteSettings(value.quoteSettings)) {
+    issues.push("quoteSettings.missing_or_invalid");
+  }
+
+  if (mode === "current") {
+    if (value.themeMode !== "system" && value.themeMode !== "light" && value.themeMode !== "dark") {
+      issues.push("themeMode.invalid");
+    }
+    if (typeof value.hapticsEnabled !== "boolean") {
+      issues.push("hapticsEnabled.invalid");
+    }
+    if (!companionIds.has(value.fireCompanionId as FireSnapshot["fireCompanionId"])) {
+      issues.push("fireCompanionId.invalid");
+    }
+    if (!destinationIds.has(value.fireDestinationId as FireSnapshot["fireDestinationId"])) {
+      issues.push("fireDestinationId.invalid");
+    }
+    if (!isString(value.currency) || !/^[A-Za-z]{3}$/.test(value.currency.trim())) {
+      issues.push("currency.invalid");
+    }
+    if (value.language !== "en" && value.language !== "zhHant") {
+      issues.push("language.invalid");
+    }
+  }
+
+  return issues;
 }
 
 function isQuoteSettings(value: unknown): value is UnknownRecord {
@@ -240,6 +359,11 @@ export function hydrateSnapshotPreferences(parsed: Partial<FireSnapshot>): FireS
 
   return {
     transactions: validItems(raw.transactions, isTransaction, seedSnapshot.transactions),
+    recurringTransactions: validItems(
+      raw.recurringTransactions,
+      isRecurringTransaction,
+      seedSnapshot.recurringTransactions,
+    ),
     categories: validItems(raw.categories, isCategory, seedSnapshot.categories),
     assetTypes: requiredItems(raw.assetTypes, isAssetType, seedSnapshot.assetTypes),
     assets: validItems(raw.assets, isAsset, seedSnapshot.assets),

@@ -35,11 +35,12 @@ import { StatusBadge } from "../components/StatusBadge";
 import { tokens } from "../design/tokens";
 import { typography, useThemeColors } from "../design/theme";
 import type { FireSnapshot, Milestone, ProjectionScenario } from "../features/types";
+import { useRecurringViewModel } from "../hooks/useRecurringViewModel";
 import { useSettingsViewModel } from "../hooks/useSettingsViewModel";
 import { useI18n } from "../i18n";
 import { buildCsvExport, buildGoogleSheetsExport } from "../utils/exportData";
 import { shareExportWithFallback } from "../utils/shareExport";
-import { shortDateTime } from "../utils/format";
+import { formatCompactDateInputLabel, shortDateTime } from "../utils/format";
 
 const currencyOptions = ["HKD", "USD", "TWD", "JPY", "EUR", "GBP", "CNY", "SGD"].map(
   (currency) => ({
@@ -140,7 +141,7 @@ function SettingsRow({
       <MotionPressable
         onPress={onPress}
         haptic="selection"
-        accessibilityLabel={`${title}${value ? `, ${value}` : ""}`}
+        accessibilityLabel={[title, value, supporting].filter(Boolean).join(", ")}
         style={rowStyle}
       >
         {content}
@@ -269,6 +270,7 @@ export function SettingsScreen() {
   const t = useI18n();
   const router = useRouter();
   const vm = useSettingsViewModel();
+  const recurringVm = useRecurringViewModel();
   const [milestoneListOpen, setMilestoneListOpen] = useState(false);
   const [scenarioListOpen, setScenarioListOpen] = useState(false);
   const [firePlanEditorOpen, setFirePlanEditorOpen] = useState(false);
@@ -293,6 +295,11 @@ export function SettingsScreen() {
     vm.snapshot.quoteSettings.enabled && vm.quoteUrlValid && vm.quoteAssetCount > 0;
   const refreshFailed = vm.refreshQuotes.error instanceof Error;
   const credentialFailed = vm.saveToken.error instanceof Error;
+  const recurringStatus = recurringVm.nextSchedule
+    ? t.recurring.nextDate(formatCompactDateInputLabel(recurringVm.nextSchedule.nextDate, t.locale))
+    : recurringVm.schedules.length > 0
+      ? t.recurring.pausedNoBackfill
+      : t.recurring.createFromLog;
   const exportOptions: { label: string; value: ExportFormat }[] = [
     { label: t.settings.csvFile, value: "csv" },
     { label: t.settings.googleSheetsFile, value: "sheets" },
@@ -339,50 +346,48 @@ export function SettingsScreen() {
   function saveMilestone(milestoneId: string, patch: Partial<Milestone>) {
     if (creatingMilestone && editingMilestone) {
       const draft = { ...editingMilestone, ...patch };
-      vm.createMilestone({
-        archivedAt: draft.archivedAt ?? null,
-        expectedReturnOverride: draft.expectedReturnOverride ?? null,
-        goalId: draft.goalId,
-        isActive: draft.isActive,
-        isHidden: draft.isHidden,
-        name: draft.name,
-        order: draft.order,
-        targetAmount: draft.targetAmount,
-        targetDate: draft.targetDate ?? null,
-      });
-    } else {
-      vm.updateMilestone(milestoneId, patch);
+      return Boolean(
+        vm.createMilestone({
+          archivedAt: draft.archivedAt ?? null,
+          expectedReturnOverride: draft.expectedReturnOverride ?? null,
+          goalId: draft.goalId,
+          isActive: draft.isActive,
+          isHidden: draft.isHidden,
+          name: draft.name,
+          order: draft.order,
+          targetAmount: draft.targetAmount,
+          targetDate: draft.targetDate ?? null,
+        }),
+      );
     }
-    closeMilestoneEditor();
+    return vm.updateMilestone(milestoneId, patch);
   }
 
   function archiveMilestone(milestoneId: string) {
-    vm.archiveMilestone(milestoneId);
-    closeMilestoneEditor();
+    return vm.archiveMilestone(milestoneId);
   }
 
   function saveScenario(scenarioId: string, patch: Partial<ProjectionScenario>) {
     if (creatingScenario && editingScenario) {
       const draft = { ...editingScenario, ...patch };
-      vm.createScenario({
-        archivedAt: draft.archivedAt ?? null,
-        expectedReturnAdjustment: draft.expectedReturnAdjustment,
-        inflationAdjustment: draft.inflationAdjustment,
-        isDefault: draft.isDefault,
-        monthlySavingAdjustment: draft.monthlySavingAdjustment,
-        name: draft.name,
-        targetSpendingAdjustment: draft.targetSpendingAdjustment,
-        withdrawalRateAdjustment: draft.withdrawalRateAdjustment ?? 0,
-      });
-    } else {
-      vm.updateScenario(scenarioId, patch);
+      return Boolean(
+        vm.createScenario({
+          archivedAt: draft.archivedAt ?? null,
+          expectedReturnAdjustment: draft.expectedReturnAdjustment,
+          inflationAdjustment: draft.inflationAdjustment,
+          isDefault: draft.isDefault,
+          monthlySavingAdjustment: draft.monthlySavingAdjustment,
+          name: draft.name,
+          targetSpendingAdjustment: draft.targetSpendingAdjustment,
+          withdrawalRateAdjustment: draft.withdrawalRateAdjustment ?? 0,
+        }),
+      );
     }
-    closeScenarioEditor();
+    return vm.updateScenario(scenarioId, patch);
   }
 
   function archiveScenario(scenarioId: string) {
-    vm.archiveScenario(scenarioId);
-    closeScenarioEditor();
+    return vm.archiveScenario(scenarioId);
   }
 
   async function shareExport(format: ExportFormat) {
@@ -426,8 +431,9 @@ export function SettingsScreen() {
         text: t.settings.resetDemoData,
         style: "destructive",
         onPress: () => {
-          vm.resetSeed();
-          AccessibilityInfo.announceForAccessibility(t.settings.demoDataReset);
+          if (vm.resetSeed()) {
+            AccessibilityInfo.announceForAccessibility(t.settings.demoDataReset);
+          }
         },
       },
     ]);
@@ -483,7 +489,9 @@ export function SettingsScreen() {
               <Switch
                 accessibilityLabel={t.settings.hapticFeedback}
                 value={vm.snapshot.hapticsEnabled}
-                onValueChange={vm.setHapticsEnabled}
+                onValueChange={(enabled) => {
+                  vm.setHapticsEnabled(enabled);
+                }}
                 trackColor={{ false: colors.surfaceBorder, true: colors.primary }}
                 thumbColor={colors.mode === "dark" ? colors.text : colors.surface}
               />
@@ -518,6 +526,21 @@ export function SettingsScreen() {
       </GlassCard>
 
       <GlassCard style={styles.settingsCard} motionIndex={1}>
+        <SettingsRow
+          icon="calendar-sync"
+          title={t.recurring.title}
+          value={
+            recurringVm.schedules.length > 0
+              ? t.recurring.activeCount(recurringVm.activeCount)
+              : undefined
+          }
+          supporting={recurringStatus}
+          onPress={() => router.push("/recurring")}
+          divider={false}
+        />
+      </GlassCard>
+
+      <GlassCard style={styles.settingsCard} motionIndex={2}>
         <SettingsSectionHeading title={t.settings.fireSettings} />
         <SettingsRow
           title={t.common.currentAge}
@@ -572,7 +595,7 @@ export function SettingsScreen() {
         </View>
       </GlassCard>
 
-      <GlassCard style={styles.settingsCard} motionIndex={2}>
+      <GlassCard style={styles.settingsCard} motionIndex={3}>
         <View style={styles.sectionHeader}>
           <SettingsSectionHeading
             title={t.settings.marketData}
@@ -613,10 +636,11 @@ export function SettingsScreen() {
             <SegmentedControl
               value={quoteProvider}
               onChange={(provider) => {
-                vm.updateQuoteSettings({ provider, enabled: provider === "free_market" });
-                vm.setTokenDraft("");
-                vm.saveToken.reset();
-                vm.refreshQuotes.reset();
+                if (vm.updateQuoteSettings({ provider, enabled: provider === "free_market" })) {
+                  vm.setTokenDraft("");
+                  vm.saveToken.reset();
+                  vm.refreshQuotes.reset();
+                }
               }}
               options={[
                 { label: t.settings.freeMarket, value: "free_market" },
@@ -641,7 +665,9 @@ export function SettingsScreen() {
             <Switch
               accessibilityLabel={t.settings.enableLiveQuotes}
               value={vm.snapshot.quoteSettings.enabled}
-              onValueChange={(enabled) => vm.updateQuoteSettings({ enabled })}
+              onValueChange={(enabled) => {
+                vm.updateQuoteSettings({ enabled });
+              }}
               trackColor={{ false: colors.surfaceBorder, true: colors.primary }}
               thumbColor={colors.mode === "dark" ? colors.text : colors.surface}
             />
@@ -792,7 +818,7 @@ export function SettingsScreen() {
         ) : null}
       </GlassCard>
 
-      <GlassCard style={styles.settingsCard} motionIndex={3}>
+      <GlassCard style={styles.settingsCard} motionIndex={4}>
         <SettingsSectionHeading title={t.settings.maintenance} />
         <View style={styles.rowGroup}>
           <SettingsRow
@@ -863,8 +889,9 @@ export function SettingsScreen() {
         value={vm.snapshot.currency}
         onClose={() => setCurrencyPickerOpen(false)}
         onSelect={(currency) => {
-          vm.setCurrency(currency);
-          setCurrencyPickerOpen(false);
+          if (vm.setCurrency(currency)) {
+            setCurrencyPickerOpen(false);
+          }
         }}
       />
       <FireCompanionPickerSheet
@@ -887,8 +914,9 @@ export function SettingsScreen() {
         value={vm.snapshot.language}
         onClose={() => setLanguagePickerOpen(false)}
         onSelect={(language) => {
-          vm.setLanguage(language as FireSnapshot["language"]);
-          setLanguagePickerOpen(false);
+          if (vm.setLanguage(language as FireSnapshot["language"])) {
+            setLanguagePickerOpen(false);
+          }
         }}
       />
       <PreferenceOptionSheet

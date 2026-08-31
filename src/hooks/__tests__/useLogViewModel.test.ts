@@ -67,6 +67,57 @@ describe("Log workflow", () => {
     expect(store.createTransaction).not.toHaveBeenCalled();
   });
 
+  it("creates a recurring schedule atomically with the first logged entry", async () => {
+    const store = storeWith();
+    useFireStoreMock.mockReturnValue(store);
+    const { result } = await renderHook(() => useLogViewModel());
+
+    await act(() => {
+      result.current.setAmountText("28000");
+      result.current.setType("income");
+      result.current.setCategoryId("cat-salary");
+      result.current.setRecurringEnabled(true);
+      result.current.setRecurringFrequency("monthly");
+    });
+    await act(() => expect(result.current.confirm()).toBe(true));
+
+    expect(store.createTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        amount: 28_000,
+        categoryId: "cat-salary",
+        type: "income",
+      }),
+      { frequency: "monthly" },
+    );
+    expect(result.current.recurringEnabled).toBe(false);
+    expect(result.current.recurringFrequency).toBe("monthly");
+  });
+
+  it("clears an incompatible category when type changes and resets a cancelled draft", async () => {
+    const store = storeWith();
+    useFireStoreMock.mockReturnValue(store);
+    const { result } = await renderHook(() => useLogViewModel());
+
+    await act(() => {
+      result.current.setAmountText("20000");
+      result.current.setType("income");
+    });
+    expect(result.current.categoryId).toBe("");
+    expect(result.current.canConfirm).toBe(false);
+    expect(result.current.hasDraft).toBe(true);
+
+    await act(() => {
+      result.current.setCategoryId("cat-salary");
+    });
+    expect(result.current.canConfirm).toBe(true);
+
+    await act(() => result.current.resetDraft());
+    expect(result.current.amount).toBe(0);
+    expect(result.current.type).toBe("expense");
+    expect(result.current.categoryId).toBe("cat-food");
+    expect(result.current.hasDraft).toBe(false);
+  });
+
   it("routes category edits and archive actions through the store", async () => {
     const store = storeWith();
     useFireStoreMock.mockReturnValue(store);

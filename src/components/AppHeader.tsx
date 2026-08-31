@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { memo, type ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
 import Animated, { Easing, FadeIn, FadeInUp } from "react-native-reanimated";
 
@@ -6,7 +6,7 @@ import { typography, useThemeColors } from "../design/theme";
 import { tokens } from "../design/tokens";
 import { useReducedMotion } from "../hooks/useReducedMotion";
 
-export function AppHeader({
+export const AppHeader = memo(function AppHeader({
   eyebrow,
   title,
   subtitle,
@@ -62,7 +62,7 @@ export function AppHeader({
       ) : null}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   root: {

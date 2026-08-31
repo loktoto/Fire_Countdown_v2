@@ -1,3 +1,4 @@
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useEffect } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Animated, {
@@ -17,18 +18,24 @@ function SegmentOption({
   active,
   activeColor,
   activeSoftColor,
+  color,
+  icon,
   label,
+  softColor,
   onPress,
 }: {
   active: boolean;
   activeColor?: string;
   activeSoftColor?: string;
+  color?: string;
+  icon?: keyof typeof MaterialCommunityIcons.glyphMap;
   label: string;
+  softColor?: string;
   onPress: () => void;
 }) {
   const colors = useThemeColors();
-  const indicatorColor = activeColor ?? colors.primary;
-  const indicatorSoftColor = activeSoftColor ?? colors.primarySoft;
+  const indicatorColor = color ?? activeColor ?? colors.primary;
+  const indicatorSoftColor = softColor ?? activeSoftColor ?? colors.primarySoft;
   const reducedMotion = useReducedMotion();
   const selected = useSharedValue(active ? 1 : 0);
 
@@ -65,18 +72,21 @@ function SegmentOption({
           indicatorStyle,
         ]}
       />
-      <Text
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        minimumFontScale={0.78}
-        style={[
-          styles.label,
-          typography.button,
-          { color: active ? indicatorColor : colors.textMuted },
-        ]}
-      >
-        {label}
-      </Text>
+      <View style={styles.labelRow}>
+        {icon ? <MaterialCommunityIcons name={icon} size={20} color={indicatorColor} /> : null}
+        <Text
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.78}
+          style={[
+            styles.label,
+            typography.button,
+            { color: color ?? (active ? indicatorColor : colors.textMuted) },
+          ]}
+        >
+          {label}
+        </Text>
+      </View>
     </MotionPressable>
   );
 }
@@ -89,7 +99,13 @@ export function SegmentedControl<T extends string>({
   activeSoftColor,
 }: {
   value: T;
-  options: { label: string; value: T }[];
+  options: {
+    label: string;
+    value: T;
+    color?: string;
+    icon?: keyof typeof MaterialCommunityIcons.glyphMap;
+    softColor?: string;
+  }[];
   onChange: (next: T) => void;
   activeColor?: string;
   activeSoftColor?: string;
@@ -109,7 +125,10 @@ export function SegmentedControl<T extends string>({
           active={option.value === value}
           activeColor={activeColor}
           activeSoftColor={activeSoftColor}
+          color={option.color}
+          icon={option.icon}
           label={option.label}
+          softColor={option.softColor}
           onPress={() => onChange(option.value)}
         />
       ))}
@@ -144,5 +163,12 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     zIndex: 1,
+  },
+  labelRow: {
+    zIndex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
   },
 });

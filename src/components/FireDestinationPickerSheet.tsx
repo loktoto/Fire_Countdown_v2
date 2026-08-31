@@ -19,7 +19,7 @@ export function FireDestinationPickerSheet({
 }: {
   visible: boolean;
   value: FireDestinationId;
-  onSelect: (id: FireDestinationId) => void;
+  onSelect: (id: FireDestinationId) => boolean;
   onClose: () => void;
 }) {
   const colors = useThemeColors();
@@ -76,8 +76,9 @@ export function FireDestinationPickerSheet({
                 <MotionPressable
                   key={id}
                   onPress={() => {
-                    onSelect(id);
-                    onClose();
+                    if (onSelect(id)) {
+                      onClose();
+                    }
                   }}
                   haptic="selection"
                   accessibilityLabel={label}

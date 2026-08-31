@@ -16,8 +16,11 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { TimeLensProvider } from "../components/TimeLens";
-import { FireStoreProvider } from "../data/fireStore";
+import { FireStoreProvider, useFireStore } from "../data/fireStore";
+import { HapticsPreferenceProvider } from "./hapticsPreference";
 import { LoadingScreen, systemLocale } from "./LoadingScreen";
+import { PersistenceErrorNotice } from "./PersistenceErrorNotice";
+import { SnapshotRecoveryNotice } from "./SnapshotRecoveryNotice";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -27,6 +30,17 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+// Bridges the store's haptics preference into the lightweight leaf channel so
+// pressables don't each subscribe to the whole FireSnapshot.
+function HapticsPreferenceBridge({ children }: { children: ReactNode }) {
+  const { snapshot } = useFireStore();
+  return (
+    <HapticsPreferenceProvider hapticsEnabled={snapshot.hapticsEnabled}>
+      {children}
+    </HapticsPreferenceProvider>
+  );
+}
 
 export function Providers({ children }: { children: ReactNode }) {
   const colorScheme = useColorScheme();
@@ -49,7 +63,11 @@ export function Providers({ children }: { children: ReactNode }) {
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
           <FireStoreProvider>
-            <TimeLensProvider>{children}</TimeLensProvider>
+            <HapticsPreferenceBridge>
+              <TimeLensProvider>{children}</TimeLensProvider>
+              <PersistenceErrorNotice />
+              <SnapshotRecoveryNotice />
+            </HapticsPreferenceBridge>
           </FireStoreProvider>
         </QueryClientProvider>
       </SafeAreaProvider>

@@ -18,13 +18,14 @@ Any future analytics, cloud sync, remote backup, telemetry, or account feature r
 
 ## Data inventory
 
-| Data                    | Examples                                                                                    | Current storage                                                | Leaves device?                                                                                       | Current retention and deletion                                                                                                                                                                                                                                                                                      |
-| ----------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Financial snapshot      | transactions, categories, assets, goals, scenarios, milestones, quote settings, preferences | `expo-sqlite/localStorage` under `fire-countdown-v2:snapshot`  | Only through user-selected export, or when included in a user-triggered quote request where required | Retained across app restarts and updates. Replaced by demo seed when the user confirms **Reset Demo Data**. Platform uninstall/backup behavior is controlled by the OS and build configuration.                                                                                                                     |
-| Quote cache             | prices, currencies, FX rates, source/status, timestamps, bounded raw provider payload       | Inside the financial snapshot                                  | Provider requests retrieve new values; existing cached values are not uploaded as a backup           | Same lifecycle as the snapshot.                                                                                                                                                                                                                                                                                     |
-| Custom quote credential | custom bridge token                                                                         | Expo SecureStore under `fire-countdown-v2.quote-token`         | Sent only to the configured custom HTTPS bridge, in a JSON POST body                                 | Retained until explicitly overwritten or deleted through SecureStore code. **Reset Demo Data does not currently delete this credential.** Android uninstall normally removes it. iOS Keychain data may persist across reinstall with the same bundle identifier and must not be assumed to be deleted by uninstall. |
-| Export working file     | generated CSV or tab-separated text                                                         | Temporary file in the app cache when file sharing is available | Yes, only after the user chooses an export and a share destination                                   | Cache lifetime is OS-controlled. The receiving app, cloud drive, message, email, clipboard, or file destination controls the exported copy after sharing.                                                                                                                                                           |
-| UI diagnostics          | screenshots, screen recordings, copied error text                                           | Outside app control after capture                              | Potentially, according to the destination selected by the user or OS                                 | The app cannot revoke or delete copies held by the OS, another app, a backup, or another person.                                                                                                                                                                                                                    |
+| Data                    | Examples                                                                                    | Current storage                                                          | Leaves device?                                                                                       | Current retention and deletion                                                                                                                                                                                                                                                                                      |
+| ----------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Financial snapshot      | transactions, categories, assets, goals, scenarios, milestones, quote settings, preferences | `expo-sqlite/localStorage` under `fire-countdown-v2:snapshot`            | Only through user-selected export, or when included in a user-triggered quote request where required | Retained across app restarts and updates in a versioned envelope. Replaced by demo seed when the user confirms **Reset Demo Data**. Platform uninstall/backup behavior is controlled by the OS and build configuration.                                                                                             |
+| Recovery quarantine     | the exact unreadable or unsupported snapshot payload and a local capture timestamp          | `expo-sqlite/localStorage` under `fire-countdown-v2:snapshot:quarantine` | Only when the user selects **Export original data** on the recovery surface                          | Created before recovery can replace a malformed, future-version, partially corrupt, or failed-migration payload. Removed after a successful recovery reset when storage permits; a stale local copy can remain if the platform rejects cleanup.                                                                     |
+| Quote cache             | prices, currencies, FX rates, source/status, timestamps, bounded raw provider payload       | Inside the financial snapshot                                            | Provider requests retrieve new values; existing cached values are not uploaded as a backup           | Same lifecycle as the snapshot.                                                                                                                                                                                                                                                                                     |
+| Custom quote credential | custom bridge token                                                                         | Expo SecureStore under `fire-countdown-v2.quote-token`                   | Sent only to the configured custom HTTPS bridge, in a JSON POST body                                 | Retained until explicitly overwritten or deleted through SecureStore code. **Reset Demo Data does not currently delete this credential.** Android uninstall normally removes it. iOS Keychain data may persist across reinstall with the same bundle identifier and must not be assumed to be deleted by uninstall. |
+| Export working file     | generated CSV or tab-separated text                                                         | Temporary file in the app cache when file sharing is available           | Yes, only after the user chooses an export and a share destination                                   | Cache lifetime is OS-controlled. The receiving app, cloud drive, message, email, clipboard, or file destination controls the exported copy after sharing.                                                                                                                                                           |
+| UI diagnostics          | screenshots, screen recordings, copied error text                                           | Outside app control after capture                                        | Potentially, according to the destination selected by the user or OS                                 | The app cannot revoke or delete copies held by the OS, another app, a backup, or another person.                                                                                                                                                                                                                    |
 
 The financial snapshot is not protected by app-level encryption today. Device encryption, device passcode policy, operating-system sandboxing, and platform backup configuration are outside the JavaScript application contract.
 
@@ -32,16 +33,18 @@ The financial snapshot is not protected by app-level encryption today. Device en
 
 ### Financial snapshot
 
-`src/data/fireStore.tsx` installs the Expo SQLite localStorage implementation and treats it as the source of truth. `src/data/snapshotStorage.ts` serializes the complete `FireSnapshot` as JSON.
+`src/data/fireStore.tsx` installs the Expo SQLite localStorage implementation and treats it as the source of truth. `src/data/snapshotStorage.ts` serializes the complete `FireSnapshot` inside a schema-versioned JSON envelope. The current schema version is `1`.
 
 Current behavior:
 
-1. First run with no stored snapshot loads demo seed data.
-2. A successful mutation writes the next snapshot to local storage.
-3. A failed write keeps the prior in-memory snapshot.
-4. Unreadable JSON or an invalid top-level value currently falls back to demo seed data.
+1. First run with no stored snapshot loads demo seed data and is distinguished from recovery.
+2. A valid unversioned or schema-version-`0` snapshot is validated and migrated in memory. The original storage key is replaced only after the complete schema-`1` envelope is written successfully.
+3. A successful mutation writes the complete schema-`1` envelope before the in-memory snapshot changes.
+4. A failed write keeps the prior persisted and in-memory snapshot and shows a localized storage error.
+5. Malformed JSON, unsupported/future schema versions, and invalid collection rows are not hydrated by silently dropping data. The exact raw payload remains at the original key, the app attempts a second local quarantine copy, and financial mutations are blocked.
+6. Recovery presents a localized blocking surface with **Export original data** and destructive **Reset to demo data** actions. If a quarantine copy cannot be written, reset stays blocked until the original payload has been sent successfully to the operating-system share sheet.
 
-The fourth behavior is a known recovery limitation. Issue #6 owns versioned migrations, quarantine of the raw prior payload, and a localized corruption-recovery surface. Until that work is complete, maintainers must not describe current fallback as lossless recovery.
+Recovery does not claim to repair arbitrary corruption or downgrade future schemas. The seed snapshot shown behind the blocking recovery surface is a safe UI fallback, not a recovered copy and not permission to overwrite the original.
 
 ### Quote credential
 
@@ -53,7 +56,7 @@ SecureStore is appropriate for a small credential, not for the full financial sn
 - iOS stores values in Keychain; a value can persist after uninstall when the same bundle identifier is installed again. This behavior is not guaranteed and must not be used as a backup strategy.
 - A future credential protected with `requireAuthentication` can become unreadable after biometric enrollment changes.
 
-Official reference: https://docs.expo.dev/versions/v56.0.0/sdk/securestore/
+Official reference: https://docs.expo.dev/versions/v57.0.0/sdk/securestore/
 
 ## Network destinations
 
@@ -93,6 +96,7 @@ Current export properties:
 - Formula-like cells beginning with `=`, `+`, `-`, or `@` are prefixed to reduce spreadsheet formula injection risk.
 - Quote credentials are not included.
 - The current export is a human-readable report, not yet a relationally lossless backup. Issue #34 owns schema versioning, stable relationships, and round-trip reconstruction.
+- The recovery surface can separately export the exact original payload as sensitive JSON. That raw file is for preservation/support and is not an automatic import or restore format.
 
 Users should assume that an exported file contains sensitive financial information. Once another app or person receives it, Fire Countdown cannot revoke it, enforce encryption, or delete every copy.
 
@@ -104,6 +108,7 @@ The current destructive reset:
 
 - requires the existing native confirmation dialog;
 - replaces the financial snapshot with bundled demo seed data;
+- when invoked from recovery, first requires either a local quarantine copy or a successfully shared original payload, then attempts to remove the quarantine copy after replacement;
 - does not clear the custom quote credential from SecureStore;
 - does not delete files already exported or shared;
 - does not delete screenshots, clipboard contents, OS backups, or copies held by other apps.
@@ -147,6 +152,7 @@ The app does not claim to protect against:
 - a malicious or compromised custom quote bridge;
 - a receiving app or person mishandling an export;
 - silent, lossless recovery from every corrupt or future snapshot version;
+- automatic repair or downgrade of every corrupt or future snapshot version;
 - coercion, shoulder surfing, or physical observation;
 - deletion of copies that have already left the app.
 
@@ -166,7 +172,7 @@ An optional app lock could reduce casual access when a device is already unlocke
 
 Official references:
 
-- https://docs.expo.dev/versions/v56.0.0/sdk/securestore/
+- https://docs.expo.dev/versions/v57.0.0/sdk/securestore/
 - https://docs.expo.dev/versions/latest/sdk/local-authentication/
 
 ### Release gate for a future app lock
@@ -183,13 +189,14 @@ Do not add user-facing app-lock copy until all of the following exist:
 
 ## Backup and recovery guidance
 
-Until versioned, relationally lossless backup is implemented:
+Until a versioned, relationally lossless export and restore format is implemented:
 
 - users should export before major app, device, or data changes;
 - users should store exports only in destinations they trust;
 - maintainers must distinguish the current human-readable export from a restorable backup;
 - support must not ask users to post unsanitized snapshots, screenshots, credentials, or exports in public issues;
-- corruption work must preserve the raw prior payload before any destructive reset once Issue #6 is implemented.
+- the recovery JSON export should be retained only in a trusted destination and must not be described as an automatically restorable backup;
+- maintainers must test legacy migration, future versions, malformed JSON, partial corruption, write failure, export, reset, and quarantine cleanup when changing the snapshot schema.
 
 ## Maintainer checklist
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import Animated, {
   cancelAnimation,
@@ -231,7 +231,7 @@ function MilestoneProgressBar({
   );
 }
 
-export function MilestoneJourney({
+export const MilestoneJourney = memo(function MilestoneJourneyBase({
   currency = "HKD",
   currentAmount = 0,
   items,
@@ -533,7 +533,7 @@ export function MilestoneJourney({
       </View>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   root: {

@@ -1,6 +1,43 @@
 ﻿# Fire Countdown v2 UAT execution report
 
-## Overall result
+## Current-source focused Android addendum — 2026-08-31
+
+This addendum records focused current-source UAT for commit
+`db12d7e36ce7aa0004648e8eeb1ca85760afc39d` on branch
+`codex/calendar-activity-polish`. It supplements, but does not replace, the historical 48-case
+suite below.
+
+### Environment
+
+- Android device: `Medium_Phone_API_36.0`, API 36, `emulator-5554`
+- Runtime: Expo Go 57.0.9 and Metro on port 8081
+- Device capacity at start: 4 GB RAM and approximately 6.6 GB free in `/data`
+- Final dev-server route: `exp://10.0.2.2:8081`
+- Native/EAS build: not run
+
+### Focused acceptance results
+
+| Check                               | Result | Evidence                                                                                                                                                                                                                                    |
+| ----------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Locked navigation and default route | Pass   | A normal cold launch rendered Log first and exposed Home, Calendar, the center Log action, Dashboard, and Portfolio; Settings remained outside the tabs.                                                                                    |
+| Create and immediate readback       | Pass   | Saved a one-time Food expense for HKD 789 with note `cold-persist-20260831`; Calendar showed the same note, amount, category, and HKD 789 monthly expense/net totals.                                                                       |
+| Process-death persistence           | Pass   | `am force-stop host.exp.exponent` followed by a cold Expo Go launch returned `LaunchState: COLD`; Calendar still exposed the exact note, amount, and category.                                                                              |
+| Dashboard render                    | Pass   | Overview rendered March 2063, FIRE age 67, HKD 426,043 FIRE assets, 4.4% funded, the HKD 9,600,000 target, and the projection chart without a fatal JavaScript error.                                                                       |
+| Online quote refresh                | Pass   | Portfolio settled from `Updating prices` to a timestamped update; the quoted totals changed to HKD 1,180,868 total assets and HKD 460,868 counted toward FIRE.                                                                              |
+| Offline quote fallback              | Pass   | With Wi-Fi and mobile data disabled, refresh displayed `Update failed · saved prices from Aug 31, 8:19 AM`; the HKD 1,180,868 total and allocation remained visible. Network access was then restored and refresh succeeded again.          |
+| Malformed-snapshot recovery         | Pass   | A one-shot dev-only UAT hook first duplicated the full snapshot, then injected malformed JSON. The app blocked normal use, stated that data had not been silently overwritten, and exposed `Export original data` and `Reset to demo data`. |
+| Recovery restoration                | Pass   | The duplicated snapshot was restored, quarantine/test keys were removed, and a subsequent cold launch again exposed `cold-persist-20260831` and HKD 789 in Calendar. The temporary hook was removed and the worktree returned clean.        |
+
+The recovery test did not invoke the OS share recipient or confirm the destructive demo reset; it
+verified the blocking surface, local preservation path, and lossless restoration of the test
+snapshot. iOS, screen-reader, large-text, reduced-motion, storage-exhaustion/write-failure, and
+on-device performance acceptance remain open. The final normal Expo Go launch logged
+`Running "main"` and rendered the app; an Expo Go embedded-update fallback warning preceded the
+dev bundle and is not treated as a project JavaScript failure.
+
+## Historical suite overall result
+
+> Historical evidence notice (updated 2026-08-31): the suite below applies only to the named `test/uat-e2e-suite` branch, commit `e3d987a`, Expo Go 56.0.1, and 2026-07-16 execution environment. It is not current-source release evidence; use the focused addendum above and `QUALITY_REPORT.md` for the current branch.
 
 The 48-case Android UAT suite passed on the Pixel_9a API 37 emulator using Expo Go 56.0.1. The six Android end-to-end journeys passed. Two defects were found during execution and fixed with regression coverage. No Android case is marked `Fail` or `Blocked`.
 

@@ -5,8 +5,10 @@ import {
   daysInIsoMonth,
   formatLogDateChipLabel,
   formatLogDateLabel,
+  formatCompactDateInputLabel,
   formatDateInputLabel,
   formatMonthYear,
+  formatShortMonthYear,
   percent,
   signedMoney,
 } from "../format";
@@ -54,10 +56,17 @@ describe("date formatting helpers", () => {
 
   it("formats projected months for people instead of storage keys", () => {
     expect(formatMonthYear("2027-12-01", "en-US")).toBe("December 2027");
+    expect(formatShortMonthYear("2027-12-01", "en-US")).toBe("Dec 2027");
   });
 
   it("formats editable dates as readable, locale-aware labels", () => {
     expect(formatDateInputLabel("2026-07-23", "en-US")).toBe("Thu, Jul 23, 2026");
     expect(formatDateInputLabel("2026-07-23", "zh-Hant")).toContain("2026");
+  });
+
+  it("keeps the Log date compact while retaining years when they matter", () => {
+    expect(formatCompactDateInputLabel("2026-08-01", "en-US", "2026-08-01")).toBe("Aug 1");
+    expect(formatCompactDateInputLabel("2026-07-31", "en-US", "2026-08-01")).toBe("Jul 31, 2026");
+    expect(formatCompactDateInputLabel("2027-01-02", "en-US", "2026-08-01")).toBe("Jan 2, 2027");
   });
 });

@@ -35,16 +35,27 @@ export function useSettingsViewModel() {
   const [tokenDraft, setTokenDraft] = useState("");
   const saveToken = useMutation({
     mutationKey: ["save-quote-credential", snapshot.quoteSettings.provider],
-    mutationFn: async () => saveQuoteCredential(snapshot.quoteSettings.provider, tokenDraft),
+    mutationFn: async () => {
+      await saveQuoteCredential(snapshot.quoteSettings.provider, tokenDraft);
+      if (!updateQuoteSettings({ enabled: true })) {
+        throw new Error("Quote credential was saved, but quote settings could not be persisted");
+      }
+    },
     onSuccess: () => {
-      updateQuoteSettings({ enabled: true });
       setTokenDraft("");
     },
   });
-  const milestones = [...snapshot.milestones]
-    .filter((milestone) => !milestone.archivedAt && (!goal || milestone.goalId === goal.id))
-    .sort((a, b) => a.order - b.order);
-  const scenarios = snapshot.scenarios.filter((scenario) => !scenario.archivedAt);
+  const milestones = useMemo(
+    () =>
+      [...snapshot.milestones]
+        .filter((milestone) => !milestone.archivedAt && (!goal || milestone.goalId === goal.id))
+        .sort((a, b) => a.order - b.order),
+    [snapshot.milestones, goal],
+  );
+  const scenarios = useMemo(
+    () => snapshot.scenarios.filter((scenario) => !scenario.archivedAt),
+    [snapshot.scenarios],
+  );
 
   function newMilestoneDraft() {
     if (!goal) {
@@ -96,7 +107,10 @@ export function useSettingsViewModel() {
     weightedReturn: fire.weightedReturn,
     milestones,
     scenarios,
-    categories: snapshot.categories.filter((category) => !category.archivedAt),
+    categories: useMemo(
+      () => snapshot.categories.filter((category) => !category.archivedAt),
+      [snapshot.categories],
+    ),
     setThemeMode,
     setHapticsEnabled,
     setFireCompanion,

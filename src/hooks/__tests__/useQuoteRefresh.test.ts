@@ -32,7 +32,7 @@ function testWrapper() {
 }
 
 function mockStore(overrides = {}) {
-  const saveQuotes = jest.fn();
+  const saveQuotes = jest.fn((_quotes: typeof seedSnapshot.quoteCache) => true);
   useFireStoreMock.mockReturnValue({
     snapshot: {
       ...seedSnapshot,
@@ -75,6 +75,26 @@ describe("useQuoteRefresh", () => {
       seedSnapshot.quoteCache,
     );
     expect(saveQuotes.mock.calls[0]?.[0]).toEqual(quotes);
+    await unmount();
+  });
+
+  it("reports a refresh failure when quotes cannot be persisted", async () => {
+    const saveQuotes = mockStore();
+    saveQuotes.mockReturnValue(false);
+    getPortfolioQuotesMock.mockResolvedValue([
+      { ...seedSnapshot.quoteCache[0]!, source: "FREE_MARKET" as const },
+    ]);
+
+    const { result, unmount } = await renderHook(() => useQuoteRefresh(), {
+      wrapper: testWrapper(),
+    });
+    await act(() => {
+      result.current.refreshIfDue();
+    });
+    await waitFor(() => expect(result.current.refreshQuotes.isError).toBe(true));
+
+    expect(saveQuotes).toHaveBeenCalledTimes(1);
+    expect(result.current.refreshQuotes.isSuccess).toBe(false);
     await unmount();
   });
 

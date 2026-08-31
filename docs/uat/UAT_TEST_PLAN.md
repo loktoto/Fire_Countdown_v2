@@ -2,7 +2,7 @@
 
 **Status:** Ready for execution  
 **Prepared:** 2026-07-14  
-**Scope:** 48 scenario-based UAT cases covering the complete user experience  
+**Scope:** 54 scenario-based UAT cases covering the complete user experience
 **Primary platforms:** iOS and Android  
 **Secondary platform:** Web smoke testing
 
@@ -19,7 +19,7 @@ This plan validates that a real user can complete the core Fire Countdown experi
 5. Configure appearance, language, currency, quote integration, and data export.
 6. Continue using the app after restart, offline use, or quote-service failure.
 
-The suite deliberately uses **48 consolidated business scenarios** rather than 100 narrowly separated checks. Each case validates a complete user outcome and may contain several related acceptance points.
+The suite deliberately uses **54 consolidated business scenarios** rather than 100 narrowly separated checks. Each case validates a complete user outcome and may contain several related acceptance points.
 
 ---
 
@@ -126,6 +126,12 @@ Allow normal display rounding. Any unexplained cross-screen difference is a defe
 - **Steps:** Open an invalid/deep route supported by the test environment; use the recovery action.
 - **Expected:** A controlled “route not found” state appears; the user can return to Log; the app does not crash.
 
+### UAT-NAV-05 — Keyboard clearance preserves the active form
+
+- **Priority:** P0
+- **Steps:** On Log, focus Amount and then Note; confirm the software keyboard is open; dismiss it with Android Back; repeat after opening a long-form editor from Calendar or Portfolio.
+- **Expected:** The focused field and its controls remain reachable above the live keyboard inset; the floating bottom navigation is hidden while the keyboard is open and returns after dismissal; no field is obscured, no hard-coded keyboard-height gap is visible, and the active form remains usable.
+
 ---
 
 ## B. Log transactions — 8 cases
@@ -146,7 +152,7 @@ Allow normal display rounding. Any unexplained cross-screen difference is a defe
 
 - **Priority:** P1
 - **Steps:** Use previous/next day controls and the date picker to select a non-today date; record an expense.
-- **Expected:** The record is stored on the selected date; Calendar automatically shows it on that date; today’s impact does not incorrectly include it.
+- **Expected:** The record is stored on the selected date; Calendar automatically shows it on that date with a muted “Upcoming · Not in FIRE yet” state; today’s FIRE impact does not include it; the pending treatment disappears when the date arrives.
 
 ### UAT-LOG-04 — Amount input normalization
 
@@ -169,8 +175,8 @@ Allow normal display rounding. Any unexplained cross-screen difference is a defe
 ### UAT-LOG-07 — FIRE impact preview responds to the draft
 
 - **Priority:** P1
-- **Steps:** Enter a material expense; note the preview; switch to Income with the same amount; change the amount.
-- **Expected:** Preview recalculates immediately; expense and income move projected FIRE impact in opposite directions; zero amount shows neutral/no impact; no `NaN`, infinity, or broken label appears.
+- **Steps:** Enter a material expense; note the preview; switch to Income with the same amount; change the amount; then move the entry to a future date before the projected FIRE date.
+- **Expected:** Preview recalculates immediately; expense and income move projected FIRE impact in opposite directions; the future-dated entry still moves the companion without being treated as available before its date; zero amount shows neutral/no impact; no `NaN`, infinity, or broken label appears.
 
 ### UAT-LOG-08 — Prevent duplicate submission
 
@@ -248,7 +254,47 @@ Allow normal display rounding. Any unexplained cross-screen difference is a defe
 
 ---
 
-## E. Home experience — 4 cases
+## E. Recurring cashflow — 6 cases
+
+### UAT-REC-01 — Create recurring income or spending from Log
+
+- **Priority:** P0
+- **Steps:** On Log, enter a valid income or expense; enable Repeat; choose Monthly; save; open recurring management from Calendar and again from Settings.
+- **Expected:** The first entry is saved once; Calendar and Settings open the same recurring schedule; Settings shows the active count and next date; the schedule has the correct amount, type, category, note, currency, first date, frequency, and next date.
+
+### UAT-REC-02 — Generate a due entry once
+
+- **Priority:** P0
+- **Steps:** Use a schedule whose next date is due; fully terminate and relaunch or foreground the app twice.
+- **Expected:** One ordinary Calendar entry is added for the due date; the schedule advances to the correct next date; repeated launch/foreground does not duplicate it; the FIRE countdown updates only after the due entry is added.
+
+### UAT-REC-03 — Pause and resume without backfilling
+
+- **Priority:** P0
+- **Steps:** Pause an active schedule; pass or simulate at least one due date; reopen the app; resume the schedule.
+- **Expected:** Nothing is added while paused; missed dates remain skipped; resuming schedules the next current or future occurrence instead of backfilling the paused period.
+
+### UAT-REC-04 — Edit schedule versus one generated entry
+
+- **Priority:** P1
+- **Steps:** Edit a schedule's type, amount, category, note, frequency, first date, and active state; then edit one generated entry from Calendar.
+- **Expected:** Schedule changes apply to future entries only; existing Calendar history stays unchanged; editing a generated entry changes only that entry and leaves the schedule intact.
+
+### UAT-REC-05 — Month-end, persistence, deletion, and export
+
+- **Priority:** P1
+- **Steps:** Create a monthly schedule anchored on the 29th, 30th, or 31st; relaunch; inspect February and the following month; delete the schedule; export data.
+- **Expected:** Short months clamp to their last valid day without permanently drifting the anchor; schedules persist locally; deleting a schedule preserves prior entries; recurring cashflow appears in export data and no deleted schedule returns after relaunch.
+
+### UAT-REC-06 — Preview future occurrences without early FIRE impact
+
+- **Priority:** P0
+- **Steps:** Create a monthly recurring income or expense; move Calendar to each of the next two due months; select the scheduled date; open the projected row.
+- **Expected:** Every future due date has a muted Calendar marker and an “Upcoming · Not in FIRE yet” row; Calendar totals, daily net, and FIRE calculations exclude the projection; selecting the row opens that recurring schedule for editing; no duplicate projection appears after its due transaction is created.
+
+---
+
+## F. Home experience — 5 cases
 
 ### UAT-HOME-01 — Baseline FIRE summary is internally consistent
 
@@ -275,9 +321,15 @@ Allow normal display rounding. Any unexplained cross-screen difference is a defe
 - **Steps:** Compare current included assets with milestone targets; modify an included asset so one milestone changes status; reopen Home.
 - **Expected:** Milestones remain ordered; achieved/current/future states update logically; hidden or archived milestones are not shown.
 
+### UAT-HOME-05 — Convert this month’s cash flow into FIRE time
+
+- **Priority:** P1
+- **Steps:** Record at least one current-month income and expense in the FIRE goal’s base currency; add a larger future entry, archive another entry, and open Home; tap either Money → time row.
+- **Expected:** Home shows the largest executed income and expense categories for the current month with signed amounts and deterministic marginal FIRE-day changes; favorable time removed is green and negative, unfavorable time added is pink and positive; future, archived, and other-currency entries are excluded; tapping a row opens Calendar; the central countdown ring and all existing Home sections remain available.
+
 ---
 
-## F. Dashboard and projections — 6 cases
+## G. Dashboard and projections — 6 cases
 
 ### UAT-DASH-01 — Baseline deterministic FIRE calculation
 
@@ -318,7 +370,7 @@ Allow normal display rounding. Any unexplained cross-screen difference is a defe
 
 ---
 
-## G. Portfolio and assets — 7 cases
+## H. Portfolio and assets — 7 cases
 
 ### UAT-PORT-01 — Portfolio baseline totals and allocation
 
@@ -365,7 +417,7 @@ Allow normal display rounding. Any unexplained cross-screen difference is a defe
 
 ---
 
-## H. FIRE plan, methods, and milestones — 4 cases
+## I. FIRE plan, methods, and milestones — 4 cases
 
 ### UAT-PLAN-01 — Edit the complete FIRE plan
 
@@ -393,7 +445,7 @@ Allow normal display rounding. Any unexplained cross-screen difference is a defe
 
 ---
 
-## I. Settings, resilience, and accessibility — 5 cases
+## J. Settings, resilience, and accessibility — 5 cases
 
 ### UAT-SYS-01 — Theme, language, currency, and haptics preferences
 
@@ -466,6 +518,12 @@ A user configures quotes, encounters a failed endpoint/offline state, retains po
 `UAT-SYS-01 → UAT-LOG-02 → UAT-SYS-03 → UAT-SYS-05`
 
 A user switches language/theme, records income, exports data, and completes the flow with accessible critical controls.
+
+## Journey 7 — Automate regular cashflow
+
+`UAT-REC-01 → UAT-REC-02 → UAT-REC-03 → UAT-REC-04 → UAT-REC-05`
+
+A user creates a regular payday or bill from Log, receives one due entry, pauses safely, edits future behavior independently from history, and retains the schedule across relaunch and export.
 
 ---
 

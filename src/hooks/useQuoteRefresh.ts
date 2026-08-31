@@ -26,14 +26,17 @@ export function useQuoteRefresh() {
       if (network.isConnected === false) {
         throw new Error("You’re offline. Saved prices are still available.");
       }
-      return getPortfolioQuotes(
+      const quotes = await getPortfolioQuotes(
         snapshot.quoteSettings,
         quoteAssets,
         baseCurrency,
         snapshot.quoteCache,
       );
+      if (!saveQuotes(quotes)) {
+        throw new Error("Unable to persist refreshed quotes.");
+      }
+      return quotes;
     },
-    onSuccess: saveQuotes,
   });
   const { isPending, mutate } = refreshQuotes;
   const { enabled, lastRefreshAt, refreshIntervalMinutes } = snapshot.quoteSettings;

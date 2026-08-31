@@ -30,7 +30,7 @@ Both third-party actions are pinned to full commit SHAs. Update those SHAs only 
 
 ## Expo Doctor
 
-Expo Doctor is intentionally excluded from the required workflow for now. It relies on network-delivered compatibility metadata and the repository currently has a separate Expo SDK alignment task. Add it only when the command and metadata behavior can be made stable and version-pinned; it must not replace the four source-quality gates above.
+Expo Doctor is intentionally excluded from the required workflow for now. The SDK 57 dependency set passes all 21 checks locally, but Doctor relies on network-delivered compatibility metadata. Add it only when the command and metadata behavior can be made stable and version-pinned; it must not replace the four source-quality gates above.
 
 ## Branch protection setup
 

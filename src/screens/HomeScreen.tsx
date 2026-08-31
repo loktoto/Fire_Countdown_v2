@@ -1,10 +1,11 @@
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
 
 import { AppHeader } from "../components/AppHeader";
 import { FireProgressRing } from "../components/FireProgressRing";
 import { MilestoneJourney } from "../components/MilestoneJourney";
+import { MoneyTimeCard } from "../components/MoneyTimeCard";
 import { MotionPressable } from "../components/MotionPressable";
 import { ScreenScaffold } from "../components/ScreenScaffold";
 import { StatusBadge } from "../components/StatusBadge";
@@ -26,6 +27,7 @@ export function HomeScreen() {
   const colors = useThemeColors();
   const t = useI18n();
   const vm = useHomeViewModel();
+  const router = useRouter();
   const { fontScale, width } = useWindowDimensions();
   const [assetAmountsHidden, setAssetAmountsHidden] = useState(false);
   const [ringMotionKey, setRingMotionKey] = useState(0);
@@ -132,6 +134,12 @@ export function HomeScreen() {
           </Text>
         </View>
       </View>
+
+      <MoneyTimeCard
+        entries={vm.moneyTimeConversions}
+        onAddEntry={() => router.push("/(tabs)/log")}
+        onOpenCalendar={() => router.push("/(tabs)/calendar")}
+      />
 
       <View
         style={[

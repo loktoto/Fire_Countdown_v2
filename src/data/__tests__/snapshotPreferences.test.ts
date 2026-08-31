@@ -36,6 +36,33 @@ describe("hydrateSnapshotPreferences", () => {
     expect(hydrated.transactions).toEqual(expect.any(Array));
     expect(hydrated.goals.length).toBeGreaterThan(0);
     expect(hydrated.quoteSettings.id).toBe("quote-settings");
+    expect(hydrated.recurringTransactions).toEqual([]);
+  });
+
+  it("migrates and validates recurring cashflow schedules", () => {
+    const validSchedule = {
+      id: "rec-salary",
+      type: "income",
+      amount: 28_000,
+      currency: "HKD",
+      categoryId: "cat-salary",
+      frequency: "monthly",
+      startDate: "2026-08-01",
+      nextDate: "2026-09-01",
+      isActive: true,
+      createdAt: "2026-08-01T00:00:00.000Z",
+      updatedAt: "2026-08-01T00:00:00.000Z",
+    };
+    const hydrated = hydrateSnapshotPreferences({
+      recurringTransactions: [
+        validSchedule,
+        { ...validSchedule, id: "bad-frequency", frequency: "sometimes" },
+        { ...validSchedule, id: "bad-date-order", nextDate: "2026-07-01" },
+        { ...validSchedule, id: "bad-calendar-date", nextDate: "2026-09-31" },
+      ] as never,
+    });
+
+    expect(hydrated.recurringTransactions).toEqual([validSchedule]);
   });
 
   it("drops malformed entries while preserving valid user entries", () => {

@@ -25,7 +25,7 @@ import Animated, {
 import { pressSpring } from "../design/motion";
 import { tokens } from "../design/tokens";
 import { useThemeColors } from "../design/theme";
-import { useFireStore } from "../data/fireStore";
+import { useStoredHapticsEnabled } from "../providers/hapticsPreference";
 import { useReducedMotion } from "../hooks/useReducedMotion";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -65,7 +65,7 @@ export function MotionPressable({
 }) {
   const reducedMotion = useReducedMotion();
   const colors = useThemeColors();
-  const { snapshot } = useFireStore();
+  const storedHaptics = useStoredHapticsEnabled();
   const { width: windowWidth } = useWindowDimensions();
   const pressableRef = useRef<View>(null);
   const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -135,7 +135,7 @@ export function MotionPressable({
   }
 
   async function runHaptic() {
-    if (!haptic || !snapshot.hapticsEnabled) {
+    if (!haptic || !(storedHaptics ?? true)) {
       return;
     }
 

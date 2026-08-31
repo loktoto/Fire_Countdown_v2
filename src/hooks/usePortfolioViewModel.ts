@@ -1,7 +1,8 @@
 import { useMemo } from "react";
 
 import { useFireStore } from "../data/fireStore";
-import { resolveAssetValue, type AssetValueResolution } from "../engine/fireEngine";
+import { resolveAssetValueFromMap, type AssetValueResolution } from "../engine/fireEngine";
+import { latestUsableQuotesByAsset } from "../engine/fireEngine";
 import { deriveFireView, mainGoal } from "../engine/selectors";
 import type { Asset, AssetQuoteCache } from "../features/types";
 import { todayIso } from "../utils/format";
@@ -28,25 +29,6 @@ export type PortfolioAssetRow = {
 
 function normalizeCurrency(value?: string | null) {
   return (value ?? "").trim().toUpperCase();
-}
-
-function latestQuoteForAsset(assetId: string, quotes: AssetQuoteCache[]): AssetQuoteCache | null {
-  let latest: AssetQuoteCache | null = null;
-  let latestTime = Number.NEGATIVE_INFINITY;
-
-  for (const quote of quotes) {
-    if (quote.assetId !== assetId) {
-      continue;
-    }
-
-    const receivedAt = Date.parse(quote.receivedAt);
-    if (Number.isFinite(receivedAt) && receivedAt > latestTime) {
-      latest = quote;
-      latestTime = receivedAt;
-    }
-  }
-
-  return latest;
 }
 
 function quoteFreshness(
@@ -92,13 +74,15 @@ export function shapePortfolioAssetRows(
   quotes: AssetQuoteCache[],
   baseCurrency?: string,
 ): PortfolioAssetRow[] {
+  // Build the latest-quote lookup once instead of rescanning the quote cache
+  // for every asset.
+  const quotesByAsset = latestUsableQuotesByAsset(quotes);
+  const base = baseCurrency ? baseCurrency.trim().toUpperCase() : "";
   return assets.map((asset) => {
-    const resolution = resolveAssetValue(asset, quotes, baseCurrency);
-    const latestQuote = latestQuoteForAsset(asset.id, quotes);
+    const latestQuote = quotesByAsset.get(asset.id) ?? null;
+    const resolution = resolveAssetValueFromMap(asset, quotesByAsset, baseCurrency);
     const currencyState =
-      baseCurrency && normalizeCurrency(resolution.currency) !== normalizeCurrency(baseCurrency)
-        ? "unsupported"
-        : "supported";
+      !base || normalizeCurrency(resolution.currency) === base ? "supported" : "unsupported";
 
     return {
       asset,
@@ -142,10 +126,17 @@ export function usePortfolioViewModel() {
     [allAssetRows],
   );
   const assets = useMemo(() => assetRows.map((row) => row.asset), [assetRows]);
-  const rawMilestones = [...snapshot.milestones]
-    .filter((milestone) => !milestone.archivedAt && (!goal || milestone.goalId === goal.id))
-    .sort((a, b) => a.order - b.order);
-  const scenarios = snapshot.scenarios.filter((scenario) => !scenario.archivedAt);
+  const rawMilestones = useMemo(
+    () =>
+      [...snapshot.milestones]
+        .filter((milestone) => !milestone.archivedAt && (!goal || milestone.goalId === goal.id))
+        .sort((a, b) => a.order - b.order),
+    [snapshot.milestones, goal],
+  );
+  const scenarios = useMemo(
+    () => snapshot.scenarios.filter((scenario) => !scenario.archivedAt),
+    [snapshot.scenarios],
+  );
 
   const allocation = useMemo(() => {
     const groups = new Map<string, number>();

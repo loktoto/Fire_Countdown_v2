@@ -95,8 +95,8 @@ export function CategoryEditorSheet({
   category: Category | null;
   type: TransactionType;
   onClose: () => void;
-  onSave: (input: Pick<Category, "name" | "icon" | "color">, categoryId?: string) => void;
-  onDelete?: (categoryId: string) => void;
+  onSave: (input: Pick<Category, "name" | "icon" | "color">, categoryId?: string) => boolean;
+  onDelete?: (categoryId: string) => boolean;
 }) {
   const colors = useThemeColors();
   const reducedMotion = useReducedMotion();
@@ -155,8 +155,8 @@ function CategoryEditorContent({
   category: Category | null;
   type: TransactionType;
   onClose: () => void;
-  onSave: (input: Pick<Category, "name" | "icon" | "color">, categoryId?: string) => void;
-  onDelete?: (categoryId: string) => void;
+  onSave: (input: Pick<Category, "name" | "icon" | "color">, categoryId?: string) => boolean;
+  onDelete?: (categoryId: string) => boolean;
 }) {
   const colors = useThemeColors();
   const t = useI18n();
@@ -191,7 +191,7 @@ function CategoryEditorContent({
     if (!canSave) {
       return;
     }
-    onSave(
+    const persisted = onSave(
       {
         name: name.trim(),
         icon: decodedIcon,
@@ -199,7 +199,9 @@ function CategoryEditorContent({
       },
       category?.id,
     );
-    onClose();
+    if (persisted) {
+      onClose();
+    }
   }
 
   function deleteCategory() {
@@ -212,8 +214,9 @@ function CategoryEditorContent({
       return;
     }
 
-    onDelete(category.id);
-    onClose();
+    if (onDelete(category.id)) {
+      onClose();
+    }
   }
 
   return (
