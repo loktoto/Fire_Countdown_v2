@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 
 import { monthlySummary } from "../engine/fireEngine";
+import { effectiveProjectionAssumptions } from "../engine/projectionAssumptions";
 import { deriveFireView, mainGoal, monthlyCategoryLeaders } from "../engine/selectors";
 import { useFireStore } from "../data/fireStore";
 import { todayIso } from "../utils/format";
@@ -47,23 +48,7 @@ export function useDashboardViewModel() {
   const view = base ?? deriveFireView(snapshot, today);
   const effectiveAssumptions = useMemo(
     () => ({
-      expectedReturn: Math.max(
-        -0.95,
-        view.weightedReturn + (scenario?.expectedReturnAdjustment ?? 0),
-      ),
-      inflationRate: view.goal.inflationRate + (scenario?.inflationAdjustment ?? 0),
-      monthlySaving: Math.max(
-        0,
-        view.goal.monthlySaving + (scenario?.monthlySavingAdjustment ?? 0),
-      ),
-      withdrawalRate: Math.max(
-        0.001,
-        view.goal.withdrawalRate + (scenario?.withdrawalRateAdjustment ?? 0),
-      ),
-      targetMonthlySpending: Math.max(
-        0,
-        view.goal.targetMonthlySpending + (scenario?.targetSpendingAdjustment ?? 0),
-      ),
+      ...effectiveProjectionAssumptions(view.goal, scenario, view.weightedReturn),
       targetAmount: view.target,
     }),
     [scenario, view],

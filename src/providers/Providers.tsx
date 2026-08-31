@@ -20,6 +20,7 @@ import { FireStoreProvider, useFireStore } from "../data/fireStore";
 import { HapticsPreferenceProvider } from "./hapticsPreference";
 import { LoadingScreen, systemLocale } from "./LoadingScreen";
 import { PersistenceErrorNotice } from "./PersistenceErrorNotice";
+import { SnapshotRecoveryNotice } from "./SnapshotRecoveryNotice";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -65,6 +66,7 @@ export function Providers({ children }: { children: ReactNode }) {
             <HapticsPreferenceBridge>
               <TimeLensProvider>{children}</TimeLensProvider>
               <PersistenceErrorNotice />
+              <SnapshotRecoveryNotice />
             </HapticsPreferenceBridge>
           </FireStoreProvider>
         </QueryClientProvider>

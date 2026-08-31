@@ -11,6 +11,7 @@ import {
   valueAssets,
   weightedExpectedReturn,
 } from "./fireEngine";
+import { effectiveProjectionAssumptions } from "./projectionAssumptions";
 import type { FireSnapshot, ProjectionScenario, TransactionType } from "../features/types";
 import { addIsoDays, todayIso } from "../utils/format";
 
@@ -235,17 +236,15 @@ export function scenarioWhatIfInputs(
     throw new Error("Missing main FIRE goal");
   }
 
+  const assumptions = effectiveProjectionAssumptions(
+    goal,
+    scenario,
+    weightedExpectedReturn(snapshot.assets, snapshot.quoteCache, goal.baseCurrency),
+  );
   return {
-    monthlySaving: Math.max(0, goal.monthlySaving + (scenario?.monthlySavingAdjustment ?? 0)),
-    expectedReturn: Math.max(
-      -0.95,
-      weightedExpectedReturn(snapshot.assets, snapshot.quoteCache, goal.baseCurrency) +
-        (scenario?.expectedReturnAdjustment ?? 0),
-    ),
-    targetMonthlySpending: Math.max(
-      0,
-      goal.targetMonthlySpending + (scenario?.targetSpendingAdjustment ?? 0),
-    ),
+    monthlySaving: assumptions.monthlySaving,
+    expectedReturn: assumptions.expectedReturn,
+    targetMonthlySpending: assumptions.targetMonthlySpending,
   };
 }
 

@@ -48,6 +48,30 @@ export const en = {
       "Couldn't save this change. Your draft is still open. Free device storage and try again.",
     dismissPersistenceError: "Dismiss storage error",
   },
+  recovery: {
+    title: "Stored data needs recovery",
+    message:
+      "Fire Countdown could not safely load the stored snapshot. It may be damaged or from an unsupported app version, so it has not been silently overwritten.",
+    version: (version: number) => `Stored schema version: ${version}`,
+    quarantined:
+      "A local recovery copy is ready. Export it to a trusted location before resetting if you may need support or recovery.",
+    exported:
+      "The original payload was sent to the share sheet. Keep it somewhere you trust before resetting.",
+    exportFirst:
+      "Export the original payload before resetting. It contains sensitive financial data.",
+    exportAction: "Export original data",
+    exportTitle: "Fire Countdown recovery data",
+    exportFailedTitle: "Recovery export failed",
+    exportFailedMessage:
+      "The original data could not be shared. It remains unchanged on this device.",
+    resetAction: "Reset to demo data",
+    resetTitle: "Reset stored data?",
+    resetMessage:
+      "This replaces the unreadable local snapshot with demo data. Export the original data first if you may need it later.",
+    resetFailedTitle: "Reset blocked",
+    resetFailedMessage:
+      "Fire Countdown could not preserve or replace the original data safely. Free device storage and try exporting again.",
+  },
   timeLens: {
     kicker: "TIME LENS",
     money: "Money",

@@ -15,7 +15,10 @@ import { initializeDatabase } from "./database";
 import { mergeQuoteCache } from "./quoteCache";
 import { seedSnapshot } from "./seed";
 import {
-  readSnapshotFromStorage,
+  clearSnapshotQuarantine,
+  quarantineRawSnapshot,
+  readSnapshotResultFromStorage,
+  type SnapshotRecovery,
   type SnapshotStorage,
   writeSnapshotToStorage,
 } from "./snapshotStorage";
@@ -38,10 +41,17 @@ import type {
   Transaction,
 } from "../features/types";
 
+type ActiveSnapshotRecovery = SnapshotRecovery & {
+  occurredAt: string;
+  exportedAt: string | null;
+};
+
 type FireStoreContextValue = {
   snapshot: FireSnapshot;
+  snapshotRecovery: ActiveSnapshotRecovery | null;
   persistenceError: { occurredAt: string } | null;
   dismissPersistenceError: () => void;
+  markSnapshotRecoveryExported: () => void;
   resetSeed: () => boolean;
   createTransaction: (
     input: Omit<Transaction, "id" | "createdAt" | "updatedAt">,
@@ -98,18 +108,28 @@ function todayIso() {
 }
 
 function readMaterializedSnapshot(storage: SnapshotStorage) {
-  const stored = readSnapshotFromStorage(storage);
+  const result = readSnapshotResultFromStorage(storage);
+  if (result.recovery) {
+    return {
+      snapshot: result.snapshot,
+      snapshotRecovery: { ...result.recovery, occurredAt: nowIso(), exportedAt: null },
+      persistenceError: null,
+    };
+  }
+
+  const stored = result.snapshot;
   const materialized = materializeDueRecurringTransactions(stored, todayIso(), nowIso());
   if (materialized === stored) {
-    return { snapshot: stored, persistenceError: null };
+    return { snapshot: stored, snapshotRecovery: null, persistenceError: null };
   }
 
   if (writeSnapshotToStorage(storage, materialized)) {
-    return { snapshot: materialized, persistenceError: null };
+    return { snapshot: materialized, snapshotRecovery: null, persistenceError: null };
   }
 
   return {
     snapshot: stored,
+    snapshotRecovery: null,
     persistenceError: { occurredAt: nowIso() },
   };
 }
@@ -124,6 +144,10 @@ export function FireStoreProvider({
   const [initialState] = useState(() => readMaterializedSnapshot(storage));
   const [snapshot, setSnapshot] = useState<FireSnapshot>(initialState.snapshot);
   const snapshotRef = useRef(initialState.snapshot);
+  const [snapshotRecovery, setSnapshotRecovery] = useState<ActiveSnapshotRecovery | null>(
+    initialState.snapshotRecovery,
+  );
+  const snapshotRecoveryRef = useRef<ActiveSnapshotRecovery | null>(initialState.snapshotRecovery);
   const [persistenceError, setPersistenceError] = useState<{ occurredAt: string } | null>(
     initialState.persistenceError,
   );
@@ -136,6 +160,10 @@ export function FireStoreProvider({
 
   const commit = useCallback(
     (updater: (current: FireSnapshot) => FireSnapshot) => {
+      if (snapshotRecoveryRef.current) {
+        return false;
+      }
+
       const current = snapshotRef.current;
       const updated = updater(current);
       const next = materializeDueRecurringTransactions(updated, todayIso(), nowIso());
@@ -167,16 +195,44 @@ export function FireStoreProvider({
   const value = useMemo<FireStoreContextValue>(
     () => ({
       snapshot,
+      snapshotRecovery,
       persistenceError,
       dismissPersistenceError: () => setPersistenceError(null),
+      markSnapshotRecoveryExported: () => {
+        const recovery = snapshotRecoveryRef.current;
+        if (!recovery) {
+          return;
+        }
+        const next = { ...recovery, exportedAt: nowIso() };
+        snapshotRecoveryRef.current = next;
+        setSnapshotRecovery(next);
+      },
       resetSeed: () => {
+        const recovery = snapshotRecoveryRef.current;
+        if (recovery && recovery.rawPayload === null) {
+          setPersistenceError({ occurredAt: nowIso() });
+          return false;
+        }
+        if (
+          recovery &&
+          recovery.rawPayload !== null &&
+          !recovery.quarantinePersisted &&
+          !recovery.exportedAt &&
+          !quarantineRawSnapshot(storage, recovery.rawPayload)
+        ) {
+          setPersistenceError({ occurredAt: nowIso() });
+          return false;
+        }
         if (!writeSnapshotToStorage(storage, seedSnapshot)) {
           setPersistenceError({ occurredAt: nowIso() });
           return false;
         }
         snapshotRef.current = seedSnapshot;
         setSnapshot(seedSnapshot);
+        snapshotRecoveryRef.current = null;
+        setSnapshotRecovery(null);
         setPersistenceError(null);
+        clearSnapshotQuarantine(storage);
         return true;
       },
       createTransaction: (input, recurrence) =>
@@ -521,7 +577,7 @@ export function FireStoreProvider({
           language,
         })),
     }),
-    [commit, persistenceError, snapshot, storage],
+    [commit, persistenceError, snapshot, snapshotRecovery, storage],
   );
 
   return <FireStoreContext.Provider value={value}>{children}</FireStoreContext.Provider>;

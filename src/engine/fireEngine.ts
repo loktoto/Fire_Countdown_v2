@@ -7,6 +7,7 @@ import type {
   Transaction,
 } from "../features/types";
 import { isUsableQuoteStatus } from "../features/quoteStatus";
+import { effectiveProjectionAssumptions } from "./projectionAssumptions";
 
 export type AssetValueResolution = {
   assetId: string;
@@ -352,46 +353,22 @@ export function transactionCashflowNet(
 }
 
 export function fireTarget(goal: FireGoal, scenario?: ProjectionScenario) {
-  const spending = Math.max(
-    0,
-    finiteNumber(goal.targetMonthlySpending) + finiteNumber(scenario?.targetSpendingAdjustment),
-  );
-  const withdrawalRate =
-    finiteNumber(goal.withdrawalRate) + finiteNumber(scenario?.withdrawalRateAdjustment);
-  return (spending * 12) / Math.max(withdrawalRate, 0.001);
+  const assumptions = effectiveProjectionAssumptions(goal, scenario);
+  return (assumptions.targetMonthlySpending * 12) / assumptions.withdrawalRate;
 }
 
 function createProjectionRuntime(input: ProjectionInput): ProjectionRuntime {
   const months = input.months ?? 600;
   const startDate = input.startDate ?? new Date().toISOString().slice(0, 10);
   const scenario = input.scenario;
-  const annualReturn = Math.min(
-    10,
-    Math.max(
-      -0.95,
-      (input.weightedAnnualReturn ??
-        weightedExpectedReturn(input.assets, input.quotes, input.goal.baseCurrency)) +
-        finiteNumber(scenario?.expectedReturnAdjustment),
-    ),
+  const assumptions = effectiveProjectionAssumptions(
+    input.goal,
+    scenario,
+    input.weightedAnnualReturn ??
+      weightedExpectedReturn(input.assets, input.quotes, input.goal.baseCurrency),
   );
-  const monthlyExpectedReturn = Math.pow(1 + annualReturn, 1 / 12) - 1;
-  const annualInflation = Math.min(
-    10,
-    Math.max(
-      -0.95,
-      finiteNumber(input.goal.inflationRate) + finiteNumber(scenario?.inflationAdjustment),
-    ),
-  );
-  const monthlyInflationRate = Math.pow(1 + annualInflation, 1 / 12) - 1;
-  const monthlySaving = Math.max(
-    0,
-    finiteNumber(input.goal.monthlySaving) + finiteNumber(scenario?.monthlySavingAdjustment),
-  );
-  const monthlyRetirementSpending = Math.max(
-    0,
-    finiteNumber(input.goal.targetMonthlySpending) +
-      finiteNumber(scenario?.targetSpendingAdjustment),
-  );
+  const monthlyExpectedReturn = Math.pow(1 + assumptions.expectedReturn, 1 / 12) - 1;
+  const monthlyInflationRate = Math.pow(1 + assumptions.inflationRate, 1 / 12) - 1;
   const baseTarget = fireTarget(input.goal, scenario);
   const projectedAssets =
     includedFireAssets(input.assets, input.quotes, input.goal.baseCurrency) +
@@ -402,8 +379,8 @@ function createProjectionRuntime(input: ProjectionInput): ProjectionRuntime {
     startDate,
     monthlyExpectedReturn,
     monthlyInflationRate,
-    monthlySaving,
-    monthlyRetirementSpending,
+    monthlySaving: assumptions.monthlySaving,
+    monthlyRetirementSpending: assumptions.targetMonthlySpending,
     baseTarget,
     projectedAssets,
     hasReachedFire: projectedAssets >= baseTarget,

@@ -16,6 +16,7 @@ import Animated from "react-native-reanimated";
 import { sheetBackdropEnter, sheetBackdropExit, sheetEnter, sheetExit } from "../../design/motion";
 import { tokens } from "../../design/tokens";
 import { typography, useThemeColors } from "../../design/theme";
+import { effectiveProjectionAssumptions } from "../../engine/projectionAssumptions";
 import type { FireGoal, Milestone, ProjectionScenario } from "../../features/types";
 import { useReducedMotion } from "../../hooks/useReducedMotion";
 import { MotionPressable } from "../MotionPressable";
@@ -86,19 +87,7 @@ export function scenarioAssumptions(
   scenario: ProjectionScenario,
   baseExpectedReturn = 0,
 ) {
-  const targetMonthlySpending = Math.max(
-    0,
-    (goal?.targetMonthlySpending ?? 0) + scenario.targetSpendingAdjustment,
-  );
-  const monthlySaving = Math.max(0, (goal?.monthlySaving ?? 0) + scenario.monthlySavingAdjustment);
-  const withdrawalRate = Math.max(
-    0.001,
-    (goal?.withdrawalRate ?? 0) + (scenario.withdrawalRateAdjustment ?? 0),
-  );
-  const inflationRate = (goal?.inflationRate ?? 0) + scenario.inflationAdjustment;
-  const expectedReturn = Math.max(-0.95, baseExpectedReturn + scenario.expectedReturnAdjustment);
-
-  return { expectedReturn, inflationRate, monthlySaving, targetMonthlySpending, withdrawalRate };
+  return effectiveProjectionAssumptions(goal, scenario, baseExpectedReturn);
 }
 
 export function BaseSheet({

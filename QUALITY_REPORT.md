@@ -1,110 +1,134 @@
 # Fire Countdown v2 project overview
 
-**Review date:** 2026-08-28
+**Review date:** 2026-08-29 to 2026-08-30
 
 **Branch reviewed:** `codex/calendar-activity-polish`
 
-**Scope:** Repository-wide product-contract, correctness, persistence, dependency, test, accessibility, and release-readiness review.
+**Scope:** Repository-wide product-contract, correctness, persistence, dependency, test, accessibility, security, and release-readiness review.
 
-**Decision:** **Source integration GO. Public release NO-GO until the P0/P1 gates below are closed and a current production-candidate UAT pass is executed.**
+**Decision:** **Source integration GO. Public release NO-GO until current device UAT, performance evidence, and the unresolved product decisions below are closed.**
 
 ## Executive summary
 
-The current source preserves the locked information architecture (`Home | Calendar | + | Dashboard | Portfolio`), keeps `+` as the Log/default route, and keeps Settings outside the bottom tabs. FIRE outputs remain deterministic TypeScript calculations. The dependency set is aligned to Expo SDK 57, Expo Doctor passes all 21 checks, and all current source-quality gates pass.
+The current source preserves the locked information architecture (`Home | Calendar | + | Dashboard | Portfolio`), keeps `+` as the Log/default route, and keeps Settings outside the bottom tabs. FIRE outputs remain deterministic TypeScript calculations. The project is aligned to Expo SDK 57, Expo Doctor passes all 21 checks, and the complete automated suite passes.
 
-This pass hardened the most immediate false-success risks. Store mutations now report persistence failure to callers; financial editors keep drafts open when a write fails; a global accessible notice explains the failure; quote refresh cannot report success before its cache is persisted; and unusable failed/unsupported quotes can no longer displace the last usable quote or blank Portfolio valuation. The visible Dashboard label is also aligned with the locked product contract.
+The highest-risk source gaps found in this review are now hardened. Persistence failures retain the last saved state and keep editor drafts open; failed/unsupported quotes cannot displace a usable cached or manual valuation; and the visible Dashboard label matches the locked product contract. Persisted snapshots now use an explicit schema-`1` envelope, migrate supported legacy data only after a complete write, retain malformed or unsupported raw data, block mutations during recovery, and present localized export/reset actions. Empty stored values are treated as corruption rather than a first run.
 
-The project is not yet a public release candidate. A corrupt or future snapshot still falls back silently to demo seed data, transaction and recurring-entry currency cannot be edited after creation, milestone return overrides are stored but not applied to milestone ETA, and current-source device UAT/performance evidence is unavailable. These are release gates, not implied completions.
+Projection assumptions now use one finite, deterministic normalization contract across the engine, Dashboard, What-if flow, and FIRE-plan sheets. Expo/Metro patch alignment removed the four high-severity `image-size` audit findings without a forced downgrade. Eleven moderate transitive `uuid` findings remain through Expo's `xcode` tooling chain; npm's forced proposal would install the incompatible `expo-sharing@14.0.8` and was not applied.
+
+This is not a public release candidate. Current-source Android warm-flow UAT is only partial, the forced cold relaunch did not render past the Expo Go host spinner on the resource-saturated emulator, iOS UAT has not been run, and performance is unverified on a healthy target. Transaction/recurring currency editability still needs deterministic FX semantics, milestone return-override behavior is unresolved, and the current CSV/TSV export is not a lossless backup.
 
 ## Current scorecard
 
-| Area                            | Status                                      | Evidence and constraint                                                                                                                                                                                                             |
-| ------------------------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Product contract and navigation | Pass                                        | Navigation contract test protects the five locked tabs, Log landing route, Settings exclusion, and visible Dashboard label.                                                                                                         |
-| Deterministic FIRE engine       | Pass with product gap                       | Engine suite passes and usable-quote fallback is deterministic. Milestone return-override semantics remain unresolved.                                                                                                              |
-| Persistence integrity           | Improved; release gate remains              | Failed writes retain the last persisted snapshot, editors retain drafts, and an app-level alert is shown. Corrupt-snapshot recovery is still silent and non-lossless.                                                               |
-| Portfolio resilience            | Pass                                        | Failed/unsupported responses no longer outrank a usable cached quote; manual fallback remains available.                                                                                                                            |
-| Dependency alignment            | Pass                                        | Expo Doctor 21/21 and `npm ls --depth=0` pass on the aligned SDK 57 dependency set.                                                                                                                                                 |
-| Automated tests                 | Pass                                        | 41 suites / 227 tests, including persistence-failure injection and quote-cache regressions.                                                                                                                                         |
-| Coverage                        | Measured, below release ambition            | 75.18% lines overall; 91.69% engine lines; store and UI callback paths are the main gaps.                                                                                                                                           |
-| Accessibility                   | Source-level improvements; manual gate open | Persistence notice uses alert/live-region semantics and drafts remain recoverable. Screen-reader and large-text device passes are not current.                                                                                      |
-| Performance                     | Unverified on device                        | No speculative performance claims are made without a healthy device profiler run.                                                                                                                                                   |
-| Runtime UAT                     | Blocked                                     | `emulator-5554` lacked Android activity/package/window services and became offline after one reboot. No current-source app pass was recorded.                                                                                       |
-| Supply chain                    | Conditional risk                            | `npm audit --omit=dev` reports 15 transitive findings: 4 high in Metro's `image-size` chain and 11 moderate in Expo's `xcode -> uuid` chain. npm's complete proposal is a breaking forced downgrade to Expo 46 and was not applied. |
+| Area                            | Status                                | Evidence and constraint                                                                                                                                                                     |
+| ------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Product contract and navigation | Pass                                  | Contract tests protect the five locked tabs, Log landing route, Settings exclusion, and visible Dashboard label.                                                                            |
+| Deterministic FIRE engine       | Pass with product gap                 | Shared assumption bounds prevent display/engine drift and non-finite output. Milestone return-override semantics remain unresolved.                                                         |
+| Persistence integrity           | Source pass; device UAT open          | Versioned migration, raw-payload retention, blocking recovery, write-before-state mutations, reset gating, and failing-storage regressions are present. Recovery UI is not device-verified. |
+| Portfolio resilience            | Pass                                  | Failed/unsupported responses do not outrank a usable cached quote; manual fallback remains available.                                                                                       |
+| Dependency alignment            | Pass with accepted upstream risk      | Expo Doctor 21/21 passes. Metro is aligned where supported; 11 moderate transitive `uuid` audit findings remain.                                                                            |
+| Automated tests                 | Pass                                  | 42 suites / 243 tests.                                                                                                                                                                      |
+| Coverage                        | Measured, below release ambition      | 79.29% lines overall; 91.83% engine lines; 86.48% data lines. UI interaction and platform branches remain the main gaps.                                                                    |
+| Security                        | Pass at reviewed checkpoints          | Baseline Standard scan and complete working-tree diff review each returned zero findings. The final immutable diff scan remains a mandatory pre-commit gate.                                |
+| Accessibility                   | Source improvements; manual gate open | Persistence/recovery notices use blocking or alert semantics. Screen-reader and large-text device passes are not current.                                                                   |
+| Performance                     | Unverified on a healthy device        | The 4 GB emulator exhausted nearly all swap during a cold Expo Go launch, so its timings are not accepted as app performance evidence.                                                      |
+| Runtime UAT                     | Partial; release gate open            | Android warm launch, Home, Calendar, Log create, and Calendar edit-save passed. Cold relaunch, remaining tabs, recovery UI, accessibility, and iOS remain unverified.                       |
 
 ## Work completed in this pass
 
-### Persistence and user trust
+### Recoverable snapshot lifecycle
 
-- Added a safe-area-aware, dismissible, localized persistence error notice with assertive accessibility semantics.
-- Kept transaction, recurring, asset, category, FIRE-plan, milestone, scenario, currency, language, companion, and destination drafts open unless their write succeeds.
-- Prevented Calendar from moving to an edited transaction's date when the edit was not persisted.
-- Prevented reset success announcements, quote-cache success, and credential success from appearing after a failed snapshot write.
-- Added injected-storage-failure tests and editor close/retain regression tests.
+- Added stable schema-`1` snapshot envelopes while retaining the existing logical storage key.
+- Validates collections and required preferences before hydration can silently filter or replace rows.
+- Migrates valid unversioned/schema-`0` data and replaces the main key only after a successful complete write.
+- Distinguishes first run, malformed JSON, partial corruption, future/unsupported versions, storage unavailability, and migration-write failure.
+- Retains the exact original at the main key, attempts a second local quarantine copy, and exposes only non-value diagnostic codes.
+- Blocks every financial mutation during recovery and prevents storage-unavailable recovery from resetting data.
+- Adds a localized blocking recovery surface with sensitive JSON export and destructive reset confirmation.
+- Treats an empty persisted string as corruption, preserves it, and permits reset only after safe quarantine conditions are satisfied.
+- Updates `docs/PRIVACY_DATA_LIFECYCLE.md` with storage, quarantine, export, reset, cache, and deletion boundaries.
 
-### Quote correctness and Portfolio resilience
+### Persistence and calculation correctness
 
-- Centralized usable quote statuses (`ok`, `delayed`, `stale`, `manual`).
-- Made usable cached quotes outrank newer `failed` or `unsupported` responses.
-- Filtered unusable quotes out of engine and Portfolio valuation selection.
-- Preserved manual valuation when no usable quote exists.
-- Added cache, engine, and refresh-persistence regressions.
+- Added failing-storage and persisted/in-memory consistency tests across transaction, recurring, category, asset, milestone, scenario, goal, quote, and preference actions.
+- Verifies due recurring materialization when the app returns active.
+- Centralized projection assumption normalization for return, inflation, withdrawal, saving, and spending inputs.
+- Repairs direct non-finite values and addition overflow so the shared assumption contract never emits `NaN` or `Infinity`.
+- Keeps Dashboard, What-if, sheet presentation, target calculation, and projection runtime on the same bounds.
 
-### Contract, dependencies, and maintainability
+### Dependencies and security
 
-- Restored the visible `Dashboard` / `儀表板` label to the locked IA contract.
-- Aligned Expo SDK 57 runtime and test packages without `--force` or legacy peer-dependency bypasses.
-- Removed the deprecated quote query client in favor of the active bridge/free-market modules already represented by current tests.
-- Split the FIRE plan sheets and added the current Money Time / What-if presentation modules already present in the working scope.
-- Applied the repository formatter so the committed source passes the same check used by CI.
+- Updated Expo to `~57.0.18`, Expo Constants to `~57.0.16`, and Expo Font to `~57.0.2`.
+- Aligned the vulnerable Metro path to `0.84.5` through narrow package overrides and verified the installed tree.
+- Removed the four high-severity `image-size` findings; retained 11 moderate upstream `uuid` findings rather than applying npm's breaking `expo-sharing@14.0.8` proposal.
+- Codex Security Standard scan `69623e6c-c6de-4c44-a780-ea353b4eec8b` completed with full coverage and zero findings at base commit `321f6b5`.
+- Codex Security working-tree diff scan `d72fbc8d-100e-409c-8202-dcabfcf22b8c` reviewed all 16 changed source items with complete coverage and zero findings before the final two quality edge-case refinements.
+- No secret, quote token, analytics destination, automatic recovery upload, native build, or EAS path was added.
+
+### Runtime UAT executed
+
+- Installed the SDK-57-compatible Expo Go 57.0.9 on `emulator-5554`; this was a host-app update, not a native project rebuild.
+- Loaded the current Android bundle successfully and confirmed the locked `Home | Calendar | + | Dashboard | Portfolio` navigation surface, with Settings outside the tabs.
+- Opened Calendar and Log, created a one-time Food expense for HKD 123 dated 2026-08-29, and verified Calendar totals and history.
+- Reopened the transaction editor, changed the amount to HKD 456, saved it, and verified both the summary and history row updated to HKD 456.
+- Attempted a forced Expo Go stop/relaunch to verify persistence. Metro completed a 2,254-module Android bundle and React Native logged `Running "main"`, but the host remained on its spinner. The emulator had 750,976 KiB of 751,592 KiB swap in use and Expo Go consumed roughly 55–87% CPU during the attempt. This is recorded as a blocked cold-launch/persistence check, not a pass or an app performance result.
+- No fatal JavaScript exception was observed in the successful warm flow. The blocked cold attempt emitted Expo Go/native-host soft exceptions involving keyboard-controller UI-manager initialization and its headless app loader; attribution to project source was not established.
+- Dashboard, Portfolio quote fallback, recovery export/reset, offline behavior, screen reader, large text, reduced motion, and iOS were not falsely inferred from the partial run.
 
 ## Verification matrix
 
-| Check                                              | Result                                                    |
-| -------------------------------------------------- | --------------------------------------------------------- |
-| `npm run typecheck`                                | Pass                                                      |
-| `npm run lint`                                     | Pass                                                      |
-| `npm run format:check`                             | Pass                                                      |
-| `npm test -- --runInBand --watch=false`            | Pass — 41 suites, 227 tests                               |
-| `npm test -- --runInBand --watch=false --coverage` | Pass — 75.18% lines overall, 91.69% engine lines          |
-| `npx expo-doctor`                                  | Pass — 21/21                                              |
-| `npm ls --depth=0`                                 | Pass                                                      |
-| `git diff --check`                                 | Pass                                                      |
-| `npm audit --omit=dev --audit-level=moderate`      | Conditional fail — 15 upstream/transitive findings remain |
-| Android current-source UAT                         | Blocked by offline/unhealthy emulator; not executed       |
-| Native/EAS/store/production build                  | Not run — prohibited by repository instructions           |
+| Check                                              | Result                                                                                                                        |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Targeted recovery/persistence/projection tests     | Pass — 3 suites, 24 tests                                                                                                     |
+| `npm run typecheck`                                | Pass                                                                                                                          |
+| `npm run lint`                                     | Pass                                                                                                                          |
+| `npm run format:check`                             | Pass                                                                                                                          |
+| `npm test -- --runInBand --watch=false --coverage` | Pass — 42 suites, 243 tests; 79.29% overall, 91.83% engine, 86.48% data lines                                                 |
+| `npx expo-doctor`                                  | Pass — 21/21                                                                                                                  |
+| `npm ls --depth=0`                                 | Pass                                                                                                                          |
+| `npm run validate:web`                             | Pass — 1,639 modules; 3.4 MB entry bundle and 139 KB worker bundle                                                            |
+| `git diff --check`                                 | Pass                                                                                                                          |
+| `npm audit --omit=dev --audit-level=moderate`      | Conditional fail — 11 moderate upstream/transitive `uuid` findings; incompatible `expo-sharing@14.0.8` proposal rejected      |
+| Codex Security                                     | Pass — Standard and diff checkpoints have complete coverage and zero findings; final immutable rescan required before commit  |
+| Android/iOS current-source UAT                     | Android partial: warm Home/Calendar/Log create/edit-save pass; cold relaunch and remaining surfaces blocked; iOS not executed |
+| Native/EAS/store/production build                  | Not run — prohibited by repository instructions                                                                               |
 
 ## Release gates and prioritized backlog
 
 ### P0 — must close before calling the app release-ready
 
-1. **Loss-aware snapshot recovery ([issue #6](https://github.com/loktoto/Fire_Countdown_v2/issues/6)).** Replace silent fallback with schema versioning, raw-payload quarantine/recovery, a localized user decision, and tests proving the original payload cannot be overwritten accidentally.
-2. **Current production-candidate UAT ([issue #28](https://github.com/loktoto/Fire_Countdown_v2/issues/28)).** Run cold launch, persistence/relaunch, all five tabs, Log create, Calendar edit/move/archive, Portfolio fallback, Settings/export/reset, offline behavior, screen reader, large text, and reduced motion on healthy Android and iOS targets.
-3. **Persistence mutation contract completion ([issue #2](https://github.com/loktoto/Fire_Countdown_v2/issues/2)).** The main false-success surfaces are now covered, but every remaining mutation caller should be audited and failure-injected before closing the issue.
+1. **Current production-candidate UAT ([issue #28](https://github.com/loktoto/Fire_Countdown_v2/issues/28)).** On healthy Android and iOS targets, run cold launch, migration/recovery/export/reset, persistence/relaunch, all five tabs, Log create, Calendar edit/move/archive, Portfolio fallback, offline behavior, screen reader, large text, and reduced motion.
+2. **On-device performance ([issue #32](https://github.com/loktoto/Fire_Countdown_v2/issues/32)).** Capture launch, navigation, list, modal, and animation evidence with a defined regression budget.
 
-### P1 — required product decisions or structural work
+### Source acceptance completed; issue state intentionally unchanged
 
-1. **Editable transaction and recurring currency.** Both editors display the saved currency as static text. Decide the deterministic FX/base-currency behavior, then make this user-owned FIRE input editable without treating currencies as 1:1.
-2. **Milestone return override semantics ([issue #5](https://github.com/loktoto/Fire_Countdown_v2/issues/5)).** The editor persists `expectedReturnOverride`, but projection/milestone ETA does not consume it. Define and test precedence versus the portfolio-weighted return and scenarios.
-3. **Relational, round-trip export ([issue #34](https://github.com/loktoto/Fire_Countdown_v2/issues/34)).** Current CSV/TSV is a human-readable report, not a lossless backup.
-4. **Deterministic FX ledger ([issue #36](https://github.com/loktoto/Fire_Countdown_v2/issues/36)).** Required before full multi-currency aggregation or currency-edit promises can be made safely.
-5. **View-model boundary cleanup.** `TimeLens` and `FireImpactCard` still read the store directly; move screen-facing data and mutations behind view models/selectors.
-6. **Coverage expansion ([issue #31](https://github.com/loktoto/Fire_Countdown_v2/issues/31)).** Prioritize `fireStore`, settings mutation outcomes, modal interactions, quote credentials, and loading/error UI rather than inflating coverage through localization constants.
+- **Versioned recovery ([issue #6](https://github.com/loktoto/Fire_Countdown_v2/issues/6)).** All listed source acceptance criteria are implemented and automated; manual recovery UAT remains part of issue #28.
+- **Persistence mutation contract ([issue #2](https://github.com/loktoto/Fire_Countdown_v2/issues/2)).** Representative create/update/archive/preference paths and editor failure behavior are covered. The GitHub issue remains open pending maintainer/device acceptance.
+
+### P1 — product decisions or structural work
+
+1. **Editable transaction and recurring currency.** Define the deterministic FX/base-currency behavior before making these FIRE-affecting fields editable; never aggregate currencies as 1:1.
+2. **Milestone return override semantics ([issue #5](https://github.com/loktoto/Fire_Countdown_v2/issues/5)).** Define precedence versus portfolio-weighted return and scenarios, then apply it consistently to ETA/projection.
+3. **Relational, round-trip export ([issue #34](https://github.com/loktoto/Fire_Countdown_v2/issues/34)).** Current CSV/TSV and recovery JSON are not a user-facing lossless restore format.
+4. **Deterministic FX ledger ([issue #36](https://github.com/loktoto/Fire_Countdown_v2/issues/36)).** Required before full multi-currency aggregation or currency-edit promises.
+5. **View-model boundary cleanup.** `TimeLens` and `FireImpactCard` still read the store directly; move screen-facing derivation and mutations behind view models/selectors.
+6. **Coverage expansion ([issue #31](https://github.com/loktoto/Fire_Countdown_v2/issues/31)).** Prioritize recovery-modal interaction, storage/quarantine failure branches, Settings outcomes, quote credentials, and loading/error UI.
 
 ### P2 — quality and operations
 
-- Capture an on-device performance baseline and regression budget ([issue #32](https://github.com/loktoto/Fire_Countdown_v2/issues/32)).
-- Reassess the 15 upstream audit findings when Expo/Metro publish compatible fixes; do not force-downgrade the SDK.
-- Add stable Expo Doctor execution to CI only if its network-delivered metadata can be made reliable for required checks.
+- Reassess the 11 upstream audit findings when Expo/tooling ships a compatible fix; do not force-downgrade the SDK.
+- Decide whether cross-collection snapshot references need a stricter schema validator or a future repair workflow.
+- Verify platform share-cancellation semantics and temporary recovery-file cleanup on Android and iOS.
 - Complete release metadata/store readiness ([issue #33](https://github.com/loktoto/Fire_Countdown_v2/issues/33)).
 
-## Historical evidence boundary
+## Evidence boundary
 
-`docs/uat/UAT_EXECUTION_REPORT.md` contains useful evidence for its named historical branch, commit, SDK, and emulator only. It is not evidence for this 2026-08-28 integration review. Source tests and the verification matrix above are current; device UAT is explicitly blocked.
+`docs/uat/UAT_EXECUTION_REPORT.md` is historical evidence for its named branch, commit, SDK, and emulator only. It is not evidence for this integration review. Source gates above are current; the Android observations listed here are the only current-source runtime evidence, and every unfinished surface remains explicit.
 
 ## Preservation and provenance
 
-- Source instructions read first: `AGENTS.md`.
-- Pre-edit backup: `C:\Users\TOTO\Projects\Fire_Countdown_v2_backups\pm-overview-start-20260827-102509.zip` (296,149,034 bytes; 1,573 entries; outside the repository).
-- Existing tracked and untracked work was preserved and reviewed as one integration scope; no reset, destructive cleanup, native build, or EAS build was performed.
-- Product/architecture audit completed with a delegated agent. Three additional delegated Luna audit attempts hit their model usage limit; the primary agent independently ran the full automated and dependency gates above.
+- Source instructions were read first from `AGENTS.md`.
+- Pre-edit Git bundle: `C:\Users\TOTO\Projects\Fire_Countdown_v2_backups\pre-pm-fixes-20260829-114436.bundle` (8,537,798 bytes, complete history/all refs, outside the repository).
+- Earlier full workspace backup: `C:\Users\TOTO\Projects\Fire_Countdown_v2_backups\pm-overview-start-20260827-102509.zip`.
+- Existing user work was preserved; no reset, destructive cleanup, native build, or EAS build was performed.
+- A 5.6 Luna max fresh-context security architecture review completed and was reconciled against primary evidence. Other delegated Luna audit attempts hit their usage limit and are not counted as evidence.
